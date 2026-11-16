@@ -15110,6 +15110,30 @@ the lawspeaker editing cards, logs or lore directly (rulings are data,
 code applies them); a budget of its own (one key, one cap); erasing a
 belief a ruling overrides (reconciled, with its history); running with a
 key by default (off until turned on).
+
+448 amended (1) (the decision-number script's label; the coordinator's approval, 2026-11-16, and the
+coordinator's design ruling on the plea): a refused key. The box's lawspeaker has met HTTP 401 since
+11-13: each round logged "[builder] lawspeaker: HTTP 401, ..." under the builder's tag, asked again the
+next day for ever, and a "Speak for" plea whose quarrel a player had brought lapsed with the player's
+standing lost, though the lawspeaker could rule on nothing. Now (1) ClaudeClient's lines go under its
+caller's own tag (log_name: [builder] for an ask, [lawspeaker] for his rounds), the API's message bounded
+to MESSAGE_CHARS (200) on one line, and its first 401 or 403 of a run says one plain line of our own words,
+never the key and none of the API's text: "[lawspeaker] the API key is refused (HTTP 401): no rulings until
+it is mended" ("no builder answers" for the builder's); the answer carries the status. (2) After a 401 or
+403 the lawspeaker asks no more until the server restarts (Lawspeaker.stopped), every town's candidates
+kept, with one line when he stops; a 429 or a 5xx is asked again the next day, as before. (3) The
+coordinator's ruling: a plea to speak for someone whose quarrel was brought does not lapse while that
+quarrel is not yet ruled on (Offers._brought_unruled, keyed to the dispute's own state at economy's word,
+so a ruling on another quarrel meanwhile does not end its wait). It stays open, the simpler of the two the
+ruling allowed, so no new line, and closes through Offers.ruled once he rules on it. With rulings off (no
+lawspeaker sitting, or the switch off) nothing could end it, so it ends quietly (Offers._close_quietly:
+nothing said, nothing paid, no standing moved; economy, 11-16, by Jeff's bonuses, not penalties). A plea
+whose quarrel nobody brought lapses as before. Economy read the diff. Rows: lawspeaker_test
+_test_key_refused (a 529 asked again the next day; a 401 asked once and never again, the candidates kept;
+settings read again ask again) and _test_refused_line (the line once, under the caller's tag, never the
+key; a 403 that is not JSON is a refusal too); offers_test _test_quarrel_waits_on_ruling (not ruled on:
+open, standing kept; a ruling on another quarrel: still open; ruled on: closed with the notice as before;
+rulings off: ended quietly; a quarrel never brought lapses as before). Server only; protocol unchanged; no new class_name.
 ## 453. Accessibility: the interface size, the text size, distinct colours, and keys
 
 Roadmap `ui`, step 6 (the coordinator approved it as written; release asked

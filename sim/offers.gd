@@ -1677,6 +1677,10 @@ static func tick(given: Dictionary = ctx) -> void:
 		var ask: Dictionary = pair[1]
 		if now - int(ask.get("step", now)) <= (law_limit if ask.get("what", {}).has("law") else limit):
 			continue
+		if _brought_unruled(pair[0], ask, given):
+			if _law_sitting(str(ask.get("town", "")), given).is_empty():
+				_close_quietly(pair[0], ask, given)  # Rulings off: nothing could end it (economy's word, 11-16).
+			continue
 		var by := str(ask.get("by_name", "someone"))
 		var name := str(production.worker(pair[0]).get("name", pair[0]))
 		if str(ask.get("sub", "")) == OFFERING:
@@ -1686,6 +1690,29 @@ static func tick(given: Dictionary = ctx) -> void:
 			continue
 		_close(pair[0], ask, "%s never kept the promise %s: %s." % [by, "to " + name, _promise(ask)], "%s's promise to %s lapsed: %s." % [by, name, _promise(ask)], "", 1, given,
 			"errand_lapsed" if str(ask.get("kind", "")) == ERRAND else "lapsed", "let a promise lapse, %s" % _promise(ask))
+
+
+## Whether [param ask], a plea to speak for [param from_id] before the lawspeaker, waits on his ruling:
+## its quarrel was brought and is not yet ruled on (the coordinator's ruling, 11-16, keyed to the dispute's
+## own state at economy's word: with the box's key refused he rules on nothing, and a ruling on another
+## quarrel does not end this one's wait). It stays open, and closes through ruled() once he rules on it; a
+## plea whose quarrel nobody brought lapses as before.
+static func _brought_unruled(from_id: String, ask: Dictionary, given: Dictionary) -> bool:
+	var what: Dictionary = ask.get("what", {}) if ask.get("what") is Dictionary else {}
+	if str(what.get("law", "")).is_empty():
+		return false
+	var log: Variant = _call(given, "memory", [str(ask.get("town", ""))])
+	if not log is Array:
+		return false
+	return Townsfolk.dispute_of(log, from_id, str(what.get("other", ""))).get("brought") is Dictionary
+
+
+## [param ask] ended with nothing said and nothing paid, no standing moved: a brought quarrel's plea when
+## rulings are off (no lawspeaker sitting, or the switch off), which nothing could end otherwise (economy,
+## 11-16: Jeff's bonuses, not penalties). Main is told with no line, so it leaves the player's list.
+static func _close_quietly(worker_id: String, ask: Dictionary, given: Dictionary) -> void:
+	_drop_ask(given["production"], worker_id, str(ask.get("id", "")))
+	_call(given, "done", [str(ask.get("by", "")), ask, "", 0])
 
 
 ## Connects the world's signals, once per instance: the objects are held

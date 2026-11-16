@@ -41,6 +41,10 @@ You never write lore and never invent the world: no factions, history, places, g
 
 static var _settings := {}
 static var _due: Dictionary = {}
+## The HTTP status that refused the key (401 or 403), 0 while none has: after one he asks no more until
+## the server restarts, every town's candidates kept as they are (the coordinator, 11-16; a 429 or a 5xx
+## is asked again the next day, as before).
+static var stopped := 0
 ## Test hook: the last request built and the last rulings applied.
 static var last_request: Dictionary = {}
 static var last_applied: Array = []
@@ -59,6 +63,7 @@ static func settings() -> Dictionary:
 static func use_settings(given: Dictionary) -> void:
 	_settings = {}
 	_due = {}
+	stopped = 0
 	if not given.is_empty():
 		_settings = DEFAULTS.duplicate()
 		_settings.merge(given, true)
@@ -323,7 +328,7 @@ static func _note_spend(model: String, input: int, output: int) -> float:
 ## Claude budget is spent (ClaudeMind.spent), or nothing is due.
 static func tick(step: int, client: Variant, given: Dictionary = Offers.ctx) -> void:
 	var production: Production = given.get("production")
-	if production == null or client == null or not client.has_method("send"):
+	if production == null or client == null or not client.has_method("send") or stopped != 0:
 		return
 	var every := setting("every")
 	var towns := {}
@@ -363,6 +368,10 @@ static func tick(step: int, client: Variant, given: Dictionary = Offers.ctx) -> 
 			Offers._call(given, "set_lawspeaker", [town, mine])
 			MindLog.record({"kind": "ruling", "mind": "lawspeaker", "town": town, "model": model, "candidates": body.get("candidates", []),
 				"outcome": "no rulings", "error": str(response.get("error", "")), "cost": cost})
+			if int(response.get("status", 0)) in [401, 403]:
+				stopped = int(response["status"])
+				print("[lawspeaker] asks no more until the server restarts (the key refused, HTTP %d); every town's candidates wait as they are" % stopped)
+				return
 			continue
 		var fresh: Array = Offers._call(given, "memory", [town])  # Read again: talk went on while we waited.
 		var lines := apply(fresh, rulings, step, given, town)

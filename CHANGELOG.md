@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
 - In a fight your companion stays near you, chasing a foe farther only when you're fighting it too (957).
 - Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).

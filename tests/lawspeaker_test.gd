@@ -32,14 +32,16 @@ class Answer:
 	var text := ""
 	var sent: Array = []
 	var error := ""
-	func _init(words: String, fail := "") -> void:
+	var status := 0
+	func _init(words: String, fail := "", code := 0) -> void:
 		text = words
 		error = fail
+		status = code
 	func send(body: Dictionary) -> Dictionary:
 		sent.append(body.duplicate(true))
 		await Engine.get_main_loop().process_frame
 		if not error.is_empty():
-			return {"error": error}
+			return {"error": error, "status": status} if status != 0 else {"error": error}
 		return {"model": body.get("model", ""), "stop_reason": "end_turn", "usage": {"input_tokens": 900, "output_tokens": 120},
 			"content": [{"type": "text", "text": text}], "request_id": "req_test"}
 
@@ -50,6 +52,8 @@ func _ready() -> void:
 	_test_apply()
 	await _test_round()
 	await _test_failures()
+	await _test_key_refused()
+	_test_refused_line()
 	_test_remembered_in_voice()
 	_test_proposed_page()
 	_test_rounds()
@@ -228,6 +232,54 @@ func _test_failures() -> void:
 	await Lawspeaker.tick(_now + 200, fine, _ctx)
 	_check(fine.sent.is_empty() and TownMemory.of_tier(_logs[TOWN], TownMemory.CANDIDATE).size() == 3, "the session's budget spent: not asked")
 	ClaudeMind.calls = spent_before
+
+
+## The box's key refused (the coordinator, 11-16): after a 401 he asks no more until the server restarts,
+## the candidates kept; a 529 is asked again the next day, as before.
+func _test_key_refused() -> void:
+	print("\n== a refused key stops his rounds till a restart; an overload is asked again ==")
+	_setup()
+	_logs[TOWN] = _log_with_candidates()
+	var busy := Answer.new("", "HTTP 529: overloaded", 529)
+	await Lawspeaker.tick(_now, busy, _ctx)
+	await Lawspeaker.tick(_now + 100, busy, _ctx)
+	_check(busy.sent.size() == 2 and Lawspeaker.stopped == 0, "a 529: asked again the next day (%d asked)" % busy.sent.size())
+	var refused := Answer.new("", "HTTP 401: invalid x-api-key", 401)
+	await Lawspeaker.tick(_now + 200, refused, _ctx)
+	_check(refused.sent.size() == 1 and Lawspeaker.stopped == 401 and _records[TOWN]["failed"] == "HTTP 401: invalid x-api-key", "a 401: asked once, the record says why")
+	await Lawspeaker.tick(_now + 300, refused, _ctx)
+	await Lawspeaker.tick(_now + 900, refused, _ctx)
+	_check(refused.sent.size() == 1, "and never again while the server runs (%d asked)" % refused.sent.size())
+	_check(TownMemory.of_tier(_logs[TOWN], TownMemory.CANDIDATE).size() == 3 and _notes.is_empty(), "the candidates wait as they were, the town told nothing")
+	Lawspeaker.use_settings({"every": 100, "rest_days": 7, "max_candidates": 12, "max_tokens": 500, "lore_facts": 4})
+	_check(Lawspeaker.stopped == 0, "a restart (settings read again) asks again")
+
+
+## ClaudeClient's refused key (the coordinator, 11-16): one plain line of our own under the caller's tag,
+## the first 401 or 403 of a run only, never the key; the API's message bounded in its HTTP line.
+func _test_refused_line() -> void:
+	print("\n== a refused key said once, in our words, never the key ==")
+	var client := ClaudeClient.new()
+	client.api_key = "test-key-not-real"
+	client.log_name = "lawspeaker"
+	client.refused_stops = "no rulings until it is mended"
+	var body := '{"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key %s"}}' % "x".repeat(400)
+	var done := [HTTPRequest.RESULT_SUCCESS, 401, PackedStringArray(["request-id: req_test"]), body.to_utf8_buffer()]
+	var answer: Dictionary = client._answered(done, {}, Time.get_ticks_msec())
+	_check(client.refusals_said == 1 and client.refused == 401
+		and client.refused_line == "[lawspeaker] the API key is refused (HTTP 401): no rulings until it is mended",
+		"the first 401: one line, his tag, our words: %s" % client.refused_line)
+	_check(not client.refused_line.contains(client.api_key) and not str(answer).contains(client.api_key), "the key in neither the line nor the answer")
+	_check(int(answer.get("status", 0)) == 401 and str(answer.get("error", "")).length() <= ClaudeClient.MESSAGE_CHARS + 12, "the answer carries the status, its message bounded (%d chars)" % str(answer.get("error", "")).length())
+	client._answered(done, {}, Time.get_ticks_msec())
+	client._answered([HTTPRequest.RESULT_SUCCESS, 403, PackedStringArray(), "<html>no</html>".to_utf8_buffer()], {}, Time.get_ticks_msec())
+	_check(client.refusals_said == 1 and client.refused == 401, "a second refusal, or a 403 after it, says nothing more")
+	var fresh := ClaudeClient.new()
+	var not_json: Dictionary = fresh._answered([HTTPRequest.RESULT_SUCCESS, 403, PackedStringArray(), "<html>forbidden</html>".to_utf8_buffer()], {}, Time.get_ticks_msec())
+	_check(fresh.refused == 403 and fresh.refused_line.begins_with("[builder] the API key is refused (HTTP 403)") and int(not_json.get("status", 0)) == 403,
+		"a 403 that is not JSON is a refusal too, the builder's tag by default: %s" % fresh.refused_line)
+	client.free()
+	fresh.free()
 
 
 func _test_remembered_in_voice() -> void:

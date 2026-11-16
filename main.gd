@@ -16443,7 +16443,8 @@ func _make_lawspeaker() -> void:
 	if _lawspeaker_client != null or not Net.is_authority() or Net.lawspeaker in ["", "off", "no", "false", "0"]:
 		return
 	var client := ClaudeClient.new()
-	client.log_tag = "lawspeaker"
+	client.log_name = "lawspeaker"
+	client.refused_stops = "no rulings until it is mended"
 	add_child(client)
 	_lawspeaker_client = client
 	print("[lawspeaker] on: %s, one round a town a day; players' words %s" % [str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),

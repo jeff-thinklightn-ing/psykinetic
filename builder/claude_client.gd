@@ -28,6 +28,19 @@ var api_key := ""
 var workspace_id := ""
 ## Logged with each request (the player who asked, the level).
 var log_tag := ""
+## The tag this client's lines go under: [builder] for builder mode's asks, [lawspeaker] for his rounds
+## (decision 448), so a line names who asked.
+var log_name := "builder"
+## What a refused key stops, in the one plain line its first refusal prints (the coordinator, 11-16).
+var refused_stops := "no builder answers until it is mended"
+## The HTTP status of this run's first 401 or 403 (the key refused), 0 for none: said once, in a line of
+## our own words, never the key and none of the API's text.
+var refused := 0
+## The refused line as said, and how many times (once a run; tests read them).
+var refused_line := ""
+var refusals_said := 0
+## An error message from the API as logged: bounded.
+const MESSAGE_CHARS := 200
 
 
 func _ready() -> void:
@@ -72,6 +85,12 @@ func send(body: Dictionary) -> Dictionary:
 		return {"error": "could not send (%s)" % error_string(error)}
 	var done: Array = await http.request_completed
 	http.queue_free()
+	return _answered(done, body, started)
+
+
+## The answer to a request: [param done] (request_completed's result, code, headers and body), for
+## [param body] sent at [param started] (msec). Logged as each request is; a refused key said once.
+func _answered(done: Array, body: Dictionary, started: int) -> Dictionary:
 	var result: int = done[0]
 	var code: int = done[1]
 	var text: String = (done[3] as PackedByteArray).get_string_from_utf8()
@@ -82,19 +101,31 @@ func send(body: Dictionary) -> Dictionary:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		return {"error": "timed out" if result == HTTPRequest.RESULT_TIMEOUT else "no answer (%d)" % result}
 	var json := JSON.new()
-	if json.parse(text) != OK or not json.data is Dictionary:
+	var answered := json.parse(text) == OK and json.data is Dictionary
+	if code != 200:
+		var message: String = str(json.data["error"].get("message", text)) if answered and json.data.get("error") is Dictionary else text
+		message = message.replace("\r", " ").replace("\n", " ").left(MESSAGE_CHARS)
+		print("%sHTTP %d, request %s: %s" % [_line_head(), code, request_id, message])
+		if code in [401, 403] and refused == 0:
+			refused = code
+			refused_line = "[%s] the API key is refused (HTTP %d): %s" % [log_name, code, refused_stops]
+			refusals_said += 1
+			print(refused_line)
+		return {"error": "HTTP %d: %s" % [code, message], "status": code}
+	if not answered:
 		return {"error": "HTTP %d, not JSON" % code}
 	var response: Dictionary = json.data
-	if code != 200:
-		var message: String = str(response.get("error", {}).get("message", text.left(200))) if response.get("error") is Dictionary else text.left(200)
-		print("[builder] %s: HTTP %d, request %s: %s" % [log_tag, code, request_id, message])
-		return {"error": "HTTP %d: %s" % [code, message]}
 	var used: Dictionary = response.get("usage", {})
 	var model := str(response.get("model", body.get("model", DEFAULT_MODEL)))
-	print("[builder] %s %s (request %s): %d in, %d out, %d cache read, %d cache write, $%.4f, %.1f s, %s" % [log_tag, model, request_id,
+	print("%s%s (request %s): %d in, %d out, %d cache read, %d cache write, $%.4f, %.1f s, %s" % [_line_head(), model, request_id,
 		int(used.get("input_tokens", 0)), int(used.get("output_tokens", 0)), int(used.get("cache_read_input_tokens", 0)),
 		int(used.get("cache_creation_input_tokens", 0)),
 		cost(model, int(used.get("input_tokens", 0)), int(used.get("output_tokens", 0)),
 			int(used.get("cache_read_input_tokens", 0)), int(used.get("cache_creation_input_tokens", 0))),
 		(Time.get_ticks_msec() - started) / 1000.0, response.get("stop_reason", "")])
 	return response
+
+
+## "[builder] <the asker>: ", or "[lawspeaker] " with no tag: what each request's line starts with.
+func _line_head() -> String:
+	return "[%s] %s" % [log_name, log_tag + ": " if not log_tag.is_empty() else ""]

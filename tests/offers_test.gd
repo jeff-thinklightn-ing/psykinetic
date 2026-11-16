@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_accept_and_meet()
 	_test_errand()
 	_test_quarrel()
+	_test_quarrel_waits_on_ruling()
 	_test_walk_home()
 	_test_sick_pleas()
 	_test_care()
@@ -778,6 +779,71 @@ func _test_give() -> void:
 	_check(not bool(late["ok"]) and str(late["line"]).is_empty() and str(late.get("say", "")) == Offers.PAID_ALREADY and _purse == 60 and _given.size() <= counted + 1,
 		"a yes after the fund was met: no gold taken, and the words say it's paid (914 amended (1)): %s" % [late])
 	Offers.ctx = _ctx
+
+
+## The coordinator's ruling (11-16, with the box's key refused since 11-13), keyed to the dispute at
+## economy's word: a plea to speak for someone whose quarrel was brought does not lapse while it is not yet
+## ruled on, whatever else he rules; ruled on, it closes as before; with rulings off it ends quietly; a plea
+## whose quarrel nobody brought lapses as before.
+func _test_quarrel_waits_on_ruling() -> void:
+	print("\n== a brought quarrel waits on the lawspeaker's ruling, not the days ==")
+	_setup([["o-mara", "Mara", "smith"], ["o-bram", "Bram", "hauler"], ["o-tam", "Tam", "hauler"], ["o-wyn", "Wyn", "cook"], ["o-law", "Hrolf", "lawspeaker"]])
+	_log = []
+	_law = "o-law"
+	_model = "claude-haiku-5-5"
+	_ctx["memory"] = func(_town: String) -> Array: return _log.duplicate(true)
+	_ctx["set_memory"] = func(_town: String, log: Array) -> void: _log = log.duplicate(true)
+	_ctx["lawspeaker_of"] = func(_town: String) -> String: return _law
+	_ctx["model"] = func() -> String: return _model
+	_grudge("o-mara", "o-bram")
+	Townsfolk.note_disputes(_work, TOWN, _log, _now)
+	var mine := _offers()
+	Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	Offers.spoke_to("p1", "o-law", _ctx)
+	var standing := Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1")
+	_check(not _log.is_empty() and _log[0].get("brought") is Dictionary, "laid before him")
+	_now = 60 * DayNight.day_steps  # Far past any lapse.
+	Offers.tick(_ctx)
+	_check(_done.is_empty() and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1
+		and Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") == standing,
+		"not ruled on: the plea stays open, Jeff's standing as it was (%d): %s" % [Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1"), _done])
+	# He rules on another quarrel meanwhile: this one still waits.
+	_grudge("o-tam", "o-bram")
+	Townsfolk.note_disputes(_work, TOWN, _log, _now)
+	var other := Townsfolk.dispute_of(_log, "o-tam", "o-bram")
+	Lawspeaker.apply(_log, [{"candidate": other.get("id", ""), "ruling": "leave", "because": "test"}], _now, _ctx, TOWN)
+	Offers.tick(_ctx)
+	_check(not other.is_empty() and _done.is_empty() and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1, "a ruling on another quarrel: this plea still waits")
+	# Ruled on: closed as before, the notice and the pay.
+	var open := Townsfolk.dispute_of(_log, "o-mara", "o-bram")
+	Lawspeaker.apply(_log, [{"candidate": open.get("id", ""), "ruling": "leave", "because": "test"}], _now, _ctx, TOWN)
+	_check(_done.size() == 1 and str(_done[0][2]).begins_with("The lawspeaker has ruled on Mara's quarrel with Bram") and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(),
+		"ruled on: it closes as it did, with the notice: %s" % [_done])
+	# Rulings off with a brought quarrel's plea open: it ends quietly, no line, no standing moved.
+	_done.clear()
+	_grudge("o-mara", "o-tam")
+	Townsfolk.note_disputes(_work, TOWN, _log, _now)
+	var again := _offers()
+	Offers.accept("o-mara", "p1", "Jeff", again[0]["id"] if not again.is_empty() else "", 0, _ctx)
+	Offers.spoke_to("p1", "o-law", _ctx)
+	standing = Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1")
+	_model = "off"
+	_now = 120 * DayNight.day_steps
+	Offers.tick(_ctx)
+	_check(not again.is_empty() and _done.size() == 1 and str(_done[0][2]).is_empty() and int(_done[0][3]) == 0 and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty()
+		and Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") == standing,
+		"rulings off: the plea ends quietly, nothing said, nothing paid, standing as it was: %s" % [_done])
+	_model = "claude-haiku-5-5"
+	# Taken and never brought: it lapses as before.
+	_done.clear()
+	_grudge("o-wyn", "o-bram")
+	Townsfolk.note_disputes(_work, TOWN, _log, _now)
+	var tams := _offers("o-wyn")
+	Offers.accept("o-wyn", "p1", "Jeff", tams[0]["id"] if not tams.is_empty() else "", 0, _ctx)
+	_now = 180 * DayNight.day_steps
+	Offers.tick(_ctx)
+	_check(not tams.is_empty() and tams[0]["what"].has("law") and _done.size() == 1 and str(_done[0][2]).begins_with("Jeff's promise to Wyn lapsed"),
+		"a quarrel never brought: the plea lapses as before: %s" % [_done])
 
 
 func _test_lapse() -> void:
