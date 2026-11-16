@@ -35454,6 +35454,36 @@ lays the grey's, at points through her swing, some catching her and never most, 
 held. _test_dodge: a read told bite during her swing's stand, no dodge till the stand is done, then
 she steps; a spin mid-swing dodged at once. Server only, protocol unchanged, no new class_name; no bullet (it rides the told
 bite's).
+
+663 amended (3): DODGE_REACT_PLAIN 7, read from the tell's laying (the coordinator's stopgap, 11-16,
+on its own ruling, until Jeff's pick on C:/dev/review/decisions/companion-in-a-fight.md; dropped if
+he picks C). Enemy-ai's along row (the told bite on main, C:/dev/review/enemy-ai/grey/bitetell/along_main/README.md)
+showed her harmless to his bite at 6: she is a grid body, her struck cell her tile, which changes as her
+step begins, so a read on tick 6 of the bite's 7-tick lead left every bite at her with a tick to spare
+(companions' probe, C:/dev/review/companions/along_dodge_probe.md: 0 of about 48 landed a cell; she
+took 0.00 to 0.16 a fight along). At 7 about a quarter land; at 8 nearly all (main's untold figures).
+The player's own harm and the wins along do not move with her read. The plain tells are still
+["bite"], and his is the only plain told blow in the game, so no other lead was checked against it,
+and the stopgap is exactly as wide as his bite: until enemy-ai's told bite is on main nothing in play
+reads the number at all. Nothing of companion-in-a-fight's temperament range is built.
+Why from the laying (enemy-ai's finding, from the code): the grey lays his bite in his own act at tick
+T, and it lands after every act of T+7. She acts in the zone's order (the order bodies were added), so
+she first notices it at T if she acts after him and at T+1 if before: a grey in the zone before her
+gave her 7 ticks from first sight, one laid after her (Apex) 6, and at 7 the second read each bite only
+as it landed. How well she reads a blow must not turn on who came into the zone first. So when she
+first notices a plain tell on the tick it was laid or the one after, her read counts from its own
+from_tick (World.telegraph's); one that comes into her sight later counts from her sight, as before,
+with no head start on a blow she could not have seen. Every other tell keeps counting from her
+sight (bosses', apex moves, lunges at DODGE_REACT). companion_test's told-bite fight row (16 bites
+laid between steps at 7) is unchanged and now matches both orders.
+Figures (scratch, on enemy-ai's dd7667b21 with this; monster_test's along row, 32 starts each):
+the grey spawned first, her harm 1.56 / 1.88 / 1.09 a fight careless (fists, dagger, sword) and 1.56 /
+1.56 / 1.09 reader, 18 to 26% of the bites at her landing; she spawned first, 1.41 / 1.41 / 1.41 and
+1.41 / 1.56 / 1.41, 15 to 20%; never down, every fight won. A bite she first notices the tick after its
+laying is read 7 after its from_tick; one first noticed 2, 3 or 5 ticks after it, 7 after her sight.
+companion_test's row: 2 of 16 caught at 7, 0 of 16 at 6 (it fails, as main's 6 is untouchable).
+Server only, protocol unchanged, no new class_name; no bullet.
+
 ## 548 amended, enemy-ai's side: paid once, a payer fights the draugr again for no gold till won
 
 Jeff picked (b): "as long as you paid once you get unlimited attempts". The

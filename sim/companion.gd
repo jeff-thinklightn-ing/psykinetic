@@ -1205,8 +1205,11 @@ const DODGE_WARY := 2
 ## ticks (the player's middle react), DODGE_WARY more when wary: no danger
 ## cells, no dodge, no going round behind its maker (_unread). 663's
 ## DODGE_REACT read every one of his bites. Every other tell (bosses', apex
-## moves, lunges) keeps DODGE_REACT.
-const DODGE_REACT_PLAIN := 6
+## moves, lunges) keeps DODGE_REACT. 7, not the player's 6 (663 amended (3),
+## the coordinator's stopgap until Jeff's pick on companion-in-a-fight): a
+## grid body clears its cell as its step begins, so at 6 she left every bite
+## at her with a tick to spare; at 7 about a quarter of them land.
+const DODGE_REACT_PLAIN := 7
 const DODGE_REACH := 3
 ## The cells a dodge's way is looked for in at most (685): the square two
 ## cells wider than DODGE_REACH round her.
@@ -7391,6 +7394,14 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 			continue
 		if not _dodge_seen.has(id):
 			_dodge_seen[id] = World.tick
+			# A plain tell counts from its laying (663 amended (3)): laid in its
+			# maker's act, it is seen that tick if she acts after him in the
+			# step and a tick later if before (the zone's order, enemy-ai's
+			# finding), and her read must not turn on who came into the zone
+			# first. One come into her sight later counts from her sight.
+			var laid := int(data.get("from_tick", World.tick))
+			if str(data.get("kind", "")) in plain and World.tick - laid <= 1:
+				_dodge_seen[id] = laid
 		var read := World.tick - int(_dodge_seen[id]) >= _react_to(data, plain)
 		if not read and str(data.get("kind", "")) in plain:
 			continue  # A plain told blow not yet read (663 amended (2)).
