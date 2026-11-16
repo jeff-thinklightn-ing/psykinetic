@@ -4770,6 +4770,24 @@ func _eye_in_box(chest: Vector3, full: Vector3, least_m: float) -> bool:
 	return false
 
 
+## What the look ahead found at [param degrees] of yaw, for the log: the building whose box the eye is predicted in, how many seconds on along
+## the walk's line, and how far inside the box face the eye is; "" when it is in none.
+func _box_why(degrees: float, ahead: float) -> String:
+	var full := _camera_offset_at(degrees) / maxf(_box_pull, 0.001)
+	var base := _camera_target + Vector3.UP * BOX_PULL_CHEST
+	var walk := _box_walk()
+	var steps := int(ahead / BOX_LOOK_STEP) if walk.length() >= BOX_WALK_MIN else 0
+	for i in steps + 1:
+		var chest := base + walk * (BOX_LOOK_STEP * i)
+		var eye := chest + full * _clear_share(chest, full, BOX_PULL_LEAST)
+		for building: Dictionary in _buildings:
+			var box := _eye_box(building)
+			if box.size != Vector3.ZERO and not box.has_point(chest) and box.has_point(eye):
+				var inside := minf(minf(eye.x - box.position.x, box.end.x - eye.x), minf(eye.z - box.position.z, box.end.z - eye.z))
+				return "%s at +%.1f s, the eye %.1f m inside its box" % [building.get("code", building.get("slot", "?")), BOX_LOOK_STEP * i, inside]
+	return ""
+
+
 ## How far the player stands from the nearest roofed building's box on the ground (metres; INF with none).
 func _box_nearest() -> float:
 	var at := _camera_target
@@ -22612,7 +22630,7 @@ func _box_turn(delta: float, manual: bool, on: bool) -> void:
 		return
 	_box_close = false
 	_turn_view.start(yaw, target, CameraTurn.BOX_STAND_SPEED if standing else CameraTurn.TURN_SPEED, true)
-	print("[camera] box turn: yaw %.0f to %.0f (rung %s), eye boxed %.1f s, walking %.1f m/s" % [yaw, target, rung, _turn_view.boxed_for, _walk.length()])
+	print("[camera] box turn: yaw %.0f to %.0f (rung %s), eye boxed %.1f s, walking %.1f m/s, predicted %s" % [yaw, target, rung, _turn_view.boxed_for, _walk.length(), _box_why(yaw, BOX_TRIGGER_AHEAD)])
 
 
 ## Where the local player and their companion are, at FADE_HEIGHTS: as
