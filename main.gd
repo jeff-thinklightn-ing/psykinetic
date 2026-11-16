@@ -17628,6 +17628,11 @@ func _inn_entry(who: String, town: String, places: Dictionary) -> Dictionary:
 	var entry := {"key": who, "name": person["name"], "trade": person["trade"], "player": "", "town": town, "type": person["type"], "places": places}
 	if person.has("look_trade"):
 		entry["look_trade"] = person["look_trade"]
+	# His body's kind on the floor as in the street (decision 471, as _sync_residents gives it): Snagfin is drawn
+	# the goblin he is indoors too (ui-design's evening watch, 11-16: a kind-less body is drawn human).
+	var settled := Townsfolk.settled()
+	if settled.has(who) and not str(settled[who].get("kind", "")).is_empty():
+		entry["kind"] = str(settled[who]["kind"])
 	return entry
 
 

@@ -27,6 +27,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 	_test_first_room()
 	_test_settled_at_boot()
+	_test_settled_kind_indoors()
 	_test_shell_roof()
 	await _test_out_of_shell()
 	print("")
@@ -52,6 +53,23 @@ func _test_settled_at_boot() -> void:
 		_check(World.steps < World.WORLD_TICK_STEPS and not World.production.worker(id).is_empty() and id in World.towns.residents(town),
 			"%s a resident of %s at step %d" % [table[id].get("name", id), town, World.steps])
 
+
+## 875 on the four-piece (ui-design's evening watch, 11-16; the coordinator's ruling): a settled person's body on an inn's
+## floor keeps his kind as in the street (decision 471): Snagfin is the goblin indoors, not a kind-less body drawn human.
+func _test_settled_kind_indoors() -> void:
+	print("
+== a settled person on the Mughouse's floor keeps his kind (Snagfin, the goblin) ==")
+	var table := Townsfolk.settled()
+	_check(table.has("snagfin") and str(table["snagfin"].get("kind", "")) == "imp", "(residents.json has Snagfin, kind imp)")
+	if not table.has("snagfin"):
+		return
+	var entry: Dictionary = _main._inn_entry("snagfin", str(table["snagfin"].get("town", "")), {})
+	_check(str(entry.get("kind", "")) == "imp", "his floor entry carries kind %s" % [entry.get("kind", "-")])
+	var body := Resident.new()
+	body.spawn_spec = {"kind": str(entry.get("kind", ""))}
+	var model: Dictionary = Client3D.model_for(body)
+	body.free()
+	_check(str(model.get("scene", "")).ends_with("goblin.glb"), "and his body is drawn from the goblin's scene (%s)" % [model.get("scene", "-")])
 
 func _test_first_room() -> void:
 	print("\n== a view's first room, before any rebuild (782 amended (2)) ==")

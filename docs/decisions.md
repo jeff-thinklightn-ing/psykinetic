@@ -56103,6 +56103,17 @@ him in from INN_TRADERS_DAY's end and he walks out of its door to his stand at i
 built), so with spots on its floor the row's due runs from his first sample on his stand (within 0.25 h of
 6:00) to 18:00: 726 of 726 samples at (203,196), WORK. Levels data, a decor kind, builder's seat reading;
 server and client data only, protocol unchanged; no new class_name.
+The evening watched joined (ui-design's, on 33ed0b2a0, the Atlas, C:/dev/review/ui-design/looks/eve_33ed0b2a0; the
+coordinator's acceptance, 11-16): seven sit and two stand at 19:00, a stool under every sitter, SCRIPT ERROR 0. Hips
+against the stool's top: the rule is "within 3 cm for the two human bodies; other rigs by still". Hazel read +4.2 cm on
+(5,7), where Agnes on the same stool read +0.7, and the coordinator passed it on the stills. The same watch found the
+body under Snagfin's name drawn as a full-size man: an inn floor's body was made by Main._inn_entry, which never copied
+residents.json's settled "kind" (the wilds' _sync_residents does, decision 471), and Client3D.model_for draws a kind-less
+Resident human. Since this take is what sends the evening crowd in, it carries the mend (the coordinator's ruling):
+_inn_entry copies the settled kind, so Snagfin is the goblin ("imp") on the floor as in the street. first_room_test:
+his floor entry carries kind "imp", and model_for gives the goblin's scene. The landing waits for ui-design's joined
+still of him seated at the nearest zoom; if a 1.2 m body sits a 0.45 m stool wrongly, he stands by the fire and takes
+no stool until animation gives his rig a sit that fits.
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...
