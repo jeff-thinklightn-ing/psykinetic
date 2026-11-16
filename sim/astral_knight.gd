@@ -19,6 +19,11 @@ const ASK_WORDS := "I am %s, a knight of Theus, and my bones lie beneath the tem
 const ASK_UNNAMED := "I am a knight of Theus, and my bones lie beneath the temple, held by the draugr. The Mound-breakers dig for them, to sell them. Put down every one of them, and prove your strength. Then I will show you the way below."
 const NOT_YET_TITLE := "Not yet"
 const NOT_YET := "Some of the Mound-breakers still dig. Put them all down, then come back to me."
+## NOT_YET's place once after a fall (the coordinator, 11-16, voice's words, lore: no new
+## fact): a player with the task open who fell in the band's zone hears it at their next
+## greeting of him (Main._on_downed sets fallen; Main._monster_greeted marks it said, and
+## clears it at the greeting after, so the window asked between shows it too).
+const FELL := "The Mound-breakers are many, and you are one. Take them a few at a time. Every one you have put down, I hold counted."
 const TURN_IN_TITLE := "The robbers are put down"
 const TURN_IN_WORDS := "The Mound-breakers are put down."
 const REVEALED := "Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest."
@@ -50,6 +55,10 @@ const LAID_UNBLESSED := "You have not yet stood before what waits below. Keep th
 ## Main.altar_turn_in's mirror (its setter): the altar step on (on since
 ## 896's switch-on, as Main's).
 static var altar_on := true
+## The players (by id) who fell in the band's zone with his task open (FELL): true till
+## their next greeting of him says it, false once said (his window still shows it), gone
+## at the greeting after. Main's, kept in memory only.
+static var fallen := {}
 ## His remains laid on his altar this generation, by anyone (896): art-kit's
 ## piece lies on the bier while it is true. Kept in his spawn props, so a
 ## restart keeps it and a new generation (a new spawn) clears it.
@@ -89,7 +98,7 @@ func threatens(_entity: GridEntity) -> bool:
 func offers_for(player_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var at := _quest(player_id)
-	var step: Array = {"ask": [":ask", ASK_TITLE, ask_words(), "take"], "open": [":not_yet", NOT_YET_TITLE, NOT_YET, "take"],
+	var step: Array = {"ask": [":ask", ASK_TITLE, ask_words(), "take"], "open": [":not_yet", NOT_YET_TITLE, FELL if fallen.has(player_id) else NOT_YET, "take"],
 		"ready": [":turn_in", TURN_IN_TITLE, TURN_IN_WORDS, "take"], "altar": [":await", "", AWAIT, WORDS_ONLY],
 		"carried": [":lay", LAY_TITLE, LAY_WORDS, "take"]}.get(at, [])
 	if step.is_empty() and at.is_empty() and _quest_known(player_id):

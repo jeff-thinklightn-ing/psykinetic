@@ -44307,6 +44307,25 @@ record sits 15 cells from the host's start: at 9 the host's own join recall at l
 (RECALL_JOIN_NOW_TILES, 12) brought him back, the same way a fixture with its player near the
 place hides the record path. Main.knights_set_on_marker counts (13)'s line for the test. Tests
 and server (a counter); protocol unchanged; no new class_name.
+
+747 amended (15): the knight's line after a fall (the coordinator, 11-16: passed now, landing
+first and alone, since the ladder it tells is on main already and nobody says it; voice's words,
+lore: no new fact; label from tools/decision_number.sh; package none). A player who falls (Main's
+World.entity_downed, _on_downed, through note_barrow_fall) in the band's zone (the economy's
+robbers.barrow) with the task open is kept in AstralKnight.fallen (by player id, in memory only),
+and at their next greeting of him his "open" step's words are AstralKnight.FELL ("The
+Mound-breakers are many, and you are one. Take them a few at a time. Every one you have put down,
+I hold counted.") in place of NOT_YET. Main._monster_greeted marks it said once he has spoken
+(false) and clears it at their greeting after, so it is said once a fall and his window, which the
+client asks for again just after the greeting (its "offers"), shows the same words; the first
+joined run, with the mark cleared at the greeting itself, heard the line said and read "not yet"
+in his window. A fall elsewhere, or with the task not taken, ready or done, sets nothing. In memory
+only: a server restart between a player's fall and their next talk to him loses the line, and he
+says "not yet" as before. level_test's knight row: a fall outside the barrow "not yet", in it FELL,
+the greeting says it and his window after it reads it, the greeting after "not yet" again. The
+joined barrow tour (playtest's, its row with the route change): after the first fall with the
+task open his window and the line said read FELL word for word, the greeting after "not yet", and
+before any fall it was never heard. Server only; protocol unchanged; no new class_name.
 ## 623 amended (2), environment's side: the weather under the closer camera
 
 ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.

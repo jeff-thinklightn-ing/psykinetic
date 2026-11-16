@@ -13,6 +13,7 @@ notes (decision 324).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and there's low talk among the townsfolk inside (920).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
+- In the crypt, after you fall with the fallen knight's task open, the next time you talk to him he tells you to take the Mound-breakers a few at a time, and that those you have put down stay counted (747 amended (15)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).

@@ -14083,9 +14083,18 @@ func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
 		player.heart_debt = 0.0
 		Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": ("You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back." if _blessed(entity)
 			else "You are mortally wounded, and nobody here can save you. When you bleed out, you will be brought back.")})
+		note_barrow_fall(player)
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and (pet.keeper == entity or pet == entity):
 			pet.note_downed(entity == pet.keeper)
+
+
+## [param player] fell: in the band's zone with the fallen knight's task open, his
+## AstralKnight.FELL in place of "not yet" at their next greeting of him (747 amended (15)).
+func note_barrow_fall(player: Player) -> void:
+	var band_zone := str(World.economy.rules.get("robbers", {}).get("barrow", "")) if World.economy != null else ""
+	if not band_zone.is_empty() and player.zone == band_zone and barrow_quest_of(player.player_id) == "open":
+		AstralKnight.fallen[player.player_id] = true
 
 
 ## The peers of the other players in [param player]'s zone, each once (914): a friend
@@ -22989,6 +22998,8 @@ func _monster_greeted(player: Player, monster: GridEntity) -> void:
 		return
 	var key := String(monster.get_path())
 	var name := _speaker_name(monster)
+	if monster is AstralKnight and AstralKnight.fallen.get(player.player_id) == false:
+		AstralKnight.fallen.erase(player.player_id)  # His FELL said at the greeting before: "not yet" again.
 	var offers: Array = monster.offers_for(player.player_id)
 	Transcript.record(name, _display_name(player), "[greets]")
 	if offers.is_empty():
@@ -23003,6 +23014,10 @@ func _monster_greeted(player: Player, monster: GridEntity) -> void:
 		if str(offers[i].get("id", "")) == str(standing.get("id", "")):
 			pick = offers[(i + 1) % offers.size()]
 	_speak_offer(monster, key, name, player, pick)
+	if monster is AstralKnight and AstralKnight.fallen.has(player.player_id):
+		# His FELL said once after a fall: kept (false) till their next greeting, so the
+		# window's offers asked after this one (the client's "offers") carry it too.
+		AstralKnight.fallen[player.player_id] = false
 
 
 ## The "offers" message for a talking monster: its offers_for, under its

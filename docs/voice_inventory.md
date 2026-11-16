@@ -3002,7 +3002,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | He rests. Come back in %d day%s. | `sim/draugr.gd` rest_words() |
 |  | He rests. Come back in %d minute%s. | `sim/draugr.gd` rest_words() |
 
-### the fallen knight (27)
+### the fallen knight (28)
 
 | | Line | Where |
 |---|---|---|
@@ -3010,6 +3010,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | I am %s, a knight of Theus, and my bones lie beneath the temple, held by the draugr. The Mound-breakers dig for them, to sell them. Put down every one of them, and prove your strength. Then I will show you the way below. | `sim/astral_knight.gd` ASK_WORDS |
 |  | I am a knight of Theus, and my bones lie beneath the temple, held by the draugr. The Mound-breakers dig for them, to sell them. Put down every one of them, and prove your strength. Then I will show you the way below. | `sim/astral_knight.gd` ASK_UNNAMED |
 | L | Some of the Mound-breakers still dig. Put them all down, then come back to me. | `sim/astral_knight.gd` NOT_YET |
+|  | The Mound-breakers are many, and you are one. Take them a few at a time. Every one you have put down, I hold counted. | `sim/astral_knight.gd` FELL |
 |  | The robbers are put down | `sim/astral_knight.gd` TURN_IN_TITLE |
 | L | The Mound-breakers are put down. | `sim/astral_knight.gd` TURN_IN_WORDS |
 | L | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest. | `sim/astral_knight.gd` REVEALED |

@@ -7054,6 +7054,25 @@ func _test_barrow_quest() -> void:
 		"%s felled twice more (risen): on the list once, checked (%s)" % [band[1], record.barrow_task])
 	slay.call(band[2], null)
 	_check(not (band[2] in record.barrow_task.get("slain", [])), "a kill not theirs is not on their list")
+	# 747 amended (15) (the coordinator, voice's words): a fall in the band's zone with the task
+	# open, and his next greeting says FELL in place of "not yet", once.
+	var home_zone := player.zone
+	AstralKnight.fallen.erase(id)
+	_main.note_barrow_fall(player)
+	var outside_fall := str(knight.offers_for(id)[0]["words"])
+	player.zone = "barrow"
+	_main.note_barrow_fall(player)
+	player.zone = home_zone
+	var after_fall := str(knight.offers_for(id)[0]["words"])
+	_main._monster_greeted(player, knight)
+	var greeted_said: Array = _main.party_log.last(1)
+	var window_after := str(knight.offers_for(id)[0]["words"])
+	_main._monster_greeted(player, knight)
+	var next_said: Array = _main.party_log.last(1)
+	_check(outside_fall == AstralKnight.NOT_YET and after_fall == AstralKnight.FELL and str(greeted_said).contains(AstralKnight.FELL)
+		and window_after == AstralKnight.FELL and str(next_said).contains(AstralKnight.NOT_YET)
+		and str(knight.offers_for(id)[0]["words"]) == AstralKnight.NOT_YET and not AstralKnight.fallen.has(id),
+		"a fall elsewhere: \"not yet\"; in the barrow: FELL at the next greeting, his window asked after it the same, the greeting after \"not yet\" (%s, %s)" % [greeted_said, next_said])
 	var old := record.to_dict()
 	old.erase("barrow_task")
 	_check(PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict()))).barrow_task == record.barrow_task
