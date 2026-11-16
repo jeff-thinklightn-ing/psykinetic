@@ -27245,6 +27245,70 @@ the player standing in it) is read with the Vault's reshoot; if it reads as a po
 moved ones become not laid. Level data and the generator; protocol unchanged; no new class_name;
 the Vault's bullet stays held (608 amended (4)'s, its words after the stills); none for the barrow.
 
+608 amended (6), dungeon's side: the default camera's corner, one rule for every crypt torch (the
+decision-number script's label; the coordinator's rulings of 11-15 on ui-design's torch7,
+C:/dev/review/ui-design/looks/torch7_24b30d62c/, barrow generation 1 joined from (19,7) at the
+nearest zoom, and on torch6b read again post by post). (5)'s south edge was half the rule. torch7
+drew (17,7) whole but no post or flame at (24,7): its own east wall, the void block (25..27,7),
+stands between it and the camera. Reading torch6b's stills by Client3D's own projection (the
+resting camera on the +x +z diagonal, _camera_offset, pitch 50; at zoom 1.0 +x is (51,39) px, +z
+(-51,39), a flame 1.6 m up 74 px above its cell), which lands on every drawn post ((48,6), the
+spine's (47,12) and (51,11)) and on ui-design's light log, put (52,6) inside the wall block east of
+the mouth in all three stills that frame it: the "both whole" of (5)'s pass had read the light's
+place, not the post. What covers (52,6) is neither its own south nor its own east edge but the
+wall round (53,7) meeting its cell's south-east corner. And the Ossuary's east spine torches, (51,11)
+and (51,18) among them, read whole only because the stand put that wall in the player's see-through
+band. The geometry: the camera's diagonal makes south and east alike; a flame over its cell's middle
+looks at the camera across the cell's south-east corner, which its line passes at about 2.45 m,
+under walls 3 m tall and 0.5 m thick with posts at their ends, then clears them within the corner
+cell. So (1) a torch is hidden from the default view when any of the four edges meeting its cell's
+south-east corner is shut, a wall or door on it or floor on one side only: its own south, its own
+east, the east cell's south, the south cell's east (Crypt.hidden_from_view). (2) A hidden torch is
+tried, in order (the coordinator's): its own south shut, a cell north (as (5)); its own east shut,
+west, north-west, then south-west; both, north-west; the corner alone, west, north, then
+south-west (south-west the coordinator's third try: "a stretch of twelve rows going dark is worse
+than a post a cell down the way"); each only on floor
+(no marker) no door's line takes, with no level thing, not beside an anchor, reached with no edge
+crossed, and itself seen; a processional one only where the way keeps CLEAR_ACROSS (2) clear cells
+across on the moved post's line along the run's sideways, the posts counted solid; else not laid.
+No roll is drawn; Crypt.lay_in_view false lays as before both mends (lay_off_south_wall renamed).
+(3) The Vault's pair is template data: (49,6) and (51,6), even about the mouth's middle (50), the
+coordinator's first choice, which holds at every generation (each passes the walk, the way out routes
+from the stair's foot past both posts solid, (48,6) and (52,6) left free), so neither fallback,
+(48,6) with (51,6) or (52,5), was needed. Counts, barrow and barrow_deep generations 1 to 5, against
+main after (5): the barrow's east-hidden 5, 4, 6, 7, 4 all moved, none lost: a cell west, or
+north-west ((24,7) of torch7 stands at (23,7), north-west of its first cell (24,8), shut on both
+sides), or south-west: the east post of the five-wide way south of the First Hall, (25,15) on
+generation 1 and (25,14) on 2 and 4, whose west and north-west cells a side door's line takes,
+stands at (24,16), (24,15) and (24,15) (without that try those three were not laid and the way
+went dark from about row 9 to 21; the try changes no other torch). Generations 2 and 4 also gain
+back the room torch (5) did not lay ((13,32) at (12,31), (13,18) at (12,17): shut on both sides,
+north-west now). Torches 16, 17, 16, 15, 15 after (main: 16, 16, 16, 14, 15, those hidden among
+them; generation 5's (19,39) stays (5)'s, not laid). barrow_deep: 6, 6, 6, 5, 6 spine torches moved a
+cell west, none lost, and the Vault's pair re-placed; 14, 14, 13, 12, 13 torches as before. Pairs
+uneven (one moved off its east wall, its mate across still on the west): barrow 1, 0, 1, 1, 0;
+barrow_deep 3, 3, 2, 3, 0. On barrow generation 5 two of the band's posts lie a cell over ((15,19)
+for (15,20), (17,29) for (17,30)): Crypt._monsters shuffles the floor cells after the torches, and
+a torch moved changes which are floor; the foe's cell wins, as it is laid (the coordinator: fine,
+counted apart). When a laid world shows it: the Vault's pair is a template
+change, laid at the deploy's boot (684 amended (1)); the generator's at each crypt's next due
+re-lay. level_test _test_torches_seen, the coordinator's "one check that walks the default view's
+line from the torch's flame toward the camera": _torch_seen walks three lines (the flame's middle
+and the post's sides) from VIEW_FLAME over the cell toward the camera at VIEW_PITCH until over
+VIEW_WALL, and a torch is seen when none passes through a drawn wall (VIEW_WALL_HALF either side of
+its edge, its posts as thick), knowing nothing of the generator's edges. Its own rows: the Vault's
+(46,6), (53,6) and (5)'s (52,6) read hidden; on open floor a wall on a torch's own south or east
+edge hides it, on its west or north not, one meeting its corner from the east cell hides it, one a
+cell beyond is under the line. Run on main's generator and template it failed where the stills do:
+barrow 1 to 5 (24,7) and the rest of the east-walled, barrow_deep every generation its east spine
+and (52,6). With the mend every torch is seen on barrow, barrow_deep and Hollowfell 1 to 5 (Hollowfell
+lays none); _torches_moved, now for barrow_deep as well: the same cells and edges as with
+lay_in_view false (the foes' cells counted apart), the counts above, every way routing from the
+arrival with every post solid, every moved post leaving 2 clear cells across the way it moved.
+_test_deep_crypt's Vault row reads the new pair. level_test and labyrinth_test PASS. Level data
+and the generator; protocol unchanged; no new class_name; no bullet for the barrow; the Vault's
+stays held, ruled for after the deploy's boot lay is read.
+
 ## 608, terrain's side: niches and the hidden door drawn as walls
 
 Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)

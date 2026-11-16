@@ -6180,8 +6180,23 @@ func _test_crypt_spacing() -> void:
 ## The Charnel Vault's torches in barrow_deep's template (608 amended (4)),
 ## at the ends of its way out, which every generation opens at (48..52, 7)
 ## (47 too on most): its south row, one cell in from the corners where 608
-## amended (4) had them, behind the south wall (608 amended (5)).
-const VAULT_TORCHES: Array[Vector2i] = [Vector2i(48, 6), Vector2i(52, 6)]
+## amended (4) had them, behind the south wall (608 amended (5)); then
+## (48,6) and (52,6), the east one behind the corner of the wall east of the
+## mouth; now (49,6) and (51,6), even about the mouth's middle (608 amended (6)).
+const VAULT_TORCHES: Array[Vector2i] = [Vector2i(49, 6), Vector2i(51, 6)]
+## (5)'s pair, left free by (6).
+const VAULT_TORCHES_BEFORE: Array[Vector2i] = [Vector2i(48, 6), Vector2i(52, 6)]
+## The default camera and the walls, as Client3D draws them (608 amended
+## (6)'s line walk): the resting camera on the +x +z diagonal (_camera_offset,
+## yaw 0) CAMERA_PITCH above the ground; a torch's flame over its cell's
+## middle (prop.torch_post's flame socket, 1.45 m, and the flame); walls
+## WALL_HEIGHT tall and WALL_THICKNESS thick, posts as thick at their ends;
+## the post's half width across the view.
+const VIEW_PITCH := 50.0
+const VIEW_FLAME := 1.6
+const VIEW_WALL := 3.0
+const VIEW_WALL_HALF := 0.25
+const VIEW_POST_HALF := 0.15
 ## The crypt generator, whose torch rule a row turns off to compare (608 amended (5)).
 const CRYPT_GEN := preload("res://sim/level_gen/crypt.gd")
 ## The barrow's Offering stone, in the First Hall east of the bier since the
@@ -6290,15 +6305,42 @@ func _test_deep_crypt() -> void:
 ## default camera: the Vault's (46,6) and (53,6), each with the vault's south
 ## wall on its south edge, drew no post or flame, only their light on the wall
 ## ends; the Ossuary's spine torches with a wall on the east edge alone,
-## (51,11) and (51,18), were drawn whole, so an east wall is not counted). On barrow, barrow_deep
+## (51,11) and (51,18), were read drawn whole). On barrow, barrow_deep
 ## and hollowfell, generations 1 to 5. And the Vault's pair stands at the
 ## way out's ends, a walk from the stair's foot through the way out routing
 ## with both posts counted solid, at least two cells of the mouth clear.
+##
+## 608 amended (6): "seen" is the default camera's, a line walked from the
+## flame toward it (_torch_seen), no longer the south edge alone. ui-design's
+## torch7 (barrow generation 1 from (19,7), nearest zoom) drew no post or flame
+## at (24,7), its own east wall between; torch6b, read post by post from
+## Client3D's projection, drew none at the Vault's (52,6), the corner of the
+## wall round (53,7) between; the Ossuary's east spine torches read whole only
+## inside the player's see-through band. So the Vault's pair is (49,6) and
+## (51,6), even about the mouth's middle, (48,6) and (52,6) left free; and the
+## Ossuary's torches are counted beside the barrow's.
 func _test_torches_seen() -> void:
-	print("\n== 608 amended (5): every crypt torch seen from the default view, never a light alone ==")
+	print("\n== 608 amended (5), (6): every crypt torch seen from the default camera, never a light alone ==")
 	var template := LevelMap.from_image(Level.template("barrow_deep")["layout"], Level.template("barrow_deep")["config"])
-	_check(not _torch_seen(template, Vector2i(46, 6)) and not _torch_seen(template, Vector2i(53, 6)),
-		"the row's own check: the Vault's old corners (46,6) and (53,6), behind its south wall, read hidden")
+	var corner_only := Vector2i(52, 6)
+	_check(not _torch_seen(template, Vector2i(46, 6)) and not _torch_seen(template, Vector2i(53, 6)) and not _torch_seen(template, corner_only),
+		"the row's own check: the Vault's old corners (46,6) and (53,6), behind its south wall, and (5)'s (52,6), behind the corner of the wall east of the mouth, read hidden")
+	var open_room := LevelMap.new(Vector2i(8, 8))
+	for y in 8:
+		for x in 8:
+			open_room.cells[Vector2i(x, y)] = CRYPT_GEN.FLOOR
+	var walled := {}
+	for step: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1)]:
+		var one := _map_copy(open_room)
+		one.set_edge(Terrain.edge_key(Vector2i(4, 4), step), "wall")
+		walled[step] = _torch_seen(one, Vector2i(4, 4))
+	var se_edge := _map_copy(open_room)
+	se_edge.set_edge(Terrain.edge_key(Vector2i(5, 4), Vector2i(0, 1)), "wall")
+	var far_edge := _map_copy(open_room)
+	far_edge.set_edge(Terrain.edge_key(Vector2i(5, 5), Vector2i(0, 1)), "wall")
+	_check(_torch_seen(open_room, Vector2i(4, 4)) and not walled[Vector2i(0, 1)] and not walled[Vector2i(1, 0)] and walled[Vector2i(-1, 0)] and walled[Vector2i(0, -1)]
+			and not _torch_seen(se_edge, Vector2i(4, 4)) and _torch_seen(far_edge, Vector2i(4, 4)),
+		"the walk: open floor seen; a wall on its own south or east edge hides it, on its west or north it does not (%s); one meeting its south-east corner from the east cell hides it; one a cell beyond is under the line" % [walled])
 	for level_name: String in ["barrow", "barrow_deep", "hollowfell"]:
 		for generation in range(1, 6):
 			var made := Regen.generate(level_name, generation)
@@ -6312,59 +6354,112 @@ func _test_torches_seen() -> void:
 					torches.append(cell)
 			torches.sort()
 			var hidden := torches.filter(func(cell: Vector2i) -> bool: return not _torch_seen(map, cell))
-			_check(hidden.is_empty(), "%s generation %d: all %d torches seen from the default view, hidden: %s" % [level_name, generation, torches.size(), hidden])
+			_check(hidden.is_empty(), "%s generation %d: all %d torches seen from the default camera, hidden: %s" % [level_name, generation, torches.size(), hidden])
+			if level_name == "hollowfell":
+				continue
+			_torches_moved(level_name, map, generation, torches)
 			if level_name != "barrow_deep":
-				if level_name == "barrow":
-					_torches_moved(map, generation, torches)
 				continue
 			var mouth := range(47, 53).filter(func(x: int) -> bool: return map.walkable(Vector2i(x, 7)) and not Vector2i(x, 6) in VAULT_TORCHES)
-			_check(VAULT_TORCHES.all(func(cell: Vector2i) -> bool: return map.cells.get(cell) == "torch") and mouth.size() >= 2 and _routes_past(map, Vector2i(49, 2), 8, VAULT_TORCHES),
-				"barrow_deep generation %d: the Vault's torches at %s, the way out routing past them from the stair's foot, the mouth's clear cells x %s" % [generation, VAULT_TORCHES, mouth])
+			_check(VAULT_TORCHES.all(func(cell: Vector2i) -> bool: return map.cells.get(cell) == "torch") and mouth.size() >= 2 and _routes_past(map, Vector2i(49, 2), 8, VAULT_TORCHES)
+					and VAULT_TORCHES_BEFORE.all(func(cell: Vector2i) -> bool: return map.cells.get(cell) != "torch" and map.walkable(cell)),
+				"barrow_deep generation %d: the Vault's torches at %s, even about the mouth's middle, %s free, the way out routing past them from the stair's foot, the mouth's clear cells x %s" % [generation, VAULT_TORCHES, VAULT_TORCHES_BEFORE, mouth])
 
 
-## 608 amended (5), the barrow's own torches: generation [param generation]
-## laid again as before the mend (Crypt.lay_off_south_wall false) lays the
-## same rooms and ways (every cell and edge alike, torches read as floor);
-## the torches before and after counted, how many moved a cell north and how
-## many not laid; every way still routes from the arrival with every post
-## counted solid (no cell cut off), and a moved post leaves at least two
-## clear cells across.
-func _torches_moved(map: LevelMap, generation: int, torches: Array[Vector2i]) -> void:
-	CRYPT_GEN.lay_off_south_wall = false
-	var made_old := Regen.generate("barrow", generation)
+## A copy of [param map] (cells, edges, size) a row may change.
+static func _map_copy(map: LevelMap) -> LevelMap:
+	var out := LevelMap.new(map.size)
+	out.cells = map.cells.duplicate()
+	out.edges = map.edges.duplicate()
+	return out
+
+
+## 608 amended (5), (6), a crypt's own torches: generation [param generation]
+## of [param level_name] laid again as before the mends (Crypt.lay_in_view
+## false) lays the same rooms and ways (every cell and edge alike, torches
+## read as floor); the torches before and after counted, how many moved (a
+## cell north, west, north-west or south-west of where they stood) and how many not
+## laid, and which way's pairs now stand uneven (one moved off its wall, its
+## mate not); every way still routes from the arrival with every post counted
+## solid (no cell cut off), and a moved post leaves at least two clear cells
+## across the way it moved in.
+func _torches_moved(level_name: String, map: LevelMap, generation: int, torches: Array[Vector2i]) -> void:
+	CRYPT_GEN.lay_in_view = false
+	var made_old := Regen.generate(level_name, generation)
 	var old := LevelMap.from_image(made_old["layout"], made_old["config"])
-	CRYPT_GEN.lay_off_south_wall = true
+	CRYPT_GEN.lay_in_view = true
 	var before: Array[Vector2i] = []
 	var differ: Array[Vector2i] = []
 	for cell: Vector2i in old.cells:
 		if old.cells[cell] == "torch":
 			before.append(cell)
+	before.sort()
+	# The band and the dead are laid on the floor after the torches (Crypt._monsters,
+	# a shuffle of the floor cells), so a torch moved can lay a foe elsewhere: counted, not a fault.
+	var foes_moved := {}
 	for cell: Vector2i in old.cells.keys() + map.cells.keys():
 		var a := old.cell(cell)
 		var b := map.cell(cell)
-		if a != b and not (a == "torch" and b == CRYPT_GEN.FLOOR) and not (b == "torch" and a == CRYPT_GEN.FLOOR):
+		if a == b or a in ["torch", CRYPT_GEN.FLOOR] and b in ["torch", CRYPT_GEN.FLOOR]:
+			continue
+		if a.begins_with("monster_") and b in ["torch", CRYPT_GEN.FLOOR] or b.begins_with("monster_") and a in ["torch", CRYPT_GEN.FLOOR]:
+			foes_moved[cell] = true
+		elif not differ.has(cell):
 			differ.append(cell)
 	var edges_alike := old.edges == map.edges
-	var moved := torches.filter(func(cell: Vector2i) -> bool: return not before.has(cell))
-	var not_laid := before.size() - torches.size()
-	_check(differ.is_empty() and edges_alike and moved.all(func(cell: Vector2i) -> bool: return before.has(cell + Vector2i(0, 1))),
-		"barrow generation %d: the same rooms and ways as before the mend (cells differing %s, edges alike %s); torches %d before, %d after: %d moved a cell north %s, %d not laid"
-		% [generation, differ, edges_alike, before.size(), torches.size(), moved.size(), moved, not_laid])
-	var arrival: Vector2i = Regen.keep_cell("barrow")
+	var froms := {}
+	var stray: Array[Vector2i] = []
+	for cell in torches:
+		if before.has(cell):
+			continue
+		var from := Vector2i(-1, -1)
+		for back: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(1, 1), Vector2i(1, -1)]:
+			if before.has(cell + back) and not torches.has(cell + back) and not froms.values().has(cell + back):
+				from = cell + back
+				break
+		if from == Vector2i(-1, -1):
+			stray.append(cell)
+		else:
+			froms[cell] = from
+	var gone := before.filter(func(cell: Vector2i) -> bool: return not torches.has(cell) and not froms.values().has(cell))
+	# A pair uneven: a moved post's mate, the torch across the way from where it stood, stayed on its wall.
+	var uneven: Array = []
+	for cell: Vector2i in froms:
+		var from: Vector2i = froms[cell]
+		var away: Vector2i = Vector2i(signi((from - cell).x), signi((from - cell).y))
+		for axis: Vector2i in [Vector2i(away.x, 0), Vector2i(0, away.y)]:
+			if axis == Vector2i.ZERO:
+				continue
+			var at := from - axis
+			while old.walkable(at) and old.edge(Terrain.edge_key(at + axis, -axis)) == "clear":
+				if before.has(at) and at != from:
+					if torches.has(at):
+						uneven.append([cell, at])
+					break
+				at -= axis
+	_check(differ.is_empty() and edges_alike and stray.is_empty(),
+		"%s generation %d: the same rooms and ways as before the mends (cells differing %s, edges alike %s; foes' cells changed %d); torches %d before, %d after: %d moved %s, %d not laid %s; pairs uneven %d %s"
+		% [level_name, generation, differ, edges_alike, foes_moved.size(), before.size(), torches.size(), froms.size(), froms, gone.size(), gone, uneven.size(), uneven])
+	var arrival: Vector2i = Regen.keep_cell(level_name) if Regen.keep_cell(level_name) is Vector2i else Vector2i(49, 2)
 	var open := _reach(map, arrival, [])
 	var solid := _reach(map, arrival, torches)
 	var cut := open.keys().filter(func(cell: Vector2i) -> bool: return not torches.has(cell) and not solid.has(cell))
-	var narrow := moved.filter(func(cell: Vector2i) -> bool:
-		var clear := 0
-		var at: Vector2i = cell + Vector2i(0, 1)
-		while map.walkable(at):
-			clear += 0 if torches.has(at) else 1
-			if map.edge(Terrain.edge_key(at, Vector2i(0, -1))) != "clear":
-				break
-			at += Vector2i(0, -1)
-		return clear < 2)
+	var narrow := froms.keys().filter(func(cell: Vector2i) -> bool:
+		var from: Vector2i = froms[cell]
+		for axis: Vector2i in [Vector2i(0, 1) if from.y != cell.y else Vector2i.ZERO, Vector2i(1, 0) if from.x != cell.x else Vector2i.ZERO]:
+			if axis == Vector2i.ZERO:
+				continue
+			var clear := 0
+			for way: Vector2i in [axis, -axis]:
+				var at: Vector2i = cell
+				while map.walkable(at + way) and map.edge(Terrain.edge_key(at, way)) == "clear":
+					at += way
+					clear += 0 if torches.has(at) else 1
+			if clear < 2:
+				return true
+		return false)
 	_check(cut.is_empty() and narrow.is_empty(),
-		"barrow generation %d: every way routes from the arrival %s with all %d posts solid (cut off %s); every moved post leaves two clear cells across (narrower %s)" % [generation, arrival, torches.size(), cut, narrow])
+		"%s generation %d: every way routes from the arrival %s with all %d posts solid (cut off %s); every moved post leaves two clear cells across (narrower %s)" % [level_name, generation, arrival, torches.size(), cut, narrow])
 
 
 ## The cells of [param map] a walk from [param from] reaches, stepping on
@@ -6385,11 +6480,48 @@ static func _reach(map: LevelMap, from: Vector2i, solid: Array[Vector2i]) -> Dic
 
 
 ## Whether a torch on [param cell] of [param map] is seen from the default
-## view (608 amended (5)): walkable, its south neighbour walkable, no wall
-## or door on the edge between.
+## camera (608 amended (6), the coordinator's "one check that walks the
+## default view's line from the torch's flame toward the camera"): from the
+## flame, VIEW_FLAME over the cell's middle, and from either side of the post
+## (VIEW_POST_HALF across the view), a line walked toward the camera on the
+## +x +z diagonal, rising at VIEW_PITCH, until it is over the walls; seen when
+## no line passes through a drawn wall (an edge with a wall or door on it, or
+## floor on one side only), VIEW_WALL tall and 2 VIEW_WALL_HALF thick, its
+## ends' posts as thick. Cells are 1 m, centred on their coordinates. The walk
+## knows nothing of which edges the generator reads (Crypt.hidden_from_view),
+## so it checks that rule as well as the torches.
 static func _torch_seen(map: LevelMap, cell: Vector2i) -> bool:
-	var south := Vector2i(0, 1)
-	return map.walkable(cell) and map.walkable(cell + south) and map.edge(Terrain.edge_key(cell, south)) == "clear"
+	if not map.walkable(cell):
+		return false
+	var rise := tan(deg_to_rad(VIEW_PITCH)) * sqrt(2.0)  # Height gained per metre along x (and z).
+	var reach := (VIEW_WALL - VIEW_FLAME) / rise
+	for side: float in [-VIEW_POST_HALF, 0.0, VIEW_POST_HALF]:
+		var start := Vector2(cell) + Vector2(1.0, -1.0) * side / sqrt(2.0)
+		var t := 0.0
+		while t <= reach:
+			if _in_drawn_wall(map, start + Vector2(t, t)):
+				return false
+			t += 0.02
+	return true
+
+
+## Whether the point [param at] (x, z in cells) is inside a wall Client3D draws
+## on one of the edges round it (608 amended (6)'s walk).
+static func _in_drawn_wall(map: LevelMap, at: Vector2) -> bool:
+	var near := Vector2i(roundi(at.x), roundi(at.y))
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var c := near + Vector2i(dx, dy)
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				var other := c + step
+				var drawn := map.walkable(c) != map.walkable(other) or map.walkable(c) and map.edge(Terrain.edge_key(c, step)) != "clear"
+				if not drawn:
+					continue
+				var middle := Vector2(c) + Vector2(step) * 0.5
+				var half := Vector2(VIEW_WALL_HALF, 0.5 + VIEW_WALL_HALF) if step.x == 1 else Vector2(0.5 + VIEW_WALL_HALF, VIEW_WALL_HALF)
+				if absf(at.x - middle.x) <= half.x and absf(at.y - middle.y) <= half.y:
+					return true
+	return false
 
 
 ## Whether a walk on [param map] from [param from] reaches row [param row]
