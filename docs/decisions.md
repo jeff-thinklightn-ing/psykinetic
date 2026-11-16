@@ -59206,3 +59206,36 @@ string hand, a two-handed axe's other hand and a work tool's keep the clip's fis
 times). Client only; protocol unchanged; no new class_name. One package with 419 amended (7), landed
 together as animation's stack. The bullet waits for ui-design's joined look on the package and the
 coordinator's pass.
+
+## 948. A room level's own beds drawn and slept on (environment; the coordinator's go, 2026-11-16)
+
+Package "Umbrage: rooms read as rooms" (with art-kit's tone for the Mughouse's inner doors; it goes
+on when both are in). Art-kit's nearest-zoom read of the Mughouse's rooms on main
+(C:/dev/review/ui-design/looks/aknear_ae3f0cb9a/, zoom 0.50, the player standing there) found the
+hired rooms upstairs bare. umbrage_tavern_up lists five beds in level.json ("beds", [x, y, dx, dy],
+tools/make_interior.py), read by Level._interior_from into level["beds"] for the sim (storeys_of, the
+taverner's bed_at, level_test). But Client3D drew only a building's beds (add_beds, Level.beds_in),
+and a room level holds its beds itself. The ground floor's one bed, the keeper's at (17, 7), was
+undrawn too. Maps: she sleeps there at night on main (Main._taverner_places), and with no bed under
+her the view gave her a bedroll on the boards (_bed_under found none, _indoors none). Nobody sleeps
+upstairs yet.
+
+Now Level._interior_from also puts the beds into the level's terrain (terrain "beds", as 939 put the
+town there): the view's copy, the same list. It changes no floor, walk or solid; interior beds carry
+no "solid" key, so the taverner stays on hers. Client3D._add_level_beds, after the buildings, draws
+each as a dwelling's is drawn: its prop (prop.bed) on the middle of its two cells at the head cell's
+ground, its head (art-kit's -z) the bed's way, under a "beds" node in the room. _bed_under reads the
+terrain's beds before a building's, so a sleeper on a head cell lies on the bed (LIE_HEIGHT 0.37)
+with no bedroll. A drawn bed blocks no step; that would move the keeper's bed_at, and would be its
+own ask to maps and the coordinator.
+
+The inner doors' wardrobe look in the same stills is not this decision's. There is no near-wall cut
+to fit a door to (every wall in a room level stands WALL_HEIGHT 3.0 m, as the door frames do), so the
+coordinator ruled art-kit's tone first. A room level's near side faded as a house's is stays an option
+for after 946.
+
+view_world_test _test_room_beds: umbrage_tavern_up's five beds and umbrage_tavern's one, each at
+"beds/Bed_x_y" on the middle of its cells at the floor with its head the bed's way; the keeper asleep
+at (17, 7) on her bed at 0.37, no bedroll. It fails on main (no beds node). Client only (Level's line
+is read by the client's own load of the level; nothing is sent); protocol unchanged; no new
+class_name. No bullet until it is seen joined at the nearest zoom.

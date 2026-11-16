@@ -10778,6 +10778,32 @@ func _add_buildings() -> void:
 		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(inner):
 			_building_at[cell] = index
+	_add_level_beds()
+
+
+## A room level's own beds (948; terrain "beds", from level.json's by
+## Level._interior_from: the Mughouse's hired rooms and its keeper's), which
+## no building of the level holds (it has none), drawn as a dwelling's are
+## (add_beds): each its prop on the middle of its two cells at the head
+## cell's ground, its head (art-kit's -z) the bed's way, under a "beds" node.
+func _add_level_beds() -> void:
+	var beds: Array = _terrain.get("beds", [])
+	if beds.is_empty():
+		return
+	var node := Node3D.new()
+	node.name = "beds"
+	_room.add_child(node)
+	for bed: Variant in beds:
+		if not bed is Dictionary or bool((bed as Dictionary).get("solid", false)) or not ArtKit.has(str((bed as Dictionary).get("prop", ""))):
+			continue
+		var cells: Array = bed["cells"]
+		var head: Vector2i = cells[0]
+		var middle := (Vector2(head) + Vector2(cells[1])) * 0.5
+		var way: Vector2i = bed["head"]
+		var piece := ArtKit.instance(str(bed["prop"]))
+		piece.name = "Bed_%d_%d" % [head.x, head.y]
+		piece.transform = Transform3D(Basis(Vector3.UP, atan2(-float(way.x), -float(way.y))), Vector3(middle.x, _elevation(head), middle.y))
+		node.add_child(piece)
 
 
 ## [param building]'s beds (Level.beds_in, 751, buildings' side) under
@@ -27569,8 +27595,12 @@ func _decor_bedroll(cell: Vector2i) -> bool:
 	return false
 
 
-## The drawn bed whose head cell is [param cell] ({} for none).
+## The drawn bed whose head cell is [param cell] ({} for none): a building's,
+## or a room level's own (948, _add_level_beds).
 func _bed_under(cell: Vector2i) -> Dictionary:
+	for bed: Variant in _terrain.get("beds", []):
+		if bed is Dictionary and not ((bed as Dictionary).get("cells", []) as Array).is_empty() and (bed["cells"] as Array)[0] == cell:
+			return bed
 	for building: Variant in _drawn_buildings():
 		if building is Dictionary:
 			for bed: Variant in (building as Dictionary).get("beds", []):

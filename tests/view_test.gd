@@ -4238,6 +4238,7 @@ func _test_kinds() -> void:
 	_test_home_label()
 	_test_inside_is_his()
 	_test_tavern_inside()
+	_test_room_beds()
 	_test_smithy_inside()
 
 
@@ -4716,6 +4717,53 @@ func _test_tavern_inside() -> void:
 	var chapel: Dictionary = chapel_level["buildings"][0]
 	_rig.rebuild(chapel_level["terrain"], Vector2i(1, 1))
 	_test_glow_outside(chapel, BuildingComposer.windows(chapel, chapel_level["terrain"]["edges"]), "the temple's")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A room level's own beds (948, package "Umbrage: rooms read as rooms"):
+## the Mughouse upstairs lists five (its hired rooms) and its ground floor
+## the keeper's at (17, 7), and no building of either holds them (they have
+## none), so none was drawn and the keeper slept on a bedroll on the boards.
+## Each drawn as a dwelling's, prop.bed on the middle of its two cells at
+## the floor, its head (-z) the bed's way; a sleeper on a head cell lies on
+## the bed (0.37), no bedroll.
+func _test_room_beds() -> void:
+	print("\n== a room level's own beds drawn and slept on (948) ==")
+	for name: String in ["umbrage_tavern_up", "umbrage_tavern"]:
+		var level := Level.load_level(name)
+		var listed: Array = level.get("beds", [])
+		_rig.rebuild(level["terrain"], level["spawn_points"].values()[0])
+		var wrong: Array[String] = []
+		for bed: Dictionary in listed:
+			var head: Vector2i = bed["cells"][0]
+			var piece := _rig._room.get_node_or_null("beds/Bed_%d_%d" % [head.x, head.y]) as Node3D
+			if piece == null:
+				wrong.append("no bed at %s" % head)
+				continue
+			var middle := (Vector2(head) + Vector2(bed["cells"][1])) * 0.5
+			var way: Vector2i = bed["head"]
+			var at := piece.global_transform
+			var local := _rig._room.to_local(at.origin)
+			if not Vector2(local.x, local.z).is_equal_approx(middle) or absf(local.y - _rig._elevation(head)) > 0.01 \
+					or not (-at.basis.z).normalized().is_equal_approx(Vector3(way.x, 0, way.y)):
+				wrong.append("%s at %s head %s" % [head, local, -at.basis.z])
+		var want := 5 if name == "umbrage_tavern_up" else 1
+		_check(listed.size() == want and wrong.is_empty() and str(listed[0]["prop"]) == "prop.bed",
+			"%s: its %d listed beds drawn, each on the middle of its cells at the floor, its head the bed's way (%s)" % [name, want, wrong])
+	# The keeper asleep on hers (main._taverner_places: bed_at is its head cell).
+	var keeper := Resident.new()
+	keeper.name = "RoomBedTestResident"
+	var puppet := Node3D.new()
+	var bed: Dictionary = (_rig._terrain.get("beds", []) as Array)[0]
+	keeper.tile = bed["cells"][0]
+	keeper.facing = bed["head"]
+	keeper.activity = "sleep"
+	_rig._sync_bedroll(keeper, puppet)
+	_check(bed["cells"][0] == Vector2i(17, 7) and puppet.get_node_or_null("Bedroll") == null
+		and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
+		"the keeper asleep at (17, 7): on her bed (%.2f up), no bedroll on the boards" % float(puppet.get_meta("bed_height", 0.0)))
+	puppet.free()
+	keeper.free()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
