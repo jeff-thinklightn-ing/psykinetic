@@ -58664,8 +58664,10 @@ reader.
   door) and (0, 1) west (clear of the hearth (0, 6)). The attic none: it keeps its flame. Environment's read: with
   "windows" marked its rule is off for that level (the ground floor's rule laid 12), the common room's day mostly the
   ambient lift; it measures on this take and asks for a second window a long wall if it needs one.
-- Upstairs' landing: one tavern table in the stair room at (14, 12)..(15, 13), a lit candle on it at (14.5, 12.5), clear
-  of both stairs' cells and arrivals, row 11 open between them.
+- Upstairs' landing: one tavern table in the stair room's north-east corner at (16, 8)..(17, 9), a lit candle on it at
+  (16.5, 8.5), on the room's far side from the camera so one arriving at (16, 11) sees it (ui-design's look on the first
+  cell, (14, 12) against the south wall: the near wall hid it); clear of both stairs' cells and arrivals and of the hall
+  door's inside cells (13, 9)/(14, 9).
 level_test _test_tavern_zone: one candle upstairs, on the landing's table at its top; each floor's windows as marked, each
 on an outer wall's floor cell off its links, arrivals and hearth, the attic none. Also run alone: resident_test,
 town_day_test, zone_test; load_check. Level data and the tool; protocol unchanged (Level reads no "windows"; environment's

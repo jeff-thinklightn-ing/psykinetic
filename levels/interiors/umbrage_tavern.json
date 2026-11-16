@@ -54,7 +54,7 @@
 					"doors": [{"to": "hall_up", "cells": [[8, 8], [9, 8]], "side": "north"}], "beds": [[7, 13]]},
 				{"id": "stair_up", "use": "stair", "rect": [12, 8, 6, 6],
 					"doors": [{"to": "hall_up", "cells": [[13, 8], [14, 8]], "side": "north"}],
-					"tables": [[14, 12]], "candles": true}
+					"tables": [[16, 8]], "candles": true}
 			],
 			"stairs": [
 				{"cells": [[16, 10], [17, 10]], "to": "umbrage_tavern", "spawns": [[16, 11], [17, 11]], "way": "down", "facing": "north"},

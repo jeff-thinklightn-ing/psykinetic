@@ -4590,8 +4590,8 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	var landing: Array = (up["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == "building.tavern_table")
 	_check(on_pieces == ["building.bar_counter 1.05", "building.tavern_table 0.79", "building.tavern_table 0.79",
 			"building.tavern_table 0.79", "building.tavern_table 0.79"]
-		and up_lit.size() == 1 and Vector2(up_lit[0]["at"]) == Vector2(14.5, 12.5) and is_equal_approx(float(up_lit[0]["top"]), 0.79)
-		and landing.size() == 1 and landing[0]["rect"] == Rect2i(14, 12, 2, 2),
+		and up_lit.size() == 1 and Vector2(up_lit[0]["at"]) == Vector2(16.5, 8.5) and is_equal_approx(float(up_lit[0]["top"]), 0.79)
+		and landing.size() == 1 and landing[0]["rect"] == Rect2i(16, 8, 2, 2),
 		"the Mughouse's lit candles on its four tables and its bar, at their tops, and one upstairs on the landing's table (%s; up %s)" % [on_pieces, up_lit])
 	# 946 amended (1): each floor's windows marked, on the outside's sides (I1's one wall.wood.window_tall a side, turned in:
 	# the wilds' north, west, east and south walls to the inside's east, north, south and west), each on floor with no floor
