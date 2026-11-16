@@ -13701,6 +13701,58 @@ sheet): bound hair's knot on the crown, where the game's camera sees it, as its 
   worn felt hat, a worn hood, a bard's hat), anim_rig_test, seamless_test, parts_test, view_world_test. Joined look
   for the bullet: a woman with bound hair bare-headed, hooded and in a brimmed hat, at the nearest and playing zoom.
   Client only, protocol unchanged, no new class_name.
+419 amended (10) (pc-character, 2026-11-16; label by decision_number.sh; "heads by day", one package carried by
+pc-character over environment's 451 amended (8), the lantern dark by day; the coordinator's rulings on one joined run of
+every choice): the hair step also judged as the game draws hair and face, at noon and at 19:00. This replaces the
+version first written under this label (59e1bf02d, never landed), which was fitted on grids shot with the player's
+lantern lit over the crown and judged evening at 18:00.
+- Why: amended (4) judged the step on the colours' own L*. The game lights a crown from above and a face at a slant, so
+  as drawn a crown and a face part differently from their colours, and some of (4)'s moves took a hair nearer the face
+  on screen, not further (brown and chestnut on skin 7).
+- The rule: PersonLook.HAIR_LIT is a crown's drawn L* by its colour's L* (0, 5 .. 100), and FACE_LIT a face's drawn L*
+  by its skin's (the eight SKINS), each for noon and evening (19:00). Both are read off ui-design's covered 64-still
+  grids, lantern dark (gridcov12_4f354927e, gridcov19c_67eb7783a), crown and face measured inside each still.
+  _hair_drawn_move is (4)'s move judged on the noon-drawn values. hair_against takes it in place of (4)'s move
+  (_hair_palette_move) only where it stands further from the face at noon and no nearer at 19:00 (_hair_moved), and
+  the pair is not one of HAIR_KEPT. A drawn move stops where the drawn crown stops darkening: HAIR_LIT's 0 and 5 knots
+  are both 20.3 at noon, so black on skins 7 and 8 stops at 16100b (L* 5.1). One rule for everyone, no selector.
+- The check (ui-design, hairtable12_d308a98b5 and hairtable19_d308a98b5): one scratch commit drew (4)'s colour, this
+  rule on 18:00 knots and this rule, by a look word, in two joined runs, one per hour, each hour's choices in one run;
+  every still's hex checked against its log line. Crown against face inside each still, as L* gap and as colour
+  difference (dE2000). The rule reads lightness alone; the stills read colour too:
+  - Of the 26 pairs the knots alone move from (4)'s colour, 25 stand further from the face in dE2000 at both hours.
+  - dark/8 came nearer at both (2b1b11 7.0 at noon and 5.5 at 19:00; 47352b 5.5 and 4.3): its lighter dark-brown
+    nears the skin's hue and chroma, which lightness does not see.
+  - Pale on pale, lightness alone undersells what is there: blond and grey on skins 2 and 3 already stood 9 to 12
+    apart in dE2000 on (4)'s colours though under 3 L* apart; moved lighter, 14 to 16.
+- HAIR_KEPT, the coordinator's rulings (seven pairs keep (4)'s colour):
+  - dark/8: the stills over the knots. To the shading row.
+  - chestnut/6 and chestnut/7: their moves (946948, 8e6443) went into the skin's own hue band and read as a tan cap.
+    To the shading row, with one ask there: a chestnut that lifts lightness at (4)'s hue (about 55 degrees or redder)
+    and chroma; if one gains against the face on skins 6 and 7, it comes back as its own small take.
+  - fair/3, brown/5, dark/6 and brown/6: a move does not stand where it brings that skin's nearest two hair names
+    (crown against crown, dE2000) closer than (4)'s nearest pair there. brown/6 by the rule's second pass, once dark/6
+    was kept.
+  - Read and let stand: grey/2 (d4d0c7, white on a pale old head is what grey becomes), red/6 and red/7 (copper reads
+    as red more plainly than (4)'s maroon), brown/7 (766053, ash but a brown, and it clears skin 7's dark~brown pair).
+- The 64 pairs: 33 left as named, 12 moved as (4) moves them, 19 moved on the noon-drawn values. Short of 16 L*: on the
+  palette, 7/chestnut 11.9, 8/brown 14.8 and 6/fair 15.2. At noon as drawn, 8/black 4.6, 4/fair 9.1, 7/dark 10.3,
+  6/red 11.3, 7/black 12.0, 1/blond 12.3, 1/grey 12.9, 7/brown 13.2, 2/blond 14.4, 2/grey 15.0 and 5/chestnut 15.4.
+- The eight close pairs (under 6 L* from the face on (4)'s colours): six mended on colour, two to the shading row.
+  dE2000 against the face, (4)'s colour to this rule's, noon then 19:00:
+  - blond/2 10.3 to 14.9, 7.3 to 13.9; grey/2 10.7 to 15.9, 8.8 to 13.9; blond/3 9.2 to 14.9, 6.9 to 14.8;
+    grey/3 12.4 to 16.0, 9.6 to 14.0; red/6 10.5 to 13.9, 6.8 to 11.4; black/8 12.0 to 12.9, 10.8 to 11.9.
+  - Kept, to the shading row: chestnut/6 3.7 and 2.3; dark/8 7.0 and 5.5.
+- The next-weakest that stands, on the coordinator's read of the sheet: fair/5 (bd8a57) at 19:00 sits near the lit
+  face's own orange in the still though its figure is 13.4; if a head is called bald, it is the first to look at.
+- Oswin (skin 7, chestnut) is drawn as today: hair 583416 (kept), beard 4b290b.
+- Tests: view_test _test_hair_value (run in view_world_test). Each pair is judged on the gap its rule used, against
+  PALETTE_SHORT and DRAWN_SHORT with each figure; a drawn pair must be further at noon than (4)'s move and no nearer at
+  19:00; the seven kept pairs draw the palette's colour; Oswin's chestnut is the palette's, apart from brown; black on
+  skins 7 and 8 sits at the floor; Oswin's beard is 5 under his hair. view_test _test_look_pins (amended (11)'s pins)
+  lets a line's md5 differ only where its look's hair is a pair this rule moves from the palette's colour: 1033 lines
+  (602 seeded, 310 robbers, 121 players), each such a pair, every other line as before. Client only, protocol
+  unchanged, no new class_name.
 
 419 amended (11) (pc-character, 2026-11-16; label by decision_number.sh; the coordinator's hair row and men's outline,
 its pass on ui-design's joined sheets): long hair as one mass down the back, and two new choices for a man's head, the

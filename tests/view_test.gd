@@ -14279,13 +14279,17 @@ func _test_person_garb() -> void:
 ## two last draws. tests/look_pins.txt is main's lines from before them (tools/look_pins.gd): every seed's look, a
 ## robber's, a player's and a resident's card the same now, but a seeded cropped man who drew the tail and a seeded
 ## full beard that drew the long one (the parts with them, nothing else); a player's look never changes; the shares
-## about 1 man in 8 and 1 in 16, on the looks and on the cards.
+## about 1 man in 8 and 1 in 16, on the looks and on the cards. Since 419 amended (10) (heads by day) a line's md5 may
+## also differ where its look's hair is a pair the two-light rule moves from the palette's colour (_pin_hair_moved):
+## the hair's and so the beard's colour, nothing else (1033 lines: 602 seeded, 310 robbers, 121 players).
 func _test_look_pins() -> void:
 	print("
 == the pinned looks: nobody changes but by the tail's and the long beard's draws ==")
 	var was := FileAccess.get_file_as_string("res://tests/look_pins.txt").strip_edges().split("
 ")
-	var now: PackedStringArray = preload("res://tools/look_pins.gd").lines()
+	var pins := preload("res://tools/look_pins.gd")
+	var now: PackedStringArray = pins.lines()
+	var recoloured := {"L": 0, "R": 0, "P": 0}
 	_check(was.size() == now.size() and was.size() > 4000, "as many lines as main wrote (%d, %d)" % [was.size(), now.size()])
 	var wrong: Array[String] = []
 	# Per kind: men, of them seeded cropped and seeded full, and of those the tail and the long beard.
@@ -14296,10 +14300,18 @@ func _test_look_pins() -> void:
 		match a[0]:
 			"P":
 				if was[i] != now[i]:
-					wrong.append("player %s" % a[1])
+					if _pin_hair_moved(PersonLook.make("seed=%s %s%s" % [a[1], pins.PLAYER, PersonLook.EXTRAS_OFF])):
+						recoloured["P"] += 1
+					else:
+						wrong.append("player %s" % a[1])
 			"L", "R":
 				# L/R <seed> <body> <hair> <beard> <parts> | <md5>
-				var ok := a[1] == b[1] and a[2] == b[2] and a[7] == b[7]
+				var ok := a[1] == b[1] and a[2] == b[2]
+				if a[7] != b[7]:
+					if _pin_hair_moved(PersonLook.make("seed=%s%s" % [a[1], " " + pins.ROBBER if a[0] == "R" else ""])):
+						recoloured[a[0]] += 1
+					else:
+						ok = false
 				var parts := Array(a[5].split(","))
 				var tail := a[3] == "cropped" and b[3] == "tail"
 				var long := a[4] == "full" and b[4] == "long"
@@ -14331,7 +14343,7 @@ func _test_look_pins() -> void:
 					row[2] += 1 if a[5] == "full" else 0
 					row[3] += 1 if tail else 0
 					row[4] += 1 if long else 0
-	_check(wrong.is_empty(), "every line as main drew it but the two draws (%d not: %s)" % [wrong.size(), wrong.slice(0, 4)])
+	_check(wrong.is_empty(), "every line as main drew it but the two draws and the two-light rule's hair colours (%d not: %s; recoloured %s)" % [wrong.size(), wrong.slice(0, 4), recoloured])
 	for kind: String in ["L", "C"]:
 		var row: Array = counts[kind]
 		var men := maxf(row[0], 1.0)
@@ -14342,16 +14354,33 @@ func _test_look_pins() -> void:
 	print("  R: %d hooded men, %d long beards, %d tails (under the hood)" % [robbers[0], robbers[4], robbers[3]])
 
 
+## A look whose hair the two-light rule (419 amended (10)) draws away from the palette's colour.
+func _pin_hair_moved(look: PersonLook) -> bool:
+	var skin: Color = look.colours["skin"]
+	if not look.hair_colour in PersonLook.HAIR_COLOURS or PersonLook.SKINS.find(skin.to_html(false)) < 0:
+		return false
+	return look.colours["hair"] != PersonLook._hair_palette_move(look.hair_colour, skin)
+
+
 ## The coordinator, 11-14 (faces package): hair and beard at least PersonLook.HAIR_STEP in L* from the skin, or as far
 ## as the cap or its own name lets it (each such pair listed with its figure); every hair still nearest its own named
 ## colour, hue and chroma kept, moved at most HAIR_MOVE_MAX; the skin never moved; a far pair left as named.
+## The two-light rule (the coordinator, 11-16, on the pinned probe row): a pair takes the noon-drawn move in place of the
+## palette's only where it stands further from the face as drawn at noon and no nearer at 19:00 (heads by day: HAIR_KEPT's
+## seven keep the palette's); such a pair is judged on its noon-drawn gap (PersonLook.lit_hair, lit_face), the rest on
+## the palette's as before.
 func _test_hair_value() -> void:
 	print("
 == hair and beard set off from the skin in value; the skin never moved ==")
-	# Skin index (1..8) / hair: the gap reached where the cap (13 L*) or the name stops short of 16.
-	const SHORT := {"7/chestnut": 11.9, "3/blond": 13.1, "7/brown": 13.3, "3/grey": 13.8, "5/fair": 13.9,
-		"8/brown": 14.8, "6/fair": 15.2, "7/red": 15.4}
+	# Skin index (1..8) / hair: the gap reached where the cap (13 L*) or the name stops short of 16, on the palette's L*
+	# for a pair the palette rule moves (HAIR_KEPT's among them), as drawn at noon for one the two-light rule moves (black
+	# on the darkest skins stops where the drawn crown stops darkening).
+	const PALETTE_SHORT := {"7/chestnut": 11.9, "8/brown": 14.8, "6/fair": 15.2}
+	const DRAWN_SHORT := {"8/black": 4.6, "4/fair": 9.1, "7/dark": 10.3, "6/red": 11.3, "7/black": 12.0, "1/blond": 12.3,
+		"1/grey": 12.9, "7/brown": 13.2, "2/blond": 14.4, "2/grey": 15.0, "5/chestnut": 15.4}
 	var moved := 0
+	var drawn_moved := 0
+	var drawn_kept := 0
 	var shorts: Array = []
 	var bad: Array = []
 	for i in PersonLook.SKINS.size():
@@ -14360,6 +14389,7 @@ func _test_hair_value() -> void:
 		for name: String in PersonLook.HAIR_COLOURS:
 			var named := Color(PersonLook.HAIR_COLOURS[name])
 			var got := PersonLook.hair_against(name, skin)
+			var pal := PersonLook._hair_palette_move(name, skin)
 			var face := PersonLook.make("seed=7 hair=cropped hair_colour=%s skin=%d" % [name, i + 1], &"male")
 			var pair := "%d/%s" % [i + 1, name]
 			var h0 := PersonLook.lab_of(named)
@@ -14370,28 +14400,66 @@ func _test_hair_value() -> void:
 			var hue := absf(wrapf(rad_to_deg(Vector2(h1.y, h1.z).angle() - Vector2(h0.y, h0.z).angle()), -180.0, 180.0))
 			if face.colours["skin"] != skin or face.colours["hair"] != got or face.hair_colour != name:
 				bad.append("%s: the look's skin %s, hair %s (want %s, %s)" % [pair, face.colours["skin"].to_html(false), face.colours["hair"].to_html(false), skin.to_html(false), got.to_html(false)])
-			if absf(h0.x - ls) >= PersonLook.HAIR_STEP:
+			if got != pal:
+				# The two-light rule's: further from the face at noon than the palette's move, no nearer at 19:00.
+				var lp := PersonLook.lab_of(pal).x
+				var noon := absf(PersonLook.lit_hair(h1.x, "noon") - PersonLook.lit_face(ls, "noon"))
+				var noon_pal := absf(PersonLook.lit_hair(lp, "noon") - PersonLook.lit_face(ls, "noon"))
+				var eve := absf(PersonLook.lit_hair(h1.x, "evening") - PersonLook.lit_face(ls, "evening"))
+				var eve_pal := absf(PersonLook.lit_hair(lp, "evening") - PersonLook.lit_face(ls, "evening"))
+				if noon <= noon_pal + 0.01 or eve < eve_pal - 0.01:
+					bad.append("%s: drawn %s for the palette's %s, at noon %.1f apart (palette %.1f), at 19:00 %.1f (palette %.1f)" % [
+						pair, got.to_html(false), pal.to_html(false), noon, noon_pal, eve, eve_pal])
+				if got == named:
+					drawn_kept += 1
+					if noon < PersonLook.HAIR_STEP - 0.1:
+						bad.append("%s: left as named, %.1f apart at noon" % [pair, noon])
+					continue
+				drawn_moved += 1
+				var want_noon: float = DRAWN_SHORT.get(pair, PersonLook.HAIR_STEP)
+				if noon < want_noon - 0.1:
+					bad.append("%s: %.1f apart at noon, want %.1f" % [pair, noon, want_noon])
+				if DRAWN_SHORT.has(pair):
+					shorts.append("%s %.1f at noon" % [pair, noon])
+			elif absf(h0.x - ls) >= PersonLook.HAIR_STEP:
 				if got != named:
 					bad.append("%s: %.1f apart already, moved to %s" % [pair, absf(h0.x - ls), got.to_html(false)])
 				continue
-			moved += 1
-			var want: float = SHORT.get(pair, PersonLook.HAIR_STEP)
-			if gap < want - 0.1:
-				bad.append("%s: %.1f apart, want %.1f" % [pair, gap, want])
-			if SHORT.has(pair):
-				shorts.append("%s %.1f" % [pair, gap])
+			else:
+				moved += 1
+				var want: float = PALETTE_SHORT.get(pair, PersonLook.HAIR_STEP)
+				if gap < want - 0.1:
+					bad.append("%s: %.1f apart, want %.1f" % [pair, gap, want])
+				if PALETTE_SHORT.has(pair):
+					shorts.append("%s %.1f" % [pair, gap])
 			if PersonLook.nearest_hair(got) != name:
 				bad.append("%s: %s reads as %s" % [pair, got.to_html(false), PersonLook.nearest_hair(got)])
 			if absf(h1.x - h0.x) > PersonLook.HAIR_MOVE_MAX + 0.2 or absf(chroma1 - chroma0) > 1.0 or (chroma0 > 8.0 and hue > 3.0):
 				bad.append("%s: moved %.1f L*, chroma %.1f -> %.1f, hue %.1f deg" % [pair, h1.x - h0.x, chroma0, chroma1, hue])
-	_check(bad.is_empty(), "64 pairs: %d moved, each at least %.0f L* from its skin or as listed, its name kept, hue and chroma kept, at most %.0f L*, the skin as picked (%s)" % [
-		moved, PersonLook.HAIR_STEP, PersonLook.HAIR_MOVE_MAX, bad if not bad.is_empty() else "ok"])
-	_check(shorts.size() == SHORT.size(), "the pairs short of %.0f, each with its figure: %s" % [PersonLook.HAIR_STEP, shorts])
-	# Oswin's pair (skin 7, chestnut): a darker chestnut, not the brown man's hair beside him.
+	_check(bad.is_empty(), "64 pairs: %d moved on the palette, %d on the noon-drawn values, %d left as named where the palette moved them, each at least %.0f L* from its skin or as listed, its name kept, hue and chroma kept, at most %.0f L*, the skin as picked (%s)" % [
+		moved, drawn_moved, drawn_kept, PersonLook.HAIR_STEP, PersonLook.HAIR_MOVE_MAX, bad if not bad.is_empty() else "ok"])
+	_check(shorts.size() == PALETTE_SHORT.size() + DRAWN_SHORT.size(), "the pairs short of %.0f, each with its figure: %s" % [PersonLook.HAIR_STEP, shorts])
+	# Oswin's pair (skin 7, chestnut): kept on the palette's darker chestnut (HAIR_KEPT: the drawn move read as a tan cap),
+	# not the brown man's hair beside him (moved lighter on the noon-drawn values).
 	var oswin := PersonLook.hair_against("chestnut", Color(PersonLook.SKINS[6]))
 	var brown := PersonLook.hair_against("brown", Color(PersonLook.SKINS[6]))
-	_check(oswin != brown and PersonLook.lab_of(oswin).x < PersonLook.lab_of(Color(PersonLook.HAIR_COLOURS["chestnut"])).x,
-			"skin 7: chestnut darkened (%s), not the same as brown beside it (%s)" % [oswin.to_html(false), brown.to_html(false)])
+	_check(oswin != brown and oswin == PersonLook._hair_palette_move("chestnut", Color(PersonLook.SKINS[6]))
+			and PersonLook.lab_of(oswin).x < PersonLook.lab_of(Color(PersonLook.HAIR_COLOURS["chestnut"])).x,
+			"skin 7: chestnut darkened on the palette (%s), not the same as brown beside it (%s)" % [oswin.to_html(false), brown.to_html(false)])
+	# Each of HAIR_KEPT draws the palette's colour.
+	var kept_bad: Array = []
+	for key: String in PersonLook.HAIR_KEPT:
+		var skin_k := Color(PersonLook.SKINS[int(key.get_slice("/", 1)) - 1])
+		if PersonLook.hair_against(key.get_slice("/", 0), skin_k) != PersonLook._hair_palette_move(key.get_slice("/", 0), skin_k):
+			kept_bad.append(key)
+	_check(kept_bad.is_empty() and PersonLook.HAIR_KEPT.size() == 7, "the %d kept pairs draw the palette's colour (%s)" % [PersonLook.HAIR_KEPT.size(), kept_bad if not kept_bad.is_empty() else "ok"])
+	# The two-light rule's floor: black on skins 7 and 8 stops where the drawn crown stops darkening, short of 0.
+	for i in [6, 7]:
+		var black := PersonLook.hair_against("black", Color(PersonLook.SKINS[i]))
+		var lb := PersonLook.lab_of(black).x
+		_check(lb > 1.0 and lb < PersonLook.lab_of(Color(PersonLook.HAIR_COLOURS["black"])).x
+				and PersonLook.lit_hair(lb, "noon") - PersonLook.HAIR_LIT["noon"][0] < 0.3,
+				"skin %d: black darkened to the drawn floor and no further (%s, L* %.1f)" % [i + 1, black.to_html(false), lb])
 	# The beard: BEARD_FACING further off the skin than its hair, fading out past HAIR_STEP + BEARD_FACING; never the skin.
 	var beard_bad: Array = []
 	var beards_moved := 0

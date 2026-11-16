@@ -49,6 +49,25 @@ const HAIR_COLOURS := {"black": "1f1a17", "dark": "3b2a20", "brown": "564135", "
 ## the skin never moves (it is what a player picked). Where both ways reach the step, the smaller move; else the way
 ## ending further apart. Seven pairs stop short at the cap or the name (view_test _test_hair_value lists each).
 const HAIR_STEP := 16.0
+## The two-light rule (the coordinator's, on the pinned probe row; heads by day): the step also judged as the game draws
+## hair and face, at noon and at 19:00, with the lantern dark by day (451 amended (8)), measured off ui-design's covered
+## 64-still grids (gridcov12_4f354927e, gridcov19c_67eb7783a: crown and face inside each still): a crown's drawn L* by its
+## colour's L* at 0, 5 .. 100 (HAIR_LIT), and a face's drawn L* by its skin's (FACE_LIT by FACE_SKIN_L, the eight SKINS).
+## A hair takes the noon-drawn move (_hair_drawn_move) in place of the palette's (_hair_palette_move) only where it
+## stands further from the face at noon and no nearer at 19:00 (_hair_moved), and is not one of HAIR_KEPT; a drawn move
+## stops where the drawn crown stops darkening (the knots' floor: black on the darkest skins).
+const HAIR_LIT := {"noon": [20.3, 20.3, 21.7, 23.6, 27.1, 30.4, 34.9, 39.1, 43.4, 47.5, 52.2, 56.5, 61.1, 65.3, 70.1, 74.6,
+	78.9, 80.0, 80.0, 80.0, 80.0], "evening": [13.7, 13.7, 14.8, 17.1, 20.9, 23.8, 27.5, 31.6, 34.5, 38.4, 41.4, 45.4, 49.5,
+	53.3, 56.2, 60.9, 64.9, 65.0, 65.0, 65.0, 65.0]}
+const FACE_SKIN_L := [27.8, 37.4, 46.2, 55.2, 64.1, 71.3, 78.1, 86.5]
+const FACE_LIT := {"noon": [24.9, 32.3, 39.1, 46.3, 53.5, 59.2, 64.7, 71.7], "evening": [18.8, 25.1, 31.2, 37.5, 43.7, 48.6,
+	53.1, 58.5]}
+## Pairs (hair/skin, skin 1 the palest) that keep the palette's colour where the rule would move them, on the
+## coordinator's reading of one joined run of every choice (hairtable12/19_d308a98b5): dark/8, whose lighter move came
+## nearer the face in colour difference (dE2000) at both hours though the knots, reading lightness alone, said further;
+## chestnut/6 and chestnut/7, whose moves went to the skin's own hue band and read as a tan cap; fair/3, brown/5, dark/6
+## and brown/6, whose moves brought that skin's nearest two hair names closer than the palette's nearest pair there.
+const HAIR_KEPT := ["fair/3", "brown/5", "dark/6", "brown/6", "chestnut/6", "chestnut/7", "dark/8"]
 const HAIR_MOVE_MAX := 13.0
 const HAIR_MOVE_GRAIN := 0.25
 ## What a beard's front loses beside the cheek as drawn: it faces down, out of the sun (faces7's stills on skin 7: 3.1 L* on
@@ -424,7 +443,76 @@ static func hair_against(name: String, skin: Color) -> Color:
 	return _hair_against[key]
 
 
+## The two-light rule: the palette's move, or the noon-drawn one where that stands further from the face at noon
+## and no nearer at 19:00, but for HAIR_KEPT.
 static func _hair_moved(name: String, skin: Color) -> Color:
+	var today := _hair_palette_move(name, skin)
+	if "%s/%d" % [name, SKINS.find(skin.to_html(false)) + 1] in HAIR_KEPT:
+		return today
+	var drawn := _hair_drawn_move(name, skin)
+	var ls := lab_of(skin).x
+	var t := lab_of(today).x
+	var d := lab_of(drawn).x
+	var further_noon := absf(lit_hair(d, "noon") - lit_face(ls, "noon")) > absf(lit_hair(t, "noon") - lit_face(ls, "noon")) + 0.01
+	var nearer_evening := absf(lit_hair(d, "evening") - lit_face(ls, "evening")) < absf(lit_hair(t, "evening") - lit_face(ls, "evening")) - 0.01
+	if absf(d - t) > 0.01 and further_noon and not nearer_evening:
+		return drawn
+	return today
+
+
+## A crown of L* [param l] as drawn in [param light] (HAIR_LIT).
+static func lit_hair(l: float, light: String) -> float:
+	var knots: Array = HAIR_LIT[light]
+	var at := clampf(l / 5.0, 0.0, knots.size() - 1.001)
+	var i := int(at)
+	return lerpf(knots[i], knots[i + 1], at - i)
+
+
+## A face of skin L* [param l] as drawn in [param light] (FACE_LIT by FACE_SKIN_L).
+static func lit_face(l: float, light: String) -> float:
+	var drawn: Array = FACE_LIT[light]
+	if l <= FACE_SKIN_L[0]:
+		return drawn[0]
+	for i in FACE_SKIN_L.size() - 1:
+		if l <= FACE_SKIN_L[i + 1]:
+			return lerpf(drawn[i], drawn[i + 1], (l - FACE_SKIN_L[i]) / (FACE_SKIN_L[i + 1] - FACE_SKIN_L[i]))
+	return drawn[drawn.size() - 1]
+
+
+## The move the rule makes judged on the noon-drawn values (HAIR_LIT, FACE_LIT), as the palette rule below.
+static func _hair_drawn_move(name: String, skin: Color) -> Color:
+	var hair := Color(HAIR_COLOURS[name])
+	var ls := lit_face(lab_of(skin).x, "noon")
+	var h := lab_of(hair)
+	var d := lit_hair(h.x, "noon") - ls
+	if absf(d) >= HAIR_STEP:
+		return hair
+	var away := 1.0 if d > 0.0 else -1.0
+	var a := _hair_reach_lit(name, h, ls, away)
+	var b := _hair_reach_lit(name, h, ls, -away)
+	var pick := a
+	if a.x >= HAIR_STEP - 0.1 and b.x >= HAIR_STEP - 0.1:
+		pick = a if absf(a.y) <= absf(b.y) else b
+	elif b.x > a.x + 0.01:
+		pick = b
+	return from_lab(Vector3(h.x + pick.y, h.y, h.z))
+
+
+static func _hair_reach_lit(name: String, h: Vector3, ls: float, sign_: float) -> Vector2:
+	var move := 0.0
+	while move + HAIR_MOVE_GRAIN <= HAIR_MOVE_MAX and sign_ * (lit_hair(h.x + sign_ * move, "noon") - ls) < HAIR_STEP:
+		var next := h.x + sign_ * (move + HAIR_MOVE_GRAIN)
+		if next <= 0.0 or next >= 100.0 or nearest_hair(from_lab(Vector3(next, h.y, h.z))) != name:
+			break
+		# A move that buys nothing is not made: past the knots' floor (or ceiling) the drawn crown no longer changes.
+		if absf(lit_hair(next, "noon") - lit_hair(h.x + sign_ * move, "noon")) < 0.001:
+			break
+		move += HAIR_MOVE_GRAIN
+	return Vector2(absf(lit_hair(h.x + sign_ * move, "noon") - ls), sign_ * move)
+
+
+## The step judged on the palette's L* (the rule before the two-light one, still its first choice).
+static func _hair_palette_move(name: String, skin: Color) -> Color:
 	var hair := Color(HAIR_COLOURS[name])
 	var ls := lab_of(skin).x
 	var h := lab_of(hair)
