@@ -2632,6 +2632,35 @@ for each in gate._entries("running"):
     os.remove(gate._path("running", each["file"]))
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 
+print("== out of reach, said as such (394 amended (57)) ==")
+# Companions' net, 11-16: first in the queue over an hour beside three running jobs, said "3 heavy
+# jobs running" for three hours while it could not start with every gated job done.
+margins56 = (gate.MARGIN_GB, gate.COMMIT_MARGIN_GB)
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0  # the real gate's margins (checks above move them)
+net56 = dict(gate.kinds().get("net") or gate.KINDS["net"], kind="net")
+three56 = [{"tree": "a", "kind": "scene", "ram_gb": 1.6, "using_gb": 0.8, "gpu": False, "started": time.time() - 60},
+    {"tree": "r", "kind": "suite", "ram_gb": 7.2, "using_gb": 1.8, "gpu": False, "started": time.time() - 60},
+    {"tree": "s", "kind": "scene", "ram_gb": 1.6, "using_gb": 2.2, "gpu": False, "started": time.time() - 60}]
+check(gate.out_of_reach(net56, three56, 14.1, 10.4), "the net at 14.1 GB / 10.4 GB free beside 4.8 GB of gated jobs: out of reach")
+why56 = gate.reach_why(net56, three56, 14.1, 10.4)
+check(why56.startswith("out of reach: 18.9 GB RAM / 15.2 GB commit with every gated job done, %.1f / %.1f wanted" % (
+    net56["ram_gb"] + gate.MARGIN_GB, gate.commit_of(net56) + gate.COMMIT_MARGIN_GB)) and "memory held outside the gate" in why56,
+    "reach_why: the figures with every gated job done against what it wants, and what holds it (%s)" % why56)
+queue56 = [entry41("companions", "net", True, 1), entry41("builder", "scene", True, 2)]
+said = gate.queue_reasons(queue56, three56, 14.1, 10.4, None)
+check(said[0].startswith("waits: out of reach: 18.9 GB RAM") and "heavy jobs running" not in said[0],
+    "status: the head out of reach says so, not the count it met first (%s)" % said[0])
+check("out of reach" not in said[1], "and the scene behind it is judged as before: it holds nobody (%s)" % said[1])
+said = gate.queue_reasons(queue56, three56, 30.0, 30.0, None)
+check("out of reach" not in said[0], "in reach, the head says what it waits on as before (%s)" % said[0])
+gate.log("reach", "companions", "net", "out of reach 31 min at the head: " + why56)
+with contextlib.redirect_stdout(io.StringIO()) as out56:
+    gate.summary(datetime.date.today().isoformat())
+check(any(" companions net reach: out of reach 31 min" in line for line in out56.getvalue().splitlines()),
+    "the daily summary lists a row out of reach past REACH_LOG_SECONDS (%s)" % out56.getvalue().splitlines()[:6])
+check("reach" in gate.SUMMARY_EVENTS and gate.REACH_LOG_SECONDS == 1800, "logged once at 30 minutes, an event the summary reads")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = margins56
+
 print("== the sleepers ==")
 seen, left = [pid for pid, _ in sleepers_seen()], stop_sleepers()
 check(len(seen) >= 3 and not left, "each long sleeper stopped with its run, none left alive (%d started: %s; alive at the end: %s)" % (

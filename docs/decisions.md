@@ -11575,6 +11575,23 @@ behind a bench named; a scene queued 2 h never; a waiting bench's waiter logs it
 starts when the suite ends as before; the day's summary lists it. On main's code the first two named rows fail. Tools
 and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (57): a row out of reach says so (perf; the coordinator's ask and approval, 2026-11-16; label from
+tools/decision_number.sh). 11-16: companions' net sat first in the queue over an hour, three hours queued in all, while
+scenes that came after it kept starting; its status line said "3 heavy jobs running". The scenes were right to start: the
+net (estimate 14.74 GB RAM, 14.5 GB commit) wanted 22.7 GB RAM and 18.5 GB commit with the margins, and had 14.1 and 10.4
+free beside 4.8 GB used by the three running jobs, so 18.9 and 15.2 even with every gated job done: out of reach
+(out_of_reach), and a row out of reach holds nobody, since it waits on memory no queued job gives back (mostly the
+sessions, then 29.8 GB). Nothing about the queue changes; what changes is the wording, which named the first rule
+decide() met and not what held it. reach_why(job, running, free RAM, free commit): "out of reach: R GB RAM / C GB commit
+with every gated job done, R' / C' wanted (its estimate and the margin); memory held outside the gate (sessions,
+browsers) holds it, so jobs that fit go past it". It replaces the head's reason in status (queue_reasons) and in its
+waiter's own line, which before kept decide()'s reason and added "out of reach even with no heavy job running". A row
+out of reach at the head REACH_LOG_SECONDS (30 minutes) logs one "reach" line, which the daily summary lists
+(SUMMARY_EVENTS). tests/heavy_job_test.py: the net at 11-16's figures out of reach; reach_why's figures; status says it
+for the head and not for the scene behind it, which holds nobody as before; in reach, the head's reason as before; the
+summary lists a "reach" line. On main's code the status row fails ("waits: 3 heavy jobs running"). Tools and tests only;
+protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

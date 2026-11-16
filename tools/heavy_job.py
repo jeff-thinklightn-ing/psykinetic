@@ -695,6 +695,27 @@ def out_of_reach(job, running, free_ram_gb, free_commit_gb=None):
     return free_commit_gb is not None and free_commit_gb + back < commit_of(job) + COMMIT_MARGIN_GB
 
 
+## A row out of reach this long is logged once ("reach", in the daily summary; 394 amended (57)).
+REACH_LOG_SECONDS = 1800
+
+
+def reach_why(job, running, free_ram_gb, free_commit_gb=None):
+    """Why an out-of-reach [job] waits, in place of whatever decide() met first (394 amended (57),
+    the coordinator's ask, 2026-11-16): companions' net, first in the queue over an hour, said "3
+    heavy jobs running" for three hours while it wanted 22.7 GB and could have had 18.9 with every
+    gated job done. The figures with every gated job done against what it wants, and that memory
+    outside the gate holds it, so jobs that fit go past it."""
+    ram = free_ram_gb + sum(each.get("using_gb", 0.0) for each in running)
+    text = "out of reach: %.1f GB RAM" % ram
+    wanted = "%.1f" % (job["ram_gb"] + MARGIN_GB)
+    if free_commit_gb is not None:
+        commit = free_commit_gb + sum(each.get("using_commit_gb", each.get("using_gb", 0.0)) for each in running)
+        text += " / %.1f GB commit" % commit
+        wanted += " / %.1f" % (commit_of(job) + COMMIT_MARGIN_GB)
+    return ("%s with every gated job done, %s wanted (its estimate and the margin); memory held outside the "
+        "gate (sessions, browsers) holds it, so jobs that fit go past it" % (text, wanted))
+
+
 def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=None, now=None, length_s=None):
     """Whether [job] may start though [ahead] (the rows queued before it)
     came first: none, or each is out of reach (out_of_reach: a 29 GB mesh
@@ -2107,6 +2128,9 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
     # while it is first in the queue: a job further back waits on those
     # ahead of it too, and every waiter's late counted the same minutes again.
     held_by_backfill = None
+    # Since when it has been out of reach at the head, and whether that was logged (394 amended (57)).
+    reach_since = None
+    reach_logged = False
     # Since when it has been first in the queue: a long wait is mostly the
     # queue ahead of it, its time at the head what held it alone.
     head_since = None
@@ -2215,7 +2239,16 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 # in the order its waiter looked, and physics and items,
                 # queued first, ended 13th and 14th. The step was for waiters
                 # from a heavy_job.py older than 10-18's rule, none left.
-                why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
+                # 394 amended (57): said as what holds it, in place of the first rule decide() met
+                # ("3 heavy jobs running" for three hours, companions' net, 11-16), and logged once
+                # for the daily summary when it has been so REACH_LOG_SECONDS.
+                why = reach_why(row, running, free_ram, free_commit)
+                reach_since = reach_since or now
+                if not reach_logged and now - reach_since >= REACH_LOG_SECONDS:
+                    reach_logged = True
+                    log("reach", tree, kind, "out of reach %.0f min at the head: %s" % ((now - reach_since) / 60.0, why))
+            else:
+                reach_since = None
             if not head and holder is not None:
                 # The row that holds it (394 amended (28)), not always the
                 # head: playtest's tour, 8th, held the scenes behind it while
@@ -2969,6 +3002,9 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
             other_why = at_least(table, other, other_why)
             out.append("waits: behind %s, which waits on: %s%s" % (holder_name(queue, holder),
                 other_why or "its next look", "; " + past_why if past_why else ""))
+        elif head and out_of_reach(row, running, free_ram, free_commit):
+            # 394 amended (57): what holds it, not the first rule decide() met.
+            out.append("waits: %s" % reach_why(row, running, free_ram, free_commit))
         else:
             out.append("waits: %s" % at_least(table, row, why))
         if not ok and row.get("kind") == "bench":
@@ -3163,7 +3199,7 @@ def summary(day):
 
 ## The log's events the daily summary lists.
 SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "timeout", "backfill", "backfill_late", "front", "jump_long",
-    "old_gate", "unbeaten", "beat_failed", "timing_wait", "self_waiting")
+    "old_gate", "unbeaten", "beat_failed", "timing_wait", "self_waiting", "reach")
 ## Who may move a queued entry to the front (394 amended (25)): release, for a
 ## change every queued landing is paying for (a failing check on main, a broken
 ## tool) or on Jeff's word. Names are an honour system, as the land lock's are.
