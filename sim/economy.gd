@@ -271,7 +271,7 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 	if lines.size() > LOG_SIZE:
 		lines.pop_front()
 	_log[player_id] = lines
-	print("[economy] %s %s %d gold (%s): %d now, step %d" % [player_id, "got" if now_gold >= had else "spent",
+	print("[economy] a player %s %s %d gold (%s): %d now, step %d" % [Companion.tag(player_id), "got" if now_gold >= had else "spent",
 		absi(now_gold - had), why if why != "" else "no reason said", now_gold, now()])
 	purse_changed.emit(player_id, now_gold)
 	return now_gold

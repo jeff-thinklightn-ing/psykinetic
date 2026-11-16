@@ -4738,6 +4738,39 @@ which (net_test.sh does not read the line). Other trees' prints that
 name a player were listed to the coordinator. Server only, protocol
 unchanged, no new class_name, no bullet.
 
+284 amended (2) (the script's label; the coordinator's rulings of 2026-11-16 on companions' scan for
+279 amended (3)): no server print carries a whole player id, and a check every landing makes says
+so. A player's id is what they prove themselves with; it does not sit in a journal. Three did:
+"[crypt] <id> has been told <fact>" (main.gd), "[economy] <id> got/spent N gold (<why>): N now,
+step N" (sim/economy.gd) and "[named] <foe>'s <trophy> falls for <id>" (sim/world.gd). Each now
+says "a player #n", Companion.tag(id): the per-boot count 279 amended (3) gives her (her player's
+place in this run's order of first mention, in memory only, never the record's index), so a
+player and her companion share a number within one journal and never across a restart. The
+economy line's tail ("spent 10 gold (given toward the town's field): 40 now, step 812"), which
+ui-design's donate tours match, is unchanged. dungeon, economy and enemy-ai own the three files
+and had the lines first; release: nothing of its own reads them. Seven more prints showed an
+entity by node name where she could be the entity, or a player's node under a loose name: the
+chest's stock lines ([state] keeps its old stock, no room, topped up), the coin purse and
+World.spawn's warning take Companion.log_name(entity); [net] died (twice), [net] moved and
+[kicks] pushed, all in a Player-only branch, now say (entity as Player).name, so the check counts
+them as a player's node. tools/print_names.py (Godot-free; tests/print_names_test.sh beside it)
+reads every print, printerr and push_warning in main.gd, sim/ and net/, each call joined across
+its lines and its strings' words not read as code, and fails on her name (_name_of, a card's
+"name", pet_name, pet.name/label), an entity that may be her by node name or label (entity,
+other, target, intent_target, who, body, e, actor, occupant, victim, attacker; any label; her
+bare name in sim/companion.gd) and a whole player id (player_id, keeper_id, owner_id, the
+peer-to-id table), each passing inside Companion.tag, Main.pet_tag or Companion.log_name (an id
+read by Standing.score prints a number). "[test]" lines (test runs only) are not read. The lines
+still naming a player are counted per file in tools/print_names_budget.txt, which only falls (a
+file over its line fails, and one under it until the line is lowered in the same commit):
+player_name 23 (record.name, player_name, Main._display_name), id_letters 4 (an id's first eight
+letters: [net] joined, left and no free tile, net.gd's authenticated), player_node 16
+("Player<index>": the [free] walk, [cache], [arts], [net] joined/died/moved, [kicks]). The
+coordinator's (3): the eight letters come off next in a take of their own with server/stage.sh's
+wait; the names are Jeff's say. perf wires the check into land.sh's and land.ps1's checks after
+reading this diff, failing only once it passes on main's tip. Server only, protocol unchanged, no
+new class_name, no bullet.
+
 ## 289. Lore is read by one class, Lore, and asked one thing: what a knower knows
 
 `Lore` (`sim/lore.gd`) reads levels/lore/ once and keeps it (read on first use,

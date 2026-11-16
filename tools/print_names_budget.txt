@@ -1,0 +1,12 @@
+# Server prints that still name a player, per file (tools/print_names.py; 279 amended (3), 284
+# amended (2)). One line per file and kind: path kind count. Kinds: player_name (record.name,
+# player_name, Main._display_name), id_letters (an id's first letters, .left(n)), player_node
+# (a Player node's name, "Player<index>"). A line only falls: print_names fails a file over its
+# line (a new print names a player) and under it (lower the line in the same commit). The
+# coordinator's (3), 2026-11-16: the id's letters come off next; the names are Jeff's say.
+main.gd player_name 22
+main.gd id_letters 3
+main.gd player_node 15
+net/net.gd player_name 1
+net/net.gd id_letters 1
+sim/world.gd player_node 1

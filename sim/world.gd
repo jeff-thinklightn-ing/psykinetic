@@ -4212,7 +4212,7 @@ func _named_fell(monster: Monster, by: GridEntity) -> void:
 	if not trophy.is_empty() and monster.slots.size() > Items.RIGHT_HAND and monster.slots[Items.RIGHT_HAND] == trophy \
 			and not player_id.is_empty() and _trophy_due(player_id, monster.named_id, trophy):
 		_trophy_taken(player_id, monster.named_id, trophy)
-		print("[named] %s's %s falls for %s" % [monster.named_id, trophy, player_id])
+		print("[named] %s's %s falls for a player %s" % [monster.named_id, trophy, Companion.tag(player_id)])  # 284 amended (2): never the id.
 	else:
 		_keep_named_weapon(monster)
 	var record := named_enter(monster.named_id, str(monster.spawn_spec.get("kind", "")))
@@ -9247,7 +9247,7 @@ func _purses_migrated(entity: GridEntity, contents: Variant, uids: Variant) -> V
 			add_gold(player_id, gold, "a coin purse")
 		else:
 			drop_gold(entity.zone if not entity.zone.is_empty() else zone.name, entity.tile, gold)
-		print("[state] %s's coin purse: %d gold (601 amended)" % [entity.name, gold])
+		print("[state] %s's coin purse: %d gold (601 amended)" % [Companion.log_name(entity), gold])
 	return out
 
 
@@ -9255,7 +9255,7 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	if not Net.is_authority():
 		return false
 	if entity.spawned or entity.holds_cell and not is_free(at):
-		push_warning("World.spawn: cannot place %s at %s" % [entity.name, at])
+		push_warning("World.spawn: cannot place %s at %s" % [Companion.log_name(entity), at])
 		return false
 	if entity.holds_cell:
 		_occupancy[at] = entity  # One holding no cell (a Locker, 722) stands where it is put.

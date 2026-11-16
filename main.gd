@@ -7435,7 +7435,7 @@ func _keep_old_stock(entity: GridEntity) -> void:
 	props.erase("cache_cell")
 	entity.spawn_spec = entity.spawn_spec.duplicate()
 	entity.spawn_spec["props"] = props
-	print("[state] %s keeps its old stock; laid as its cache once empty" % entity.name)
+	print("[state] %s keeps its old stock; laid as its cache once empty" % Companion.log_name(entity))
 
 
 ## A level chest's starting kit brought to a saved world (decision 468;
@@ -7465,7 +7465,7 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 			continue
 		var free := slots.find("")
 		if free < 0:
-			print("[state] %s has no room for its stock: %s" % [entity.name, id])
+			print("[state] %s has no room for its stock: %s" % [Companion.log_name(entity), id])
 			continue
 		slots[free] = id
 		uids[free] = World.items.mint(id, "stocked", World._label_of(entity), entity.zone, entity.tile, World.style_from(entity))
@@ -7476,7 +7476,7 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 	entity.spawn_spec["props"] = props
 	if not given.is_empty():
 		World.set_slots(entity, slots, uids)
-		print("[state] %s topped up: %s" % [entity.name, ", ".join(given)])
+		print("[state] %s topped up: %s" % [Companion.log_name(entity), ", ".join(given)])
 
 
 ## Each kept record of a fallen knight holding his slot set on his marker's
@@ -22215,11 +22215,11 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 		_players.erase(peer)
 		_fell_at[peer] = entity.tile
 		if _start_return(str(_peer_ids.get(peer, "")), "player", entity.tile):
-			print("[net] %s died; to be brought back" % entity.name)
+			print("[net] %s died; to be brought back" % (entity as Player).name)
 		else:
 			_respawn_at[peer] = World.tick + RESPAWN_TICKS
 			_tell_return(peer, "", "", RESPAWN_TICKS)
-			print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
+			print("[net] %s died; respawning in %d ticks" % [(entity as Player).name, RESPAWN_TICKS])
 	if entity is Companion:
 		var record: PlayerRecord = _records.get(entity.keeper_id)
 		if record != null and not record.companion.is_empty():
@@ -23246,7 +23246,7 @@ func _secret_told(player_id: String, fact_id: String) -> void:
 	# The crypt's secrets and the old gods' (lore's old_gods.*, the same secret's deeper why) both mark it.
 	if (fact_id.begins_with("crypt.") or fact_id.begins_with("old_gods.")) and not player_id.is_empty() and not _crypt_told.get(player_id, false):
 		_crypt_told[player_id] = true
-		print("[crypt] %s has been told %s" % [player_id, fact_id])
+		print("[crypt] a player %s has been told %s" % [Companion.tag(player_id), fact_id])  # 284 amended (2): never the id.
 
 
 ## What Aldous may ask of [param player_id] now (Offers._crypt_offers, ctx
@@ -28157,7 +28157,7 @@ func _debug_text() -> String:
 func _log_player_move(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 	if entity is Player:
 		print("[net] %s (peer %d) moved %s -> %s occupancy_consistent=%s" % [
-			entity.name, entity.owner_peer, from, to, World.is_occupancy_consistent()])
+			(entity as Player).name, entity.owner_peer, from, to, World.is_occupancy_consistent()])
 
 
 func _on_join_rejected(reason: String, server_version: String) -> void:
@@ -30355,7 +30355,7 @@ func _run_test_kicks() -> void:
 			var back := -entity.free_way.normalized()
 			World._push(entity, entity, back + back.orthogonal() * 0.5, speed)
 			_test_kicks_given += 1
-			print("[kicks] pushed %s at %.1f from %s" % [entity.name, speed, entity.free_pos])
+			print("[kicks] pushed %s at %.1f from %s" % [(entity as Player).name, speed, entity.free_pos])
 
 
 
