@@ -7,21 +7,26 @@ notes (decision 324).
 
 ## Unreleased
 
-- A click on the ground walks you there even when it lands on a slow moment, and a click on ground you can't reach walks you as near to it as you can get (935 amended (1)).
-- Bound-up hair sits in a top-knot high on the crown, where you see it from the playing camera, and a hood or hat covers it (419 amended (9)).
-- Names over heads stand clear of one another: one that would cover another steps up above it, your companion's name sits above yours with a gap when they stand beside you or nearer the camera, and someone straight behind you shows no name over your head or body, while one whose head is beside yours keeps theirs (865 amended (7)).
-- Health bars are thin strips just under each name, one size near or far, and bars that would touch step apart; yours shows over your head when you're hurt or fighting, as anyone's does (865 amended (3)).
-- A click on someone behind a shut door, such as the healer in his hut, walks you to the door, opens it and brings up their window as a click in the open would (935 amended (3)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and there's low talk among the townsfolk inside (920).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
-- In the crypt, after you fall with the fallen knight's task open, the next time you talk to him he tells you to take the Mound-breakers a few at a time, and that those you have put down stay counted (747 amended (15)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.224
+
+- A click on the ground walks you there even when it lands on a slow moment, and a click on ground you can't reach walks you as near to it as you can get (935 amended (1)).
+- Bound-up hair sits in a top-knot high on the crown, where you see it from the playing camera, and a hood or hat covers it (419 amended (9)).
+- Names over heads stand clear of one another: one that would cover another steps up above it, your companion's name sits above yours with a gap when they stand beside you or nearer the camera, and someone straight behind you shows no name over your head or body, while one whose head is beside yours keeps theirs (865 amended (7)).
+- Health bars are thin strips just under each name, one size near or far, and bars that would touch step apart; yours shows over your head when you're hurt or fighting, as anyone's does (865 amended (3)).
+- A click on someone behind a shut door, such as the healer in his hut, walks you to the door, opens it and brings up their window as a click in the open would (935 amended (3)).
+- In the crypt, after you fall with the fallen knight's task open, the next time you talk to him he tells you to take the Mound-breakers a few at a time, and that those you have put down stay counted (747 amended (15)).
+- You and your companion run upright, chest up and head over the hips, with the planted foot on the ground (953).
+- The old grey's bite marks the ground under you red just before it lands: step off it and he bites the air (780 amended (38)).
 
 ## v0.1.223
 
