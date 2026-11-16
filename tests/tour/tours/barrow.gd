@@ -56,6 +56,13 @@ func run(bot: Node) -> void:
 		bot.press("close")
 		await _keep_knight(bot, true)
 		return
+	if OS.get_environment("TOUR_ONLY") == "niche":  # The cold niche alone, the quest's mark set by the console.
+		await _to_barrow(bot)
+		await _niche_shut(bot)
+		bot.log_line("setup: %s" % await bot.admin("mark Tourbot barrow_quest"))
+		await bot.seconds(2.0)
+		await _niche(bot)
+		return
 	if OS.get_environment("TOUR_ONLY") == "wall":  # A cut's line: the wall turn alone.
 		await _to_barrow(bot)
 		await _wall_turn(bot)
@@ -64,12 +71,14 @@ func run(bot: Node) -> void:
 	await _rolf(bot)
 	await _sleepers(bot)
 	await _to_barrow(bot)
+	await _niche_shut(bot)
 	await _knight(bot)
 	await _names(bot)
 	await _fights(bot)
 	await _wall_turn(bot)  # The band down: the camp's way quiet.
 	await _chest(bot)
 	await _turn_in(bot)
+	await _niche(bot)
 	await _keep_knight(bot)
 	await _out_to_rolf(bot)
 	# 724 amended: no walk this tour stepped back and forth on the spot.
@@ -172,6 +181,8 @@ func _knight(bot: Node) -> void:
 		bot.log_line("door %s open %s lock \"%s\" hp %d" % [door.key, door.open, door.lock, door.hp])
 	var got_there: bool = await bot.walk_to(knight.tile, 2, 120.0)
 	bot.expect(got_there, "I can walk to the knight", "at %s" % bot.cell())
+	_one_knight_at_bier(bot, knight)
+	_guard_room_gone(bot)
 	await _talk_knight(bot, "before the quest", AstralKnight.ASK_TITLE)
 	_names_read(bot, "the knight's window and his words")
 	# The count at the taking (747 amended (8)): one of the band felled before.
@@ -211,6 +222,50 @@ func _knight(bot: Node) -> void:
 	bot.expect(hits.is_empty(), "nobody strikes the fallen knight", "%d blows on him" % hits.size())
 
 
+## Jeff's "astral knight still in wrong room" (11-14; 747 amended (13)): one
+## fallen knight among the bodies the client knows, standing within 2 cells
+## of the First Hall's bier (the burial table nearest him in the client's
+## level).
+func _one_knight_at_bier(bot: Node, knight: GridEntity) -> void:
+	var knights: Array = bot.seen("AstralKnight")
+	bot.expect(knights.size() == 1, "one fallen knight in the barrow, as the client knows it",
+		"%d: %s" % [knights.size(), knights.map(func(k: GridEntity) -> String: return "%s@%s" % [bot.label(k), k.tile])])
+	var level: Dictionary = bot.main.get("level") if bot.main.get("level") is Dictionary else {}
+	var nearest := -1
+	var bier := Rect2i()
+	for entry: Variant in level.get("buildings", []):
+		if not entry is Dictionary or str((entry as Dictionary).get("slot", "")) != "building.burial_table":
+			continue
+		var rect: Variant = Level.building_rect(entry)
+		if not rect is Rect2i:
+			continue
+		var r: Rect2i = rect
+		var near := Vector2i(clampi(knight.tile.x, r.position.x, r.end.x - 1), clampi(knight.tile.y, r.position.y, r.end.y - 1))
+		var apart := World.distance(knight.tile, near)
+		if nearest < 0 or apart < nearest:
+			nearest = apart
+			bier = r
+	bot.expect(nearest >= 0 and nearest <= 2, "the fallen knight stands by the First Hall's bier", "at %s; the nearest bier %s, %d cells off" % [knight.tile, bier, nearest])
+
+
+## Jeff's "remove it all together" (11-14, the room with two guards, a chest
+## and a knight; 747 amended (13)): every cell of the barrow block's "rock"
+## (its place) is no floor on the client's map, and no body stands in it.
+func _guard_room_gone(bot: Node) -> void:
+	var rocks: Array = Regen.config_of("barrow").get("rock", [])
+	if not bot.expect(not rocks.is_empty(), "the barrow's block names the old guard room's place (its \"rock\")"):
+		return
+	for each: Variant in rocks:
+		var rect := Rect2i(int(each[0]), int(each[1]), int(each[2]), int(each[3]))
+		var floor: Array[Vector2i] = []
+		for cell in Level.rect_cells(rect):
+			if World.is_walkable(cell):
+				floor.append(cell)
+		var inside: Array = bot.seen().filter(func(e: GridEntity) -> bool: return rect.has_point(e.tile))
+		bot.expect(floor.is_empty() and inside.is_empty(), "the old guard room's place %s is solid rock on my map, nobody in it" % rect,
+			"%d floor cells %s; bodies %s" % [floor.size(), floor.slice(0, 6), inside.map(func(e: GridEntity) -> String: return "%s@%s" % [bot.label(e), e.tile])])
+
+
 ## The band, as a player clears the barrow: the named ones the tracker
 ## has not ticked, nearest first, Brand last; each felled one ticked. Going
 ## down is play, not a failure (the bot is a poor fighter): brought back,
@@ -220,6 +275,7 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 	var since: int = bot.now_msec()
 	var deaths := 0
 	var bosses := {}
+	var to_camp := false
 	while bot.now_msec() < end:
 		for boss: GridEntity in bot.seen("robber").filter(func(e: GridEntity) -> bool: return e.get("boss") == true):
 			bosses[boss.get_instance_id()] = str(boss.get("given_name"))
@@ -230,6 +286,7 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 			if not await _back_in(bot):
 				break
 			deaths += 1
+			to_camp = false
 			if deaths == 1 and not _unticked(bot).is_empty():
 				await _knight_after_fall(bot, never_heard)
 			continue
@@ -244,6 +301,13 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 			return e is Monster and str(e.get("given_name")) in left)
 		if foes.size() > 1:
 			foes = foes.filter(func(e: GridEntity) -> bool: return not e.get("boss") == true)
+		if foes.is_empty() and not to_camp:
+			# The band keeps to its camp (Brand at the chest's post): walked to, as a
+			# player goes looking, not waited for where the last fight ended.
+			to_camp = true
+			bot.log_line("none of %s in sight; to the camp by %s" % [left, CAMP_CHEST])
+			await bot.walk_to(CAMP_CHEST, 4, 90.0)
+			continue
 		if foes.is_empty():
 			bot.log_line("none of %s in sight; waiting" % [left])
 			await bot.guard(10.0)
@@ -590,6 +654,235 @@ func _turn_in(bot: Node) -> void:
 	await _talk_knight(bot, "after the band's turn-in", "", AstralKnight.AWAIT, true)
 	bot.press("close")
 	bot.log_line("purse %d -> %d at the turn-in" % [before, int(bot.main.gold)])
+
+
+## The way below, as a player meets it (Jeff on v0.1.186, said again since:
+## "the hidden niche ... doesn't activate by stepping on that tile"; 608,
+## 688 amended (4), 747; the coordinator's cases, 11-16). Every press is the
+## click scheme's, by real input events (Input.parse_input_event), the
+## cursor put over its cell by a parsed motion (headless, the viewport reads
+## Input's mouse position). Once the knight has revealed it: a tap on the
+## niche's floor cell alone opens nothing; a tap on the slab, as most players
+## click (press and release 0.05 s apart), from the hall and from the floor
+## cell, walks me into it and opens it (the door, and the server's line); the
+## held button steering into it is tried only if no tap opened it, so the
+## rest is walked. The stair below takes me to barrow_deep, its way up brings
+## me back. A press by E is never tried: it would hide a walk that does
+## nothing.
+func _niche(bot: Node) -> void:
+	if bot.zone() != "barrow" and not await _back_in(bot):
+		return
+	var p := _niche_parts(bot)
+	if p.is_empty():
+		return
+	if not bot.expect(not bool(p["open"]), "the slab is shut before I walk into it"):
+		return
+	var edge: Vector3i = p["edge"]
+	await bot.walk_to(p["hall"], 0, 90.0)
+	var floor_tap := await _tap_and_watch(bot, "after the turn-in, from the hall, a tap on the niche's floor cell", p["from"], edge, 4.0)
+	await bot.seconds(3.0)
+	var door: Door = World.door_on(edge)
+	bot.expect(not floor_tap["opened"] and not (door != null and door.open), "a tap on the niche's floor cell, then standing there, opens nothing",
+		"at %s; told %s" % [bot.cell(), floor_tap["told"]])
+	await bot.walk_to(p["hall"], 0, 30.0)
+	var from_hall := await _tap_and_watch(bot, "after the turn-in, from the hall, a tap on the slab", p["inside"], edge)
+	bot.expect(from_hall["opened"], "after the turn-in, a tap on the slab from the hall walks me into it and it opens", "at %s; told %s" % [bot.cell(), from_hall["told"]])
+	if from_hall["opened"]:
+		await _shut_again(bot, p)
+	await bot.walk_to(p["from"], 0, 30.0)
+	var from_floor := await _tap_and_watch(bot, "after the turn-in, on its floor cell, a tap on the slab", p["inside"], edge)
+	bot.expect(from_floor["opened"], "after the turn-in, a tap on the slab from its floor cell walks me into it and it opens", "at %s; told %s" % [bot.cell(), from_floor["told"]])
+	var opened: bool = from_floor["opened"]
+	if not opened:
+		await bot.walk_to(p["from"], 0, 30.0)
+		var since: int = bot.now_msec()
+		opened = await _walk_into(bot, p["from"], p["inside"], edge, 4.0)
+		bot.log_line("no tap opened it; the button held into it: %s; told %s" % ["opened" if opened else "shut", bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]))])
+	if not opened:
+		return
+	var opened_at: int = bot.now_msec()
+	# Down the stair: the hidden link to barrow_deep (608: under the slab).
+	var stair := _link_to(bot, "barrow_deep")
+	bot.log_line("the stair down: %s" % (str(stair) if stair != Vector2i(-1, -1) else "not in the client's level; walked through the niche"))
+	await bot.walk_to(stair if stair != Vector2i(-1, -1) else p["inside"], 0, 60.0)
+	await bot.until(func() -> bool: return bot.zone() == "barrow_deep" and bot.me() != null, 20.0)
+	if not bot.expect(bot.zone() == "barrow_deep", "through the opened niche, the stair takes me down to the Ossuary's level (barrow_deep)",
+			"zone %s at %s" % [bot.zone(), bot.cell()]):
+		return
+	var down_s: float = (bot.now_msec() - opened_at) / 1000.0
+	# 608 amended (8): a click on the stair the moment the slab opens waits out the
+	# finder's hold and walks on (Main._found_hold), never ended: one click.
+	bot.expect(down_s < 2.0, "the stair clicked as the slab opens: down it in under 2 s, one click", "%.1f s" % down_s)
+	await bot.settled()
+	var up := _link_to(bot, "barrow")
+	if not bot.expect(up != Vector2i(-1, -1), "the way back up is in barrow_deep's level"):
+		return
+	await bot.walk_to(up, 0, 60.0)
+	await bot.until(func() -> bool: return bot.zone() == "barrow" and bot.me() != null, 20.0)
+	bot.expect(bot.zone() == "barrow", "back up the stair into the barrow", "zone %s at %s" % [bot.zone(), bot.cell()])
+	await bot.settled()
+
+
+## Before the turn-in (the way not revealed to me): tapped from the hall,
+## tapped from its floor cell, and walked into with the button held, the slab
+## stays shut, and nothing I am told speaks of a way (no slab line, no
+## draught); what I am told logged.
+func _niche_shut(bot: Node) -> void:
+	var p := _niche_parts(bot)
+	if p.is_empty():
+		return
+	var edge: Vector3i = p["edge"]
+	var told: Array = []
+	await bot.walk_to(p["hall"], 0, 60.0)
+	var a := await _tap_and_watch(bot, "before the turn-in, from the hall, a tap on the slab", p["inside"], edge)
+	await bot.walk_to(p["from"], 0, 30.0)
+	var b := await _tap_and_watch(bot, "before the turn-in, on its floor cell, a tap on the slab", p["inside"], edge)
+	var since: int = bot.now_msec()
+	var held := await _walk_into(bot, p["from"], p["inside"], edge, 2.0)
+	told.append_array(a["told"])
+	told.append_array(b["told"])
+	told.append_array(bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"])))
+	bot.expect(not a["opened"] and not b["opened"] and not held, "before the turn-in the slab stays shut, tapped or walked into",
+		"from the hall %s, from its floor %s, held %s" % [a["opened"], b["opened"], held])
+	var false_words: Array = told.filter(func(t: String) -> bool: return "slab" in t or "draught" in t or "stair" in t)
+	bot.expect(false_words.is_empty(), "before the turn-in nothing I am told speaks of a way (no slab, draught or stair)", "told %s" % [told])
+	bot.log_line("before the turn-in, at the slab, told: %s" % [told])
+	await bot.walk_to(p["hall"], 0, 30.0)  # Off the slab: no press of mine left leaning into it.
+
+
+## The First Hall's hidden niche as the client holds it: its door's edge,
+## its floor cell ("from"), the slab's cell ("inside"), a hall cell 3 or 2
+## from the floor cell, straight out from the slab ("hall"), "open"; {} if
+## the client holds none.
+func _niche_parts(bot: Node) -> Dictionary:
+	var niche: Dictionary = World.hidden_niche()
+	if not bot.expect(not niche.is_empty(), "the client holds the First Hall's hidden niche", "%d niche edges" % World.niche_edges.size()):
+		return {}
+	var edge: Vector3i = niche["edge"]
+	var from: Vector2i = niche["cell"]
+	var cells: Array = Terrain.edge_cells(edge)
+	var inside: Vector2i = cells[1] if cells[0] == from else cells[0]
+	var away := from - inside
+	var hall := from
+	for n: int in [3, 2]:
+		if World.is_walkable(from + away * n):
+			hall = from + away * n
+			break
+	bot.log_line("the cold niche: its floor cell %s, the slab toward %s (edge %s, open %s); the hall's tapping spot %s" % [from, inside, edge, niche["open"], hall])
+	return {"edge": edge, "from": from, "inside": inside, "hall": hall, "open": bool(niche["open"])}
+
+
+## A tap as most players click, by parsed input events: the cursor over
+## [param cell], the left button pressed and let go 0.05 s apart; then up
+## to [param most] s for the door on [param edge] to open. {opened, told}
+## (the texts told since), logged as [param what] with the pick and where I
+## came to stand.
+func _tap_and_watch(bot: Node, what: String, cell: Vector2i, edge: Vector3i, most := 5.0) -> Dictionary:
+	var since: int = bot.now_msec()
+	var started: Vector2i = bot.cell()
+	var pick := await _point_at(bot, cell)
+	_button(true, _screen_of(bot, cell))
+	await bot.seconds(0.05)
+	_button(false, _screen_of(bot, cell))
+	await bot.until(func() -> bool:
+		var shut: Door = World.door_on(edge)
+		return shut != null and shut.open, most)
+	await bot.seconds(0.5)
+	var door: Door = World.door_on(edge)
+	var opened := door != null and door.open
+	var told: Array = bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]))
+	bot.log_line("%s: tapped %s (the pick %s) from %s; now at %s; the slab %s; told %s" % [what, cell, pick, started, bot.cell(), "open" if opened else "shut", told])
+	return {"opened": opened, "told": told}
+
+
+## The opened slab shut again for the next case (setup, not a press under
+## test): E at it with it under the cursor, from its floor cell.
+func _shut_again(bot: Node, p: Dictionary) -> void:
+	await bot.walk_to(p["from"], 0, 30.0)
+	var door: Door = World.door_on(p["edge"])
+	if door != null and door.open:
+		await bot.tap_e_door(door)
+		await bot.until(func() -> bool: return not door.open, 3.0)
+	bot.log_line("setup: the slab shut again by E: %s" % ("shut" if door != null and not door.open else "still open"))
+
+
+## The click scheme's walk into [param inside] from [param from]: the cursor
+## over my own cell, the left button pressed (a click there, the route
+## nothing), the cursor moved over the niche, the button held past
+## Main.FREE_HOLD_SECONDS so it steers, all as parsed input events; held
+## till the door on [param edge] opens, most [param most] seconds; let go.
+## True if it opened. The cursor's cell and the steer logged.
+func _walk_into(bot: Node, from: Vector2i, inside: Vector2i, edge: Vector3i, most: float) -> bool:
+	var saved := str(Net.controls)
+	Net.controls = "click"
+	await _point_at(bot, from)
+	bot.log_line("cursor over my cell %s (screen %s): the pick reads %s" % [from, _screen_of(bot, from), bot.main._pick_grid])
+	_button(true, _screen_of(bot, from))
+	await bot.frames(2)
+	var end: int = bot.now_msec() + int(most * 1000.0)
+	var picks := {}
+	var door: Door = World.door_on(edge)
+	while bot.now_msec() < end and not (door != null and door.open):
+		_motion(_screen_of(bot, inside))
+		await bot.frames(1)
+		picks[Vector2i(Vector2(bot.main._pick_grid).round())] = true
+		door = World.door_on(edge)
+	_button(false, _screen_of(bot, inside))
+	await bot.frames(2)
+	Net.controls = saved
+	bot.log_line("held into the niche: cursor cells %s; at %s; door %s" % [picks.keys(), bot.cell(), "open" if door != null and door.open else "shut"])
+	return door != null and door.open
+
+
+## Where [param cell] is on the screen, for the cursor: the 3D view's, or
+## (headless, no 3D view) the 2D pick's inverse (Main._update_pick:
+## Iso.local_to_grid of Main's local cursor point).
+func _screen_of(bot: Node, cell: Vector2i) -> Vector2:
+	var view: Node = bot.main.get("_client3d")
+	if view != null:
+		return view.screen_of_tile(cell)
+	var main: Node2D = bot.main
+	return main.get_viewport().get_screen_transform() * main.get_global_transform_with_canvas() * Iso.grid_to_local(Vector2(cell))
+
+
+## The cursor put over [param cell] by parsed motions, again each frame till
+## Main's pick reads it (within half a cell; the camera follows the body),
+## 12 frames at most; the pick it reads.
+func _point_at(bot: Node, cell: Vector2i) -> Vector2:
+	var pick := Vector2(NAN, NAN)
+	for i in 12:
+		_motion(_screen_of(bot, cell))
+		await bot.frames(1)
+		pick = bot.main._pick_grid
+		if not is_nan(pick.x) and pick.distance_to(Vector2(cell)) < 0.5:
+			break
+	return pick
+
+
+func _motion(at: Vector2) -> void:
+	var event := InputEventMouseMotion.new()
+	event.position = at
+	event.global_position = at
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) else 0
+	Input.parse_input_event(event)
+
+
+func _button(pressed: bool, at: Vector2) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = pressed
+	event.position = at
+	event.global_position = at
+	Input.parse_input_event(event)
+
+
+## The cell of the client's level's link to [param map], or (-1, -1).
+func _link_to(bot: Node, map: String) -> Vector2i:
+	var level: Dictionary = bot.main.get("level") if bot.main.get("level") is Dictionary else {}
+	for link: Dictionary in level.get("links", []):
+		if str(link.get("to_map", "")) == map and link.get("tile") is Vector2i:
+			return link["tile"]
+	return Vector2i(-1, -1)
 
 
 ## Every name made ticked before the turn-in (coordinator, 11-01): one who

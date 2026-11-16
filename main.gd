@@ -436,7 +436,7 @@ var _camp_clear_since: Dictionary[String, int] = {}
 ## about on it says so once.
 var _told_closed: Dictionary[int, Vector2i] = {}
 ## Peer -> the burial niche's edge it last pressed on (608), so pressing
-## on at it says "Only the dead lie here." once.
+## on at it says NICHE_SHUT_LINE once.
 var _told_niche: Dictionary[int, Vector3i] = {}
 ## Peer -> World.tick when "The dead bar the way." was last said to them
 ## for a walk into the held Hall door (_on_door_pressed).
@@ -1407,6 +1407,7 @@ func _process(delta: float) -> void:
 	_update_cast()
 	_update_throne()
 	_update_altar()
+	_update_niche()
 	_update_talk()
 	_update_deal()
 	_update_find()
@@ -1713,6 +1714,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return  # 896: the draugr's throne, walked to and sat on.
 	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _altar_click(player, tile):
 		return  # 896: the knight's altar, walked to and his remains laid.
+	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _niche_click(player, tile):
+		return  # 608 amended (8): a niche's stone, walked to and pressed.
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
 		return
@@ -3039,6 +3042,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles
 	_cast_wanted = NONE  # 805 amended (11): a walk ordered drops a far cast (_fish_click sets it after).
 	_throne_wanted = NONE  # 896: likewise a far throne (_throne_click sets it after).
 	_altar_wanted = NONE  # 896: and a far altar (_altar_click).
+	_niche_wanted = {}  # 608 amended (8): and a far niche (_niche_click sets it after).
 	_talk_wanted = null
 	_free_waiting = {}
 	if _free_own(player) == null:
@@ -3218,6 +3222,12 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 		if _hand_holds():
 			return Vector2.ZERO
 		_held_through = false
+	if not _niche_lean.is_empty():
+		# 608 amended (8): a niche clicked, its floor cell reached: the body leans into
+		# its stone, the server's press (World._free_pressed) as a held walk into it.
+		if Time.get_ticks_msec() < int(_niche_lean["until"]) and (_free.get("path", []) as Array).is_empty():
+			return _niche_lean["way"]
+		_niche_lean = {}
 	var at := own.shown(player)
 	if Net.controls == "wasd":
 		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
@@ -3872,6 +3882,7 @@ func _free_chase_send(player: Player, target: GridEntity) -> void:
 ## a lead taken over.
 func _free_taken_over(player: Player) -> void:
 	_free["chase"] = null
+	_niche_lean = {}  # 608 amended (8): a lean into a niche given up.
 	_guide_taken_over(player)
 
 
@@ -11623,6 +11634,11 @@ const HIDDEN_LOCK := "hidden_niche"
 ## amended (2)): Client3D's shudder, grind back and slide, 1.1 s, so the
 ## press's carry does not take them down the stair before it is seen.
 const NICHE_FOUND_HOLD := 11
+## What a niche pressed on says when it opens nothing (608 amended (8),
+## voice's words, 11-16): true of every niche, and not false of the hidden
+## slab before the way is revealed (it was "Only the dead lie here.", false
+## of the one niche over the stair).
+const NICHE_SHUT_LINE := "The stone is cold, and it doesn't give."
 ## How often a waiting seal on the hall is asked again (666): 1 s.
 const HALL_SEAL_EVERY := 10
 ## The hall's door while the Ossuary's dead stand (666): a key nobody holds.
@@ -13568,7 +13584,7 @@ func hall_lair_rect(zone_name: String) -> Rect2i:
 ## is revealed to them (747, way_revealed: the fallen knight's quest done):
 ## the door opened and said, its lock kept, so it gives to them alone (and
 ## to whoever follows them through while it stands open); any other niche,
-## or the way not theirs yet, "Only the dead lie here." once a stand
+## or the way not theirs yet, NICHE_SHUT_LINE once a stand
 ## (_told_niche).
 func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 	if not entity is Player:
@@ -13588,7 +13604,7 @@ func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 		return
 	if _told_niche.get(peer) != key:
 		_told_niche[peer] = key
-		say_to([peer], "Only the dead lie here.")
+		say_to([peer], NICHE_SHUT_LINE)
 
 
 ## Server: [param entity] (a player) stepped to [param to]: on the outer cell
@@ -27548,6 +27564,103 @@ func _altar_click(player: Player, tile: Vector2i) -> bool:
 
 ## The altar cell a click asked to lay on, walked beside first; NONE if none.
 var _altar_wanted := NONE
+
+
+## A left click on a niche's stone, the click scheme's (608 amended (8);
+## Jeff, twice, the coordinator's cases on main 11-16: standing on the
+## niche's floor cell, a click on the niche did nothing, its cell being no
+## floor, so the click was a walk of none): the niche (niche_at) walked to,
+## its floor cell, and on it the body leans into the stone (_niche_lean,
+## NICHE_LEAN_MSEC), so the server's press answers as a walk into it does
+## (Main._on_niche_pressed: the hidden slab opened once the way is
+## revealed, else NICHE_SHUT_LINE): at once when he stands there, else when
+## the walk ends there (_niche_wanted, _update_niche). Every niche alike.
+## False when [param tile] is no shut niche's stone, or under the keys'
+## scheme (its click is no walk; a key walk into a niche presses as ever):
+## the click is the ordinary one.
+func _niche_click(player: Player, tile: Vector2i) -> bool:
+	_niche_wanted = {}
+	if Net.controls == "wasd" or tile == NONE:
+		return false
+	var niche := niche_at(tile)
+	if niche.is_empty():
+		return false
+	if player.tile == niche["floor"]:
+		_lean_into(niche)
+		return true
+	_move_click(player, niche["floor"])
+	_niche_wanted = niche
+	return true
+
+
+## The niche whose stone is [param tile] (608: World.niche_edges, each the
+## edge between a floor cell, World.niche_cells, and the niche): {edge,
+## floor, way (a unit step from the floor cell into it)}; {} when it is
+## none's, or its door stands open (the stair behind is walked to).
+func niche_at(tile: Vector2i) -> Dictionary:
+	for key: Vector3i in World.niche_edges:
+		var cells := Terrain.edge_cells(key)
+		var floor: Vector2i = World.niche_cells.get(key, cells[0])
+		var stone: Vector2i = cells[1] if cells[0] == floor else cells[0]
+		if stone != tile:
+			continue
+		var door := World.door_on(key)
+		if door != null and door.open:
+			return {}
+		return {"edge": key, "floor": floor, "way": Vector2(stone - floor)}
+	return {}
+
+
+## How long a clicked niche's lean lasts (608 amended (8)): the body's way
+## from the cell's middle to the stone and World.FREE_PRESS_TICKS against
+## it, with a join's frames to spare.
+const NICHE_LEAN_MSEC := 500
+## The niche a click asked to press, walked to its floor cell first; {} if none.
+var _niche_wanted := {}
+## The lean into a clicked niche (608 amended (8)): {until (msec), way}; {} if none.
+var _niche_lean := {}
+## Whether the zone's hidden slab was open at the last frame (_found_hold).
+var _slab_was_open := false
+
+
+func _lean_into(niche: Dictionary) -> void:
+	_niche_lean = {"until": Time.get_ticks_msec() + NICHE_LEAN_MSEC, "way": niche["way"]}
+
+
+## Each frame (608 amended (8)): a niche clicked from afar leaned into once
+## the route is walked out on its floor cell; and the found slab's hold.
+func _update_niche() -> void:
+	var player := _local_player()
+	_found_hold(player)
+	if _niche_wanted.is_empty():
+		return
+	if player == null:
+		_niche_wanted = {}
+		return
+	if not (_free.get("path", []) as Array).is_empty():
+		return
+	if player.tile == _niche_wanted["floor"]:
+		_lean_into(_niche_wanted)
+	_niche_wanted = {}
+
+
+## The hidden slab found beside the local player (608 amended (8)): the
+## server holds the finder NICHE_FOUND_HOLD ticks while it swings (608
+## amended (2)), which this client is not told; its body's free view holds
+## too (FreeNet.Own.hold_until, as a push's slide), so a click made in the
+## hold (the stair behind it) waits and walks on when it ends, never ended
+## by the route's no-headway backstop (the walk ended 0.4 s in: the stair
+## taken 3.3 s after the slab opened, a second click needed).
+func _found_hold(player: Player) -> void:
+	var hidden := World.hidden_niche()
+	var open_now := not hidden.is_empty() and bool(hidden["open"])
+	if open_now and not _slab_was_open and player != null and World.distance(player.tile, hidden["cell"]) <= 1:
+		var own := _free_own(player)
+		if own != null:
+			own.hold_until = maxf(own.hold_until, World.tick + NICHE_FOUND_HOLD)
+			own.pending.clear()
+			own.open_seconds = 0.0
+	_slab_was_open = open_now
 
 
 ## Each frame (896): an altar clicked from afar is asked for once the local

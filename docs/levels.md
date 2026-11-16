@@ -585,7 +585,8 @@ their twins.
   (`"hidden": true`); the generator picks which niche each generation
   (`Labyrinth.niche_plan`, the one change it makes inside the anchor) and
   moves the link and "from_below" with it. A step into any niche presses
-  on it (`World.niche_pressed`): "Only the dead lie here." once a stand,
+  on it (`World.niche_pressed`), and so does a click on its stone (608 amended (8):
+  walked to its floor cell and leaned into): `Main.NICHE_SHUT_LINE` once a stand,
   but the true one gives ("The slab swings aside: a stair goes down into
   the dark."), its lock lifted and the door opened for everyone in the
   zone until the level is laid again or the server restarts (door state is

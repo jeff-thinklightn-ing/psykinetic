@@ -84,6 +84,7 @@ func _ready() -> void:
 	_test_hall_door_heard()
 	await _test_hidden_niche()
 	await _test_robbers_latch()
+	_test_niche_click()
 	_test_double_doors()
 	_test_camp_chest()
 	_test_band()
@@ -5335,9 +5336,9 @@ func _test_robbers_latch() -> void:
 	_put(player, Vector2i(6, 1))
 	for i in 6:
 		_hold_free(player, Vector2(0, -1), 1)
-	_check(not door.open and door.lock == Main.HIDDEN_LOCK and _main.party_log.last(1) == ["Only the dead lie here."]
+	_check(not door.open and door.lock == Main.HIDDEN_LOCK and _main.party_log.last(1) == [Main.NICHE_SHUT_LINE]
 		and not heard.any(func(text: String) -> bool: return "draft" in text),
-		"with one up, the hidden niche is any niche: shut, \"Only the dead lie here.\", no draft (%s)" % [_main.party_log.last(1)])
+		"with one up, the hidden niche is any niche: shut, the shut line, no draft (%s)" % [_main.party_log.last(1)])
 	World.damage(robber, 999)
 	_check(bool(_main._regen["lt_niche"].get("robbers_down", false)) and _main.robbers_cleared("lt_niche"),
 		"the last one falls: the clear latches for the generation (%s)" % [_main._regen["lt_niche"]])
@@ -5395,6 +5396,116 @@ func _test_robbers_latch() -> void:
 	Level.unregister("lt_niche")
 
 
+## A click on a niche's stone (608 amended (8); Jeff's report, reproduced on
+## main 11-16: on the niche's floor cell a click on it did nothing): Main's
+## click (_niche_click) walks to its floor cell and leans into the stone,
+## so the server's press answers: a plain niche's line from its floor cell
+## and from the hall; the hidden one, its way not revealed, the same line and
+## shut; revealed, it opens from the hall and from its floor cell, and the
+## found hold holds the client's own route too (_found_hold); under the keys'
+## scheme a click is no niche's; a click elsewhere drops a far one.
+func _test_niche_click() -> void:
+	print("\n== a click on a niche's stone (608 amended (8)): walked to, leaned into, pressed; every niche; the hidden one revealed and not; the found hold ==")
+	if World.economy == null:
+		_check(false, "no economy to read the robbers' barrow from")
+		return
+	var rules: Dictionary = World.economy.rules.get("robbers", {}).duplicate(true)
+	World.economy.rules["robbers"] = rules.merged({"barrow": "lt_niche"}, true)
+	_register_niche("lt_niche")
+	_main.load_map("lt_niche")
+	var kept: Variant = _main._regen.get("lt_niche")
+	_main._regen["lt_niche"] = {"generation": 1, "at_step": 0, "robbers_down": true}
+	var player := _player()
+	var own = _main._free_own(player)
+	var key := Terrain.edge_key(Vector2i(6, 1), Vector2i(0, -1))
+	var door := World.door_on(key)
+	var controls: String = Net.controls
+	Net.controls = "click"
+	_main.mark_player(player.player_id, Main.QUEST_DONE, false)
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	var ready := own != null and World.free_body(player) and door != null and not door.open
+	_check(ready, "the player's free body, its own view, the hidden niche shut")
+	if ready:
+		_check(_main.niche_at(Vector2i(2, 0)) == {"edge": Terrain.edge_key(Vector2i(2, 1), Vector2i(0, -1)), "floor": Vector2i(2, 1), "way": Vector2(0, -1)}
+			and _main.niche_at(Vector2i(2, 1)).is_empty() and _main.niche_at(Vector2i(3, 0)).is_empty() and not _main.niche_at(Vector2i(6, 0)).is_empty(),
+			"niche_at: a niche's stone names it (its edge, its floor cell, the way in); its floor cell and the wall beside it are none (%s)" % [_main.niche_at(Vector2i(2, 0))])
+		var shut := Main.NICHE_SHUT_LINE
+		var slab := "The slab swings aside: a stair goes down into the dark."
+		_put(player, Vector2i(2, 1))
+		var told := _click_niche(player, Vector2i(2, 0), heard, 240)
+		_check(told == [shut] and player.tile == Vector2i(2, 1), "on a plain niche's floor cell, a click on its stone presses it: the shut line (%s, at %s)" % [told, player.tile])
+		_put(player, Vector2i(4, 4))
+		told = _click_niche(player, Vector2i(4, 0), heard, 1200)
+		_check(told == [shut] and player.tile == Vector2i(4, 1), "from the hall, a click on another niche's stone walks to it and presses it (%s, at %s)" % [told, player.tile])
+		_put(player, Vector2i(5, 4))
+		told = _click_niche(player, Vector2i(6, 0), heard, 1200)
+		_check(told == [shut] and not door.open and player.tile == Vector2i(6, 1),
+			"the hidden niche, its way not revealed, clicked from the hall: walked to, the shut line, shut (%s, at %s)" % [told, player.tile])
+		_main._told_niche.erase(player.owner_peer)  # Said once a stand: a new stand for the next.
+		told = _click_niche(player, Vector2i(6, 0), heard, 240)
+		_check(told == [shut] and not door.open, "and clicked from its floor cell: the shut line, shut (%s)" % [told])
+		_main.mark_player(player.player_id, Main.QUEST_DONE)
+		_put(player, Vector2i(5, 4))
+		told = _click_niche(player, Vector2i(6, 0), heard, 1200)
+		_check(told == [slab] and door.open and player.tile == Vector2i(6, 1), "revealed, clicked from the hall: walked to, the slab opens (%s, at %s)" % [told, player.tile])
+		_main._update_niche()
+		_check(_main._free_own(player) != null and _main._free_own(player).held_by_server(player), "found beside me, the client's own body is held through the slab's swing (FreeNet.Own.hold_until)")
+		_hold_free(player, Vector2.ZERO, Main.NICHE_FOUND_HOLD + 1)
+		door.open = false
+		door.lock = Main.HIDDEN_LOCK
+		_main._update_niche()
+		told = _click_niche(player, Vector2i(6, 0), heard, 240)
+		_check(told == [slab] and door.open, "shut again, clicked from its floor cell: the slab opens (%s)" % [told])
+		_hold_free(player, Vector2.ZERO, Main.NICHE_FOUND_HOLD + 1)
+		_main._niche_lean = {}
+		_check(_main.niche_at(Vector2i(6, 0)).is_empty(), "its door open, its stone is no niche to press: a click there walks to the stair")
+		_put(player, Vector2i(3, 3))
+		_check(_main._niche_click(player, Vector2i(2, 0)) and not _main._niche_wanted.is_empty(), "a far niche's click waits for the walk")
+		_main._move_click(player, Vector2i(1, 4))
+		_check(_main._niche_wanted.is_empty(), "a click elsewhere after it drops it")
+		Net.controls = "wasd"
+		_check(not _main._niche_click(player, Vector2i(2, 0)), "under the keys' scheme a click is no niche's (a key walk into a niche presses as ever)")
+	_main._niche_lean = {}
+	_main._niche_wanted = {}
+	_main._free["path"] = []  # The last click's route walked by no later test.
+	Net.controls = controls
+	Net.message_received.disconnect(hear)
+	_main.mark_player(player.player_id, Main.QUEST_DONE, false)
+	World.economy.rules["robbers"] = rules
+	if kept == null:
+		_main._regen.erase("lt_niche")
+	else:
+		_main._regen["lt_niche"] = kept
+	_main.load_map("test_room")
+	Level.unregister("lt_niche")
+
+
+## Main's click on a niche's [param stone] (_niche_click), then its frames
+## as a player's: _free_drive and _update_niche each frame, the world a tick
+## every 6 frames (the throne's click rows' drive), till a "party" line is
+## heard or [param frames] pass; the lines heard since.
+func _click_niche(player: Player, stone: Vector2i, heard: Array[String], frames: int) -> Array[String]:
+	var before := heard.size()
+	player.free_view = null
+	player.free_halt_until = 0
+	if not _main._niche_click(player, stone):
+		return ["(no niche click)"]
+	for i in frames:
+		player.free_allowance = World.FREE_COMMANDS_PER_SECOND  # The test runs faster than the clock.
+		_main._free_drive(1.0 / 60.0)
+		_main._update_niche()
+		if i % 6 == 5:
+			World.step()
+		if heard.size() > before:
+			break
+	_main._niche_lean = {}
+	return heard.slice(before)
+
+
 ## The generated halls' doors two edges wide (725): the pair side by side
 ## swings as one (World.door_partner, the client's Level.door_pairs), the
 ## lone third its own; a level that does not regenerate keeps 403's rule,
@@ -5449,8 +5560,8 @@ func _register_niche(level_name: String) -> void:
 
 
 ## The hidden door (608): the first hall's one true niche is a door spawned
-## locked and stone; a step into any niche presses on it ("Only the dead
-## lie here." once a stand), the true one gives, the stair behind it is
+## locked and stone; a step into any niche presses on it (Main.NICHE_SHUT_LINE
+## once a stand), the true one gives, the stair behind it is
 ## taken, and a climb from below pushes it open from behind.
 func _test_hidden_niche() -> void:
 	print("\n== the hidden door (608): niches pressed, the true one found, the stair behind it, opened from below; the draft felt (608 amended) ==")
@@ -5485,7 +5596,7 @@ func _test_hidden_niche() -> void:
 	_check(player.tile == Vector2i(5, 3) and heard.count(draft) == 1, "the next says it no more")
 	_put(player, Vector2i(2, 1))
 	_hold_free(player, Vector2(0, -1), 6)
-	var line := "Only the dead lie here."
+	var line := Main.NICHE_SHUT_LINE
 	_check(player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line] and heard.count(line) == 1,
 		"pressing into a plain niche is stopped and says the line, to the player's screen (%s)" % [heard])
 	var told: Array = _main.party_log.last(3)

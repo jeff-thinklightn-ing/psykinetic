@@ -27606,6 +27606,44 @@ _test_deep_crypt's Vault row reads the new pair. level_test and labyrinth_test P
 and the generator; protocol unchanged; no new class_name; no bullet for the barrow; the Vault's
 stays held, ruled for after the deploy's boot lay is read.
 
+608 amended (8): a click on a niche's stone walks to it and presses it; the found slab's hold
+kept by the client's route; the shut line voice's (Jeff's report, made twice: standing at the niche
+and clicking it, nothing happened; reproduced on main 11-16 by the barrow tour's cases, the
+coordinator's: from the hall a tap on the slab opened it, the walk arriving leaning into it, but on
+its floor cell a tap did nothing, the slab's cell being no floor, so the click was a walk of none;
+the button held half a second into it opened it). Main and its free walk are physics' and
+controls', changed here on the coordinator's ruling while physics' session is stopped, ui having
+read where its click takes go. Main._niche_click, at the click handler beside the throne's and the
+altar's (the click scheme only: a key walk into a niche presses as ever, and the keys' click is no
+walk): a click whose cell is a niche's stone (Main.niche_at: World.niche_edges, the edge between
+its floor cell, World.niche_cells, and the niche; none when its door stands open, so the stair
+behind a found slab is walked to) walks to the floor cell and there leans the body into the stone
+for NICHE_LEAN_MSEC (500), at once when he stands on it, else when the walk ends there
+(_niche_wanted, _update_niche); the server's own press (World._free_pressed, 688 amended (4))
+answers as a walk into it does: every niche alike, the hidden slab opened once the way is revealed,
+else the shut line. A click elsewhere or keys taking over drop it (_move_click, _free_taken_over).
+The found hold (608 amended (2), kept on the server: the finder stands while the slab swings): the
+client was not told, and the click route's no-headway backstop ended a click on the stair made in
+those 11 ticks (the walk ended 0.4 s in; the stair taken 3.3 s after the slab opened, a second
+click needed); Main._found_hold holds its own body's view too when the zone's hidden slab opens
+beside the local player (FreeNet.Own.hold_until, the pending dropped, as a push's slide), so the
+route waits and walks on: down the stair 0.9 s after the click. The line a niche gives when it
+opens nothing was "Only the dead lie here.", false of the one niche over the stair; it is now
+Main.NICHE_SHUT_LINE, voice's "The stone is cold, and it doesn't give.", true of every niche and
+not false of the slab before the turn-in. level_test _test_niche_click (lt_niche, driven by
+Main's _free_drive as the throne's click rows are): a plain niche's line from its floor cell and
+from the hall; the hidden one unrevealed, the line and shut, from both; revealed, opened from both;
+the found hold on the client's own view; its stone no niche once open; a far one dropped by a click
+elsewhere; none under the keys. The barrow tour (playtest's file, on the coordinator's ruling):
+the niche's cases by parsed input events (the cursor's pick read on its cell): before the turn-in
+tapped from the hall and from its floor cell and held into it, shut, nothing of a way said; after,
+a tap on the floor cell opens nothing; a tap on the slab from the hall and from its floor cell
+opens it; the stair clicked as it opens, down in under 2 s; one fallen knight known, by the First
+Hall's bier; the old guard room's place (the block's "rock") solid on the client's map with nobody
+in it; once the named ones are out of sight the bot walks to the camp (the run 897 s to 259 s).
+level_test, click_route_test, controls_test and the tour PASS. Client and docs, the line on the
+server; protocol unchanged; no new class_name.
+
 ## 608, terrain's side: niches and the hidden door drawn as walls
 
 Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)
