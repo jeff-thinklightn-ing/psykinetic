@@ -4224,8 +4224,8 @@ func _test_daylight_indoors() -> void:
 	var pane_copy := _rig._see_through_of(_rig._inside_pane_material) as BaseMaterial3D
 	_rig._update_inside()
 	_check(pane_copy != null and pane_copy.emission == _rig._inside_pane_material.emission
-			and is_equal_approx(pane_copy.emission_energy_multiplier, _rig._inside_pane_material.emission_energy_multiplier * Client3D.NEAR_ALPHA)
-			and is_equal_approx(pane_copy.albedo_color.a, Client3D.NEAR_ALPHA),
+			and is_equal_approx(pane_copy.emission_energy_multiplier, _rig._inside_pane_material.emission_energy_multiplier * Client3D.INSIDE_PANE_FADED)
+			and is_equal_approx(pane_copy.albedo_color.a, Client3D.INSIDE_PANE_FADED),
 			"a pane in a cut-away wall faded with it and kept to the clock (glow %.2f of the pane's %.2f)" % [pane_copy.emission_energy_multiplier if pane_copy != null else -1.0, _rig._inside_pane_material.emission_energy_multiplier])
 	# The patches: a window with the sun on its side throws the sky's pool and
 	# the sun's patch, its length the glass's fall at that height; with the

@@ -58592,7 +58592,12 @@ well im not sure the solution".
     unchanged.
   - Panes painted by the clock (one shared material, never a house's lit window's): by day the sky's horizon
     colour toward INSIDE_PANE_SKY's blue (INSIDE_PANE_BLUE) at INSIDE_PANE_DAY 0.9, INSIDE_PANE_NIGHT's deep
-    blue at night, never black. (The first pair's 2.2 of the bare horizon read as paper, near-white.)
+    blue at night, never black. (The first pair's 2.2 of the bare horizon read as paper, near-white.) A pane
+    in a wall the camera cuts away draws in the near fade's see-through copy, made once from the shared
+    material (_see_through_of): that copy is kept to the clock and its glass and glow set at
+    INSIDE_PANE_FADED, under the wall's NEAR_ALPHA, so the glass all but goes with its wall (ui-design's last
+    sheet: met first at noon below, the copy stood in the air upstairs at night at full glow, a blue square;
+    at the wall's 0.3 it still read as a dark rectangle on the boards).
   - Patches on the floor (one additive MultiMesh): at each window the sky's pool at its foot by day, and the
     sun's patch where its glass (INSIDE_PANE_LOW to INSIDE_PANE_HIGH) sends it while the sun stands on that
     wall's side, its length and lean by the sun's height and side, stopped at the floor's run inward (a

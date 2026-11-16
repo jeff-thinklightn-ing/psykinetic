@@ -29792,6 +29792,11 @@ const INSIDE_PANE_NIGHT_ENERGY := 0.6
 const INSIDE_PANE_DAY := 0.9
 const INSIDE_PANE_SKY := Color(0.36, 0.55, 0.84)
 const INSIDE_PANE_BLUE := 0.6
+## A pane in a wall the camera cuts away: its glass and glow at this share,
+## under the wall's own NEAR_ALPHA, so the glass all but goes with its wall
+## (at the wall's 0.3 the night's blue glass read as a dark rectangle on the
+## boards behind it; ui-design's pane7 look).
+const INSIDE_PANE_FADED := 0.1
 ## The room's ambient by day: the sky look's colour toward the indoor warm
 ## grey by INSIDE_DAY_WARM, its energy INSIDE_DAY_LIFT times the night's;
 ## by night the zone's look as before (the hearth and candles carry it; the
@@ -30283,7 +30288,7 @@ func _update_inside() -> void:
 	# A see-through copy of the panes made since the last step (a wall just
 	# cut away) carries the full glow: repaint now, not at the next minute.
 	var fresh := _see_through.get(_inside_pane_material) as BaseMaterial3D if _inside_pane_material != null else null
-	if fresh != null and not is_equal_approx(fresh.emission_energy_multiplier, _inside_pane_material.emission_energy_multiplier * NEAR_ALPHA):
+	if fresh != null and not is_equal_approx(fresh.emission_energy_multiplier, _inside_pane_material.emission_energy_multiplier * INSIDE_PANE_FADED):
 		_inside_step = -1
 	if step == _inside_step:
 		return
@@ -30304,9 +30309,9 @@ func _update_inside() -> void:
 		# and faded as its wall is (else it stood in the air, full and stale).
 		var faded := _see_through.get(_inside_pane_material) as BaseMaterial3D
 		if faded != null:
-			faded.albedo_color = Color(look["pane"], NEAR_ALPHA)
+			faded.albedo_color = Color(look["pane"], INSIDE_PANE_FADED)
 			faded.emission = look["pane"]
-			faded.emission_energy_multiplier = float(look["pane_energy"]) * NEAR_ALPHA
+			faded.emission_energy_multiplier = float(look["pane_energy"]) * INSIDE_PANE_FADED
 	if _inside_apron != null:
 		var apron := _inside_apron.mesh.surface_get_material(0) as ShaderMaterial
 		apron.set_shader_parameter("near_colour", look["apron"])
