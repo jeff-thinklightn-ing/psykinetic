@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3044)
+## Lines in the code (3043)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1356,7 +1356,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (629)
+### other (sim) (628)
 
 | | Line | Where |
 |---|---|---|
@@ -1470,7 +1470,6 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | paying back the town | `sim/economy.gd` _bank_turn() |
 |  | %s paid back %d to the town (owes %d) | `sim/economy.gd` _bank_turn() |
 |  | %s works off the debt to the town hauling (owes %d) | `sim/economy.gd` _bank_turn() |
-|  | the town can't pay %s for more %s (owes %d) | `sim/economy.gd` deliver() |
 |  | hauling %d %s | `sim/economy.gd` deliver() |
 |  | %d %s delivered | `sim/economy.gd` deliver() |
 |  | %s (given toward the %s) | `sim/economy.gd` _owe_or_pay() |
