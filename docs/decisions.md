@@ -49151,6 +49151,29 @@ arrivals; the builder's keep-clear only keeps building off them, and layout_sens
 to check, never to place. level_test _test_guide_cells: the two cells as above, and no link in any level arrives at a
 guide_ point, the wilds has its starts, the names follow the arrivals and carry no reader's prefix. Level data and a
 test; protocol unchanged; no new class_name; no bullet (unseen).
+words after a joined walk from (190,219) to the door meets no cart.
+
+785 amended (1) (perf, in npc's main.gd on the coordinator's ruling of 2026-11-16 while npc's session is stopped;
+label from tools/decision_number.sh): a slow tick's line names the residents part's pieces, its path searches and its
+costliest body, as it names the companions' turn pieces. Two joined laptop runs on 11-16 (stallnc_5abf18ba5 on the
+Atlas, hops_953_5f15c3aa7 on the Lenovo) had residents 0.9 to 3.5 s at ticks 210 to 420 while every other part of
+those ticks stayed flat, and of 187 joined runs that day 150 printed residents 512 to 932 ms at tick 30 (the box: 631
+ms at tick 30); the line said "residents" and nothing more. World.resident_part(name, since) times the part's pieces:
+threats; wanted (and inside it wanted: town near, folk, homes, inn goers, places, visitors, huts, folds, droves, camp
+traders; places: fire seats); tavern; strays; sought; cap; beds, shelter, doors; bodies; spawns; notes; bands; warm,
+hearths. World.paths_watch(true) for the part's length counts every find_path (now a wrapper over _find_path_core,
+which is the old body: unwatched, the wrapper only forwards), its total and the longest's goal cell. body_begin() and
+body_end(trade, cell, step, since, with_player) keep the costliest body of the tick ("places": take_places, "spawn":
+_spawn_resident) with its own searches. World._note_slow keeps them with the worst tick and, when that tick's residents
+part took RESIDENTS_SAY_USEC (500 ms) or more, adds " (residents: <pieces, largest first>; N path searches, T ms, the
+longest L ms to (x, y); the costliest body: a <trade> at (x, y)[ with a player], <step> S ms, N path searches, ...)".
+Trades and cells only, never a resident's or a player's name or id (the coordinator's condition). The first boot with
+the mark lowered to 100 ms for a probe (headless --host on this PC) named the tick-30 step: "wanted: places 371.7,
+places: fire seats 370.9; 0 path searches": Main._seat_cells reads the zone's whole level from disk once
+(Level.load_level) for its decor, though the zone is loaded; the mend is for whoever the coordinator names. zone_test
+_test_slow_tick_line: residents at 600 ms gives the breakdown by trade and cell, at 499 ms none; a search while watched
+is counted for the tick and the body, none after; the costliest of three bodies is kept. Server only; protocol
+unchanged; no class_name; no bullet.
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's

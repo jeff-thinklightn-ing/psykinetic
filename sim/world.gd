@@ -1100,6 +1100,22 @@ var tick_parts: Dictionary[String, int] = {}
 ## a slow tick's line.
 var turn_parts: Dictionary[String, int] = {}
 var _slow_worst_turn: Dictionary[String, int] = {}
+## Within the tick's "residents" part (785 amended (1), perf's, on the coordinator's ruling of 2026-11-16 while
+## npc's session is stopped): microseconds by piece (resident_part()), the path searches made in it
+## (paths_watch()), and its costliest body (body_begin()/body_end()); told after the parts in a slow tick's
+## line only when residents took RESIDENTS_SAY_USEC or more. Two laptop runs on 11-16 (stallnc_5abf18ba5,
+## hops_953_5f15c3aa7) had residents 0.9 to 3.5 s at ticks 210 to 420 while every other part stayed flat; 180
+## other joined runs that day kept it under 130 ms past tick 30; nothing said which step. Trades and cells
+## only: never a resident's or a player's name or id ("with a player" when the body walks with one).
+const RESIDENTS_SAY_USEC := 500000
+var resident_parts: Dictionary[String, int] = {}
+var _slow_worst_res: Dictionary[String, int] = {}
+var _slow_worst_body: Dictionary = {}
+var _slow_worst_paths: Dictionary = {}
+var _res_body: Dictionary = {}
+var _paths_on := false
+var _paths: Dictionary = {"count": 0, "usec": 0, "longest": 0, "to": Vector2i(-1, -1)}
+var _body_paths: Dictionary = {}
 var _slow_count := 0
 var _slow_frames := 0
 var _slow_worst := 0
@@ -1137,6 +1153,59 @@ func turn_part(name: String, since: int) -> int:
 	return now
 
 
+## Adds the time since [param since] to this tick's residents piece [param name]; the time now.
+func resident_part(name: String, since: int) -> int:
+	var now := Time.get_ticks_usec()
+	resident_parts[name] = resident_parts.get(name, 0) + now - since
+	return now
+
+
+## Counts the path searches (find_path) made from now while [param on], with their time and the longest
+## one's goal; off again at the residents part's end.
+func paths_watch(on: bool) -> void:
+	_paths_on = on
+
+
+## One resident body's handling begins: its own path searches counted from here.
+func body_begin() -> void:
+	_body_paths = {"count": 0, "longest": 0, "to": Vector2i(-1, -1)}
+
+
+## One body's handling ended, since [param since]: kept as the tick's costliest if it was. [param trade] and
+## [param cell] say which (a trade, never a name); [param step] what was done ("places": its goals taken,
+## a route among them; "spawn": made); [param with_player] when it walks with a player.
+func body_end(trade: String, cell: Vector2i, step: String, since: int, with_player: bool) -> void:
+	var took := Time.get_ticks_usec() - since
+	if took <= int(_res_body.get("usec", -1)):
+		return
+	_res_body = {"usec": took, "trade": trade if not trade.is_empty() else "resident", "cell": cell, "step": step,
+		"paths": int(_body_paths.get("count", 0)), "longest": int(_body_paths.get("longest", 0)),
+		"to": _body_paths.get("to", Vector2i(-1, -1)), "player": with_player}
+
+
+## A slow tick's residents breakdown (RESIDENTS_SAY_USEC): its pieces, its path searches, its costliest body.
+func _residents_said() -> String:
+	var pieces := _slow_worst_res.keys()
+	pieces.sort_custom(func(a: String, b: String) -> bool: return _slow_worst_res[a] > _slow_worst_res[b])
+	var named: Array[String] = []
+	for piece: String in pieces.slice(0, 5):
+		named.append("%s %.1f" % [piece, _slow_worst_res[piece] / 1000.0])
+	var text := ", ".join(named) if not named.is_empty() else "no pieces timed"
+	var to: Vector2i = _slow_worst_paths.get("to", Vector2i(-1, -1))
+	text += "; %d path searches, %.1f ms" % [int(_slow_worst_paths.get("count", 0)), int(_slow_worst_paths.get("usec", 0)) / 1000.0]
+	if int(_slow_worst_paths.get("count", 0)) > 0:
+		text += ", the longest %.1f ms to (%d, %d)" % [int(_slow_worst_paths.get("longest", 0)) / 1000.0, to.x, to.y]
+	if not _slow_worst_body.is_empty():
+		var cell: Vector2i = _slow_worst_body["cell"]
+		var body_to: Vector2i = _slow_worst_body["to"]
+		text += "; the costliest body: a %s at (%d, %d)%s, %s %.1f ms, %d path searches" % [_slow_worst_body["trade"], cell.x, cell.y,
+			" with a player" if _slow_worst_body["player"] else "", _slow_worst_body["step"], int(_slow_worst_body["usec"]) / 1000.0,
+			int(_slow_worst_body["paths"])]
+		if int(_slow_worst_body["paths"]) > 0:
+			text += ", the longest %.1f ms to (%d, %d)" % [int(_slow_worst_body["longest"]) / 1000.0, body_to.x, body_to.y]
+	return " (residents: %s)" % text
+
+
 func _parts_total() -> int:
 	var total := 0
 	for name: String in tick_parts:
@@ -1155,6 +1224,9 @@ func _note_slow(usec: int, frame_usec: int) -> String:
 			_slow_worst_tick = tick
 			_slow_worst_parts = tick_parts.duplicate()
 			_slow_worst_turn = turn_parts.duplicate()
+			_slow_worst_res = resident_parts.duplicate()
+			_slow_worst_body = _res_body.duplicate()
+			_slow_worst_paths = _paths.duplicate()
 	elif frame_usec > SLOW_FRAME_USEC:
 		_slow_frames += 1
 		_slow_worst_frame = maxi(_slow_worst_frame, frame_usec)
@@ -1178,6 +1250,8 @@ func _note_slow(usec: int, frame_usec: int) -> String:
 			for piece: String in pieces.slice(0, 4):
 				named.append("%s %.1f" % [piece, _slow_worst_turn[piece] / 1000.0])
 			line += " (companion turns: %s)" % ", ".join(named)
+		if int(_slow_worst_parts.get("residents", 0)) >= RESIDENTS_SAY_USEC:
+			line += _residents_said()  # Which piece of the residents part, and which body (785 amended (1)).
 	if _slow_frames > 0:
 		line += "%s %d frame%s over %d ms outside the sim, the worst %.1f ms" % ["" if _slow_count == 0 else ";",
 			_slow_frames, "" if _slow_frames == 1 else "s", SLOW_FRAME_USEC / 1000, _slow_worst_frame / 1000.0]
@@ -1223,6 +1297,9 @@ func _process(delta: float) -> void:
 			var started := Time.get_ticks_usec()
 			tick_parts.clear()
 			turn_parts.clear()
+			resident_parts.clear()
+			_res_body = {}
+			_paths = {"count": 0, "usec": 0, "longest": 0, "to": Vector2i(-1, -1)}
 			step()
 			var took := Time.get_ticks_usec() - started
 			ticks_usec += took
@@ -14164,6 +14241,28 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}, opens_doors := true,
 		fire_extra := PATH_FIRE_EXTRA, bodies_within := 0) -> Array[Vector2i]:
+	if not _paths_on:
+		return _find_path_core(from, to, ignore_goal_occupant, ignore, max_tiles, nearest, walls, opens_doors, fire_extra, bodies_within)
+	# Within the residents part (paths_watch): counted, timed, the longest's goal kept, the body's too.
+	var started := Time.get_ticks_usec()
+	var found := _find_path_core(from, to, ignore_goal_occupant, ignore, max_tiles, nearest, walls, opens_doors, fire_extra, bodies_within)
+	var took := Time.get_ticks_usec() - started
+	_paths["count"] = int(_paths["count"]) + 1
+	_paths["usec"] = int(_paths["usec"]) + took
+	if took > int(_paths["longest"]):
+		_paths["longest"] = took
+		_paths["to"] = to
+	if not _body_paths.is_empty():
+		_body_paths["count"] = int(_body_paths["count"]) + 1
+		if took > int(_body_paths["longest"]):
+			_body_paths["longest"] = took
+			_body_paths["to"] = to
+	return found
+
+
+func _find_path_core(from: Vector2i, to: Vector2i, ignore_goal_occupant: bool,
+		ignore: GridEntity, max_tiles: int, nearest: bool, walls: Dictionary, opens_doors: bool,
+		fire_extra: int, bodies_within: int) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path

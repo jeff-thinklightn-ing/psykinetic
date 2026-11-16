@@ -135,6 +135,45 @@ func _test_slow_tick_line() -> void:
 	_check(line.contains("1 tick over") and line.contains("1 frame over 100 ms outside the sim, the worst 150.0 ms"),
 			"then, 10 s on: the one held back and a slow frame outside the sim (%s)" % line)
 	World.tick_parts.clear()
+	# 785 amended (1): a slow residents part names its pieces, its path searches and its costliest body
+	# (a trade and a cell; "with a player", never who), only at RESIDENTS_SAY_USEC or more.
+	World._slow_said = -World.SLOW_SAY_MSEC
+	World.tick_parts["residents"] = 600000
+	World.resident_parts.clear()
+	World.resident_parts["bodies"] = 580000
+	World.resident_parts["cap"] = 5000
+	World._paths = {"count": 3, "usec": 400000, "longest": 300000, "to": Vector2i(40, 50)}
+	World._res_body = {"usec": 570000, "trade": "smith", "cell": Vector2i(12, 34), "step": "places", "paths": 3,
+		"longest": 300000, "to": Vector2i(40, 50), "player": true}
+	line = World._note_slow(620000, 0)
+	_check(line.contains("residents 600.0") and line.contains("(residents: bodies 580.0, cap 5.0; 3 path searches, 400.0 ms, the longest 300.0 ms to (40, 50); "
+			+ "the costliest body: a smith at (12, 34) with a player, places 570.0 ms, 3 path searches, the longest 300.0 ms to (40, 50))"),
+			"residents at 600 ms: its pieces, its path searches and its costliest body by trade and cell (%s)" % line)
+	World._slow_said = -World.SLOW_SAY_MSEC
+	World.tick_parts["residents"] = 499000
+	line = World._note_slow(520000, 0)
+	_check(line.contains("residents 499.0") and not line.contains("(residents:"), "under 500 ms: the parts only, no breakdown (%s)" % line)
+	World.tick_parts.clear()
+	World.resident_parts.clear()
+	World._res_body = {}
+	# Path searches are counted only while watched (the residents part), the body's own beside the tick's.
+	World._paths = {"count": 0, "usec": 0, "longest": 0, "to": Vector2i(-1, -1)}
+	World.paths_watch(true)
+	World.body_begin()
+	World.find_path(Vector2i(1, 1), Vector2i(2, 1))
+	World.paths_watch(false)
+	World.find_path(Vector2i(1, 1), Vector2i(2, 1))
+	_check(int(World._paths["count"]) == 1 and int(World._body_paths["count"]) == 1,
+			"one search while watched counted, for the tick and the body; none after (%s, %s)" % [World._paths, World._body_paths])
+	World.body_end("farmer", Vector2i(5, 5), "places", Time.get_ticks_usec() - 2000, false)
+	World.body_begin()
+	World.body_end("hunter", Vector2i(6, 6), "spawn", Time.get_ticks_usec() - 9000, false)
+	World.body_begin()
+	World.body_end("carpenter", Vector2i(7, 7), "places", Time.get_ticks_usec() - 1000, false)
+	_check(World._res_body.get("trade") == "hunter" and World._res_body.get("step") == "spawn" and World._res_body.get("cell") == Vector2i(6, 6),
+			"the costliest body of three kept (%s)" % World._res_body)
+	World._res_body = {}
+	World._paths = {"count": 0, "usec": 0, "longest": 0, "to": Vector2i(-1, -1)}
 
 
 func _test_stats_with_nobody_on() -> void:

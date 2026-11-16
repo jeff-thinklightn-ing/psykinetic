@@ -14510,8 +14510,10 @@ func _arrival_sync(zone_name: String) -> void:
 func _sync_residents() -> void:
 	if World.towns == null or World.production == null or World.holdings == null or _world_map == null:
 		return
+	var rt := Time.get_ticks_usec()  # The residents part's pieces (World.resident_part; 785 amended (1)).
 	_threats_seen()
 	_threats_lift()
+	rt = World.resident_part("threats", rt)
 	var area: Dictionary = _world_map.areas.get(World.zone.name, {})
 	var wanted := {}
 	if not area.is_empty():
@@ -14521,7 +14523,10 @@ func _sync_residents() -> void:
 				continue
 			# Bodies only while someone is near (decision 355); a far town
 			# takes none of the RESIDENTS_MAX either.
-			if not _town_near(place_id, place):
+			var wt := Time.get_ticks_usec()
+			var near := _town_near(place_id, place)
+			wt = World.resident_part("wanted: town near", wt)
+			if not near:
 				continue
 			var ids: Array[String] = World.towns.residents(place_id).filter(func(who: String) -> bool:
 				return not who.begins_with("companion:") and not World.production.worker(who).is_empty() \
@@ -14536,13 +14541,18 @@ func _sync_residents() -> void:
 					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "",
 					"type": str(World.production.worker(who).get("type", ""))})
 			folk.append_array(_companions_resting(place_id))
+			wt = World.resident_part("wanted: folk", wt)
 			var homes := _homes(area, place)
+			wt = World.resident_part("wanted: homes", wt)
 			var inn_now := _inn_goers(place_id, DayNight.now())  # 875: who is in the shell inn now, and an hour since.
 			var inn_before := _inn_goers(place_id, DayNight.now() - _inn_walk_steps())
+			wt = World.resident_part("wanted: inn goers", wt)
 			for i in folk.size():
 				var each: Dictionary = folk[i]
 				each["town"] = place_id
+				var pt := Time.get_ticks_usec()
 				each["places"] = _resident_places(area, place, each["trade"], homes, i)
+				World.resident_part("wanted: places", pt)
 				if not str(each["key"]).begins_with("companion:") and not _inn_town_side(each, place_id, inn_now, inn_before):
 					continue  # In the Mughouse (875).
 				var settled := Townsfolk.settled()
@@ -14566,7 +14576,10 @@ func _sync_residents() -> void:
 					each["places"]["rounds"] = stops
 				wanted[each["key"]] = each
 			# Strangers passing through (711, npc's side): at the inn, the store or the temple by kind.
-			for each: Dictionary in _visitors_wanted(area, place_id, place):
+			var vt := Time.get_ticks_usec()
+			var visitors := _visitors_wanted(area, place_id, place)
+			World.resident_part("wanted: visitors", vt)
+			for each: Dictionary in visitors:
 				if (str(each["key"]).begins_with(Offers.VISITOR) or str(each["key"]).begins_with(Offers.VENDOR)) \
 						and not _visitors_leaving.has(str(each["key"])) and not _inn_town_side(each, place_id, inn_now, inn_before):
 					continue  # Lodging in the Mughouse (875).
@@ -14577,6 +14590,7 @@ func _sync_residents() -> void:
 		# And the hill herder's (640, npc's side; Jeff: "herders exist as people"): a place keyed one of
 		# economy.json herder.places (herders_hut, hill_shieling) the same way, his fold (the place's ground) his
 		# work by day and his hut his home by night; on his drove, the loop after this one.
+		var ht := Time.get_ticks_usec()
 		var herder_rule: Dictionary = World.production.rules.get("herder", {})
 		var herder_keys: Array = herder_rule.get("places", [])
 		for place_id: String in World.holdings.places_in(World.zone.name):
@@ -14608,6 +14622,7 @@ func _sync_residents() -> void:
 		# The herder on his drove (640, npc's side): away from his fold with his sheep until the record's "back",
 		# he stands at the buyer's store square (the record's "buyer" when economy keeps it, else Towns.drove_town
 		# now) while a player is near that town, as its folk do; home again, the fold's body as above.
+		ht = World.resident_part("wanted: huts, folds", ht)
 		var herder_trade := str(herder_rule.get("trade", "herder"))
 		var herders: Dictionary = World.towns.herders_to_dict()
 		for id: String in herders:
@@ -14629,11 +14644,15 @@ func _sync_residents() -> void:
 			wanted[who] = {"key": who, "name": str(worker.get("name", who)), "trade": str(trades[0]) if not trades.is_empty() else "",
 				"player": "", "town": buyer, "type": str(worker.get("type", "")),
 				"places": {"work": square, "home": square, "square": square}}
+		ht = World.resident_part("wanted: droves", ht)
 		# The forest camps' traders (799, npc's side): one body at each "trader" place while someone is near.
 		for each: Dictionary in _camp_traders_wanted(area):
 			if not wanted.has(each["key"]):
 				wanted[each["key"]] = each
+		World.resident_part("wanted: camp traders", ht)
+	rt = World.resident_part("wanted", rt)
 	_tavern_folk(wanted)
+	rt = World.resident_part("tavern", rt)
 	# The lost (decision 487): a town's people beyond the walls stand at their
 	# cell of this zone, chosen once here (far from the store, off held
 	# ground, reachable), while a player is near that cell; a walked one home
@@ -14661,12 +14680,16 @@ func _sync_residents() -> void:
 	# refuge they were placed at, lost or held, while a player is near it (as a stray); freed, they stand beside the
 	# player leading them, in whatever zone that player is (the entry's freed_by is the state, no record of its own:
 	# a body not wanted is despawned as any other); at their town's ground they are home (_sought_home).
+	rt = World.resident_part("strays", rt)
 	for each: Dictionary in _sought_here():
 		wanted[str(each["key"])] = each
+	rt = World.resident_part("sought", rt)
 	_cap_wanted(wanted)  # Who stands under RESIDENTS_MAX, by rank, not by the order found (333 amended (4)).
+	rt = World.resident_part("cap", rt)
 	_bed_down_roofless(wanted, area)
 	_shelter_all(wanted, area)
 	_keep_off_doors(wanted, area)
+	rt = World.resident_part("beds, shelter, doors", rt)
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
@@ -14692,7 +14715,10 @@ func _sync_residents() -> void:
 			continue
 		if wanted.has(body.worker_id):
 			have[body.worker_id] = true
+			World.body_begin()
+			var bt := Time.get_ticks_usec()
 			body.take_places(wanted[body.worker_id]["places"])  # A goal its place left is picked again (875 amended (1)).
+			World.body_end(body.trade, body.tile, "places", bt, not body.escort_of.is_empty())
 			# A retrained worker's body follows its trade (Pip to acolyte, a soak's retrain; 566 amended: the
 			# work tick reads it), its label the spawn's until it stands again.
 			var trade := str(wanted[body.worker_id].get("trade", ""))
@@ -14707,12 +14733,18 @@ func _sync_residents() -> void:
 			_travelling = true
 			World.despawn(body)
 			_travelling = false
+	rt = World.resident_part("bodies", rt)
 	for who: String in wanted:
 		if not have.has(who):
+			World.body_begin()
+			var st := Time.get_ticks_usec()
 			_spawn_resident(wanted[who])
+			World.body_end(str(wanted[who].get("trade", "")), _wanted_spot(wanted[who]), "spawn", st, false)
+	rt = World.resident_part("spawns", rt)
 	for entity: GridEntity in World.townsfolk():
 		(entity as Resident).sheltering = not World.towns.threatened((entity as Resident).town).is_empty()  # 762.
 	_notes_tick()
+	World.resident_part("notes", rt)
 
 
 ## Who has a body under RESIDENTS_MAX (333 amended (4), the coordinator's ruling, 11-14: the cap
@@ -17788,12 +17820,14 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 	# the level lays no "fire" spots of its own: the square's hours sit there while it burns (Resident._free_spot).
 	# A seat with no seat decor under it is left out, so a fire with none is no fire spot at all.
 	if not spots.has("fire"):
+		var ft := Time.get_ticks_usec()
 		for zone: String in _fire_places:
 			for fire: Dictionary in _fire_places[zone]:
 				if str(fire.get("town", "")) == str(place.get("id", "")):
 					var seated := fire_seat_spots(fire, key, _seat_cells(zone))
 					if not seated.is_empty():
 						spots["fire"] = seated
+		World.resident_part("places: fire seats", ft)  # A zone's seat cells read from its level once (785 amended (1)).
 	if not spots.is_empty():
 		out["spots"] = spots
 	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, a bedroll outside
@@ -26349,12 +26383,18 @@ func _on_world_ticked(tick: int) -> void:
 			if _lawspeaker_client != null and World.production != null:
 				Lawspeaker.tick(World.production.now(), _lawspeaker_client)  # His daily rulings (decision 448); a coroutine, not awaited.
 		t = World.part("camps, lawspeaker", t)
+		World.paths_watch(true)  # The residents part's path searches counted (World._residents_said).
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
+			var bands_at := Time.get_ticks_usec()
 			_sync_bands()
+			World.resident_part("bands", bands_at)
 		if tick % WARM_TICKS == 0:
+			var warm_at := Time.get_ticks_usec()
 			_warm_rests()  # By a camp's fire (decision 777), or a lit hearth's (825).
 			World.burn_hearths()  # 825: a hearth whose burn ran out goes cold.
+			World.resident_part("warm, hearths", warm_at)
+		World.paths_watch(false)
 		t = World.part("residents", t)
 		if tick % World.WORLD_TICK_STEPS == 0 and World.zone == World.home():
 			_tend_bonds()
