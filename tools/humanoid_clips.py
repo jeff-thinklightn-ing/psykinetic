@@ -175,6 +175,25 @@ CLIPS["Posture_Slouch"] = {"keys": [(0.0, P("rest", 0.0, [("spine_02", LIFT, -4.
 	("neck_01", LIFT, -4.0), ("Head", LIFT, 8.0)] + both("clavicle", TURN, -14.0)))]}
 CLIPS["Jog_Short_Loop"] = {"loop": True, "segment": ("Jog_Fwd_Loop", 0.0, 0.9333), "stride": {"legs": 0.62, "arms": 0.8, "bounce": 0.7}}
 CLIPS["Sprint_Short_Loop"] = {"loop": True, "segment": ("Sprint_Loop", 0.0, 0.6667), "stride": {"legs": 0.72, "arms": 0.85, "bounce": 0.75}}
+# The people's jog held up (Jeff, 11-11: "the walk looks like skipping"; the coordinator, 11-16: every player in
+# motion plays Jog_Short, HUMAN_GAITS handing over from Walk at 3.63 m/s under a player's 4 tiles a second): the
+# pack's Jog_Fwd, and so Jog_Short, pitches the hips-to-head line 24 to 29 degrees forward (Walk 12 to 13, Idle 8 to
+# 10), most of it in the upper back (the chest to the neck 37 to 47 against Idle's 14), the head tipped 21; and its
+# hips drop and rise 0.25 m each step (0.78 to 1.03 m; Walk 0.06, Sprint_Short 0.13), which Jog_Short's "bounce"
+# never touched (it scales the pelvis's own z, not its height: 0.24 m left). The people's copy plays Jog_Short with
+# the back bent up at spine_02 and spine_03 by PEOPLE_JOG_UPRIGHT degrees each, the neck down by PEOPLE_JOG_NECK to
+# keep the head where it looked, and the hips' rise scaled by PEOPLE_JOG_RISE about its mean. The feet fall where
+# Jog_Short's do but never under Walk's floor (Jog_Short's planted toe sinks 5.6 cm for 0.15 s of each step: ui-design's
+# jogA_3f76ef27e), and the hands keep their height over the hips (a back held up took the arms up with it, hands at
+# the shoulder: the coordinator on jog_strip_ABC); timing is Jog_Short's. Orcs, kobolds and the barrow's dead keep Jog_Short; the
+# goblin plays Jog_Fwd. Made from the pack's Jog_Fwd as Jog_Short is, its stride narrowed the same (a clip authored
+# in the same run can't be read back as a base: Blender 5.3 poses it wrong, the pelvis 0.8 m off).
+PEOPLE_JOG_UPRIGHT = 13.0
+PEOPLE_JOG_NECK = 15.0
+PEOPLE_JOG_RISE = 0.5
+PEOPLE_JOG_TOE_ABOVE = 0.022
+CLIPS["People_Jog_Short_Loop"] = dict(CLIPS["Jog_Short_Loop"], rise=PEOPLE_JOG_RISE, floor="Walk_Loop", kept_hands=True,
+	turns=[("spine_02", LIFT, PEOPLE_JOG_UPRIGHT), ("spine_03", LIFT, PEOPLE_JOG_UPRIGHT), ("neck_01", LIFT, -PEOPLE_JOG_NECK)])
 # The wade (775; Jeff: wading the hills' streams): the pack's walk with each knee lifted high out
 # of the water over its swing (the walk's swing windows, measured on its feet: the right foot off
 # the ground from 0.11 s to 0.67 s of its 1.33 s, the left half a cycle on), the arms held a little
@@ -1598,15 +1617,81 @@ class Rig:
 			pb.keyframe_insert("location", frame=frame)
 			pb.keyframe_insert("rotation_quaternion", frame=frame)
 
+	def segment_poses(self, clip: dict, base: str, times: list, extra: list = None) -> list:
+		"""A segment's armature-space matrices at [times]: the base's, or with the clip's own "turns" on every
+		frame after its parents' (People_Jog_Short's trunk); its "rise" scales the pelvis's height about its
+		mean over the segment (character axes, z up); "floor" (a clip) holds each foot where the base puts it
+		but no lower than that clip's lowest ball of the foot ("kept feet"), and "kept_hands" each hand where
+		the base puts it, carried with the hips' rise (so a trunk turned up leaves the arms as they swung)."""
+		rise = clip.get("rise", 1.0)
+		turns = list(clip.get("turns", ()))
+		if not turns and rise == 1.0 and "floor" not in clip:
+			return [self.posed(base, t) for t in times]
+		heights = [self.posed(base, t)["pelvis"].translation.z for t in times]
+		mean = sum(heights) / len(heights)
+		floor = self.floor_of(clip["floor"]) if "floor" in clip else None
+		out = []
+		for i, (t, z) in enumerate(zip(times, heights)):
+			move = (0.0, 0.0, (mean - z) * (1.0 - rise))
+			frame_turns = list(turns)
+			stock = self.posed(base, t)
+			if rise != 1.0 or floor is not None:
+				for side, sign in (("l", 1.0), ("r", -1.0)):
+					lift = max(0.0, floor - stock["ball_" + side].translation.z) if floor is not None else 0.0
+					lift += extra[i][side] if extra else 0.0
+					frame_turns.append(("thigh_" + side, ([("foot_%s@base" % side, (0.0, 0.0, lift), 1.0)], (0.2 * sign, -1.0, 0.0)), REACH))
+			if clip.get("kept_hands"):
+				for side in ("l", "r"):
+					frame_turns.append(("upperarm_" + side, ([("hand_%s@base" % side, move, 1.0)], [("lowerarm_" + side, (0.0, 0.0, 0.0), 1.0)]), REACH))
+			out.append(self.pose(P(base, t, frame_turns, move=move)))
+		return out
+
+	def floor_of(self, clip: str) -> float:
+		"""[clip]'s lowest ball of the foot (armature z), over its frames, and PEOPLE_JOG_TOE_ABOVE over it: the
+		toe bone as Godot's retarget places it reads 2 cm under the ball's head where the jog tips the foot."""
+		first, last = (int(f) for f in action_named(clip).frame_range)
+		return PEOPLE_JOG_TOE_ABOVE + min(self.posed(clip, f / FPS)[b].translation.z for f in range(first, last + 1) for b in ("ball_l", "ball_r"))
+
+	def armature(self, basis: dict) -> dict:
+		"""basis()'s inverse: each bone's armature-space matrix from its pose-space one."""
+		out = {}
+		for b in self.bones:
+			if b.parent is None:
+				out[b.name] = b.matrix_local @ basis[b.name]
+			else:
+				out[b.name] = out[b.parent.name] @ (b.parent.matrix_local.inverted() @ b.matrix_local) @ basis[b.name]
+		return out
+
 	def author(self, name: str, clip: dict):
 		action = bpy.data.actions.new(name)
 		action.use_fake_user = True
 		last = {}
 		if "segment" in clip:
 			base, start, end = clip["segment"]
-			frames = [self.basis(self.posed(base, start + f / FPS)) for f in range(round((end - start) * FPS) + 1)]
+			times = [start + f / FPS for f in range(round((end - start) * FPS) + 1)]
+			frames = [self.basis(m) for m in self.segment_poses(clip, base, times)]
 			if "stride" in clip:
 				frames = narrowed(frames, clip["stride"])
+			if "floor" in clip:
+				# The legs' narrowing moves the feet after their reach: each ball of the foot found under the floor
+				# is lifted by as much again and the frames made anew, until none is under by more than 2 mm.
+				floor = self.floor_of(clip["floor"])
+				extra = [{"l": 0.0, "r": 0.0} for _t in times]
+				for _pass in range(4):
+					under = 0.0
+					for i, basis in enumerate(frames):
+						arm = self.armature(basis)
+						for side in ("l", "r"):
+							short = floor - arm["ball_" + side].translation.z
+							if short > 0.0:
+								extra[i][side] += short
+								under = max(under, short)
+					print("floor %s pass %d: under by %.3f m at most" % (name, _pass, under))
+					if under <= 0.002:
+						break
+					frames = [self.basis(m) for m in self.segment_poses(clip, base, times, extra)]
+					if "stride" in clip:
+						frames = narrowed(frames, clip["stride"])
 			for f, basis in enumerate(frames):
 				self.basis_cache = basis
 				self.key(action, f, None, last)

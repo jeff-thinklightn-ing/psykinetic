@@ -49,6 +49,7 @@ func _ready() -> void:
 	await _test_upper_timed()
 	await _test_no_upper()
 	await _test_people_feet()
+	_test_people_jog()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
 	await _test_hand_relax()
@@ -2549,6 +2550,9 @@ func _test_no_upper() -> void:
 ## foot as it blends in or out); through each, a foot on the ground (within 1 cm of its height at rest)
 ## moves no more than PEOPLE_SLIDE in a 1/30 s, five builds. The ground sit's own slides (the UAL's,
 ## its feet drawn in while sat) are not ours to judge.
+## The people's gaits (People_Jog_Short): their feet run on the ground at the gait's pace, never
+## stood, so the stance's ends and slide are not theirs (_test_people_jog has them).
+const PEOPLE_GAITS: Array[String] = ["Jog_Short"]
 const PEOPLE_FEET_NEAR := 0.03
 const PEOPLE_SLIDE := 0.02
 const PEOPLE_START_ELSEWHERE: Array[String] = ["Counter_Low_Idle", "Counter_Low_Show", "Counter_Low_Give", "Counter_Low_Exit",
@@ -2611,7 +2615,7 @@ func _test_people_feet() -> void:
 	var spans: Array[String] = []
 	var clips: Array[String] = []
 	for clip: String in lib.get_animation_list():
-		if clip.begins_with(Client3D.PEOPLE_PREFIX):
+		if clip.begins_with(Client3D.PEOPLE_PREFIX) and not clip.trim_prefix(Client3D.PEOPLE_PREFIX) in PEOPLE_GAITS:
 			clips.append(clip)
 	# Every build's feet at People_Idle and at each clip's ends; the slide, frame by frame, on the
 	# first build only (the clips are one rig's, and a sweep of every clip at 30 frames a second on
@@ -2783,3 +2787,156 @@ static func _relax_least(tips: Array) -> float:
 	for along: float in tips:
 		least = minf(least, along)
 	return least
+
+
+## The people's jog held up (Jeff, 11-11: "the walk looks like skipping"; every player in motion plays
+## the jog): People_Jog_Short's hips-to-head line pitched forward PEOPLE_JOG_LEAN_LEAST to _MOST degrees
+## on the cycle's mean (Jog_Short's 24 to 29 at JOG_LEAN_STOCK or more), at no sample past
+## PEOPLE_JOG_LEAN_PEAK, the head tipped within PEOPLE_JOG_HEAD of Idle's; its length Jog_Short's, its feet
+## where Jog_Short's fall but no toe under Walk's floor, its hips' rise at most PEOPLE_JOG_BOB_MOST (Jog_Short's
+## 0.23 m), its hands as high over the hips as Jog_Short's and under the shoulder; a person's rig plays
+## it for "Jog_Short" and reads it so, a body with no people's stance plays Jog_Short. Read off the
+## tracks on the bone chain (8 samples a cycle), man and woman.
+const PEOPLE_JOG_LEAN_LEAST := 12.0
+const PEOPLE_JOG_LEAN_MOST := 18.0
+const PEOPLE_JOG_LEAN_PEAK := 20.0
+const JOG_LEAN_STOCK := 22.0
+const PEOPLE_JOG_HEAD := 5.0
+const PEOPLE_JOG_FEET := 0.04
+const PEOPLE_JOG_UNDER := 0.005
+const PEOPLE_JOG_HANDS := 0.05
+const PEOPLE_JOG_ACROSS := 0.03
+const PEOPLE_JOG_BOB_MOST := 0.15
+
+
+func _test_people_jog() -> void:
+	print("== the people's jog held up ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var people := Client3D.PEOPLE_PREFIX + JOG
+	_check(lib.has_animation(people), "the library has %s" % people)
+	if not lib.has_animation(people):
+		return
+	var stock := lib.get_animation(JOG)
+	var held := lib.get_animation(people)
+	_check(is_equal_approx(held.length, stock.length) and held.loop_mode == stock.loop_mode,
+			"its length and loop are Jog_Short's (%.3f / %.3f s)" % [held.length, stock.length])
+	for build: Array in [SWORD_BUILDS[0], SWORD_BUILDS[4]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var read := func(anim: Animation, t: float) -> Array:
+			_jog_pose(skeleton, anim, t)
+			var hips := _jog_global(skeleton, skeleton.find_bone("Hips"))
+			var head := _jog_global(skeleton, skeleton.find_bone("Head"))
+			var up := head.origin - hips.origin
+			var face := head.basis.z
+			return [rad_to_deg(atan2(up.z, up.y)), rad_to_deg(atan2(-face.y, Vector2(face.x, face.z).length()))]
+		var lean := {}
+		var tip := {}
+		var peak := 0.0
+		for clip: String in ["Idle", JOG, people]:
+			var anim := lib.get_animation(clip)
+			var leans := 0.0
+			var tips := 0.0
+			for i in 8:
+				var got: Array = read.call(anim, anim.length * i / 8.0)
+				leans += float(got[0]) / 8.0
+				tips += float(got[1]) / 8.0
+				if clip == people:
+					peak = maxf(peak, float(got[0]))
+			lean[clip] = leans
+			tip[clip] = tips
+		_check(lean[JOG] >= JOG_LEAN_STOCK and lean[people] >= PEOPLE_JOG_LEAN_LEAST and lean[people] <= PEOPLE_JOG_LEAN_MOST and peak <= PEOPLE_JOG_LEAN_PEAK,
+				"%s: the jog pitched %.1f degrees forward on the mean, at most %.1f (Jog_Short %.1f, Idle %.1f)" % [build[0], lean[people], peak, lean[JOG], lean["Idle"]])
+		_check(absf(float(tip[people]) - float(tip["Idle"])) <= PEOPLE_JOG_HEAD,
+				"%s: the head tipped %.1f against Idle's %.1f (Jog_Short's %.1f)" % [build[0], tip[people], tip["Idle"], tip[JOG]])
+		model.free()
+	# The feet where Jog_Short puts them across the ground (the same pace and footfalls) but never under
+	# Walk's floor (Jog_Short's toe sinks 5.6 cm for 0.15 s of each step, ui-design's jogA_3f76ef27e); the
+	# hips' path near the same, their rise at most PEOPLE_JOG_BOB_MOST; each hand's height over the hips
+	# within PEOPLE_JOG_HANDS of Jog_Short's, never over the shoulder (a back held up takes the arms up with
+	# it: the coordinator, on jog_strip_ABC).
+	var model := (load(SWORD_BUILDS[0][1]) as PackedScene).instantiate() as Node3D
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var at := func(anim: Animation, t: float, bone: String) -> Vector3:
+		_jog_pose(skeleton, anim, t)
+		return _jog_global(skeleton, skeleton.find_bone(bone)).origin
+	var walk := lib.get_animation("Walk")
+	var walk_floor := INF
+	for i in 32:
+		for toe: String in ["LeftToes", "RightToes"]:
+			walk_floor = minf(walk_floor, (at.call(walk, walk.length * i / 32.0, toe) as Vector3).y)
+	var off: Array[String] = []
+	var rise := [Vector2(INF, -INF), Vector2(INF, -INF)]
+	var most := {"across": 0.0, "feet": 0.0, "under": -INF, "hands": 0.0, "over": -INF}
+	for i in 32:
+		var t := stock.length * i / 32.0
+		var got := []
+		for anim: Animation in [stock, held]:
+			var bones := {}
+			for bone: String in ["Hips", "LeftFoot", "RightFoot", "LeftToes", "RightToes", "LeftHand", "RightHand", "LeftUpperArm", "RightUpperArm"]:
+				bones[bone] = at.call(anim, t, bone)
+			got.append(bones)
+		for side in 2:
+			var h: Vector3 = got[side]["Hips"]
+			rise[side] = Vector2(minf(rise[side].x, h.y), maxf(rise[side].y, h.y))
+		var hips_a: Vector3 = got[0]["Hips"]
+		var hips_b: Vector3 = got[1]["Hips"]
+		most["across"] = maxf(most["across"], Vector2(hips_a.x, hips_a.z).distance_to(Vector2(hips_b.x, hips_b.z)))
+		for foot: String in ["LeftFoot", "RightFoot"]:
+			var fa: Vector3 = got[0][foot]
+			var fb: Vector3 = got[1][foot]
+			most["feet"] = maxf(most["feet"], Vector2(fa.x, fa.z).distance_to(Vector2(fb.x, fb.z)))
+		for toe: String in ["LeftToes", "RightToes"]:
+			most["under"] = maxf(most["under"], walk_floor - (got[1][toe] as Vector3).y)
+		var shoulder := minf((got[1]["LeftUpperArm"] as Vector3).y, (got[1]["RightUpperArm"] as Vector3).y)
+		for hand: String in ["LeftHand", "RightHand"]:
+			var over_a: float = (got[0][hand] as Vector3).y - hips_a.y
+			var over_b: float = (got[1][hand] as Vector3).y - hips_b.y
+			most["hands"] = maxf(most["hands"], absf(over_b - over_a))
+			most["over"] = maxf(most["over"], (got[1][hand] as Vector3).y - shoulder)
+	model.free()
+	var bob: float = rise[1].y - rise[1].x
+	if most["across"] > PEOPLE_JOG_ACROSS:
+		off.append("the hips %.3f m off Jog_Short's path" % most["across"])
+	if most["feet"] > PEOPLE_JOG_FEET:
+		off.append("a foot %.3f m off Jog_Short's across the ground" % most["feet"])
+	if most["under"] > PEOPLE_JOG_UNDER:
+		off.append("a toe %.3f m under Walk's floor" % most["under"])
+	if bob > PEOPLE_JOG_BOB_MOST:
+		off.append("the hips rise %.3f m" % bob)
+	_check(off.is_empty(), "its feet within %.3f m of Jog_Short's across the ground (%.3f), no toe under Walk's floor by more than %.3f (%.3f), the hips' path within %.3f (%.3f), their rise %.3f m against %.3f (%s)" % [
+			PEOPLE_JOG_FEET, most["feet"], PEOPLE_JOG_UNDER, most["under"], PEOPLE_JOG_ACROSS, most["across"], bob, rise[0].y - rise[0].x, off])
+	_check(most["hands"] <= PEOPLE_JOG_HANDS and most["over"] < 0.0,
+			"each hand's height over the hips within %.3f m of Jog_Short's (%.3f), the highest %.3f m under the shoulder" % [PEOPLE_JOG_HANDS, most["hands"], -float(most["over"])])
+	# Who plays it: a person's rig for "Jog_Short", read back as Jog_Short; a body without the stance, Jog_Short.
+	var made := _sword_body(self, SWORD_BUILDS[0])
+	var rig: AnimRig = made[2]
+	rig.stood_as = Client3D.PEOPLE_PREFIX
+	rig.loop(JOG)
+	var person := [rig.as_played(JOG), rig.base_clip()]
+	rig.stood_as = ""
+	var plain := rig.as_played(JOG)
+	(made[0] as Node3D).queue_free()
+	(made[3] as Node3D).free()
+	_check(person == [people, JOG] and plain == JOG, "a person plays %s for the jog and reads it as %s; no stance, %s" % [person[0], person[1], plain])
+
+
+## [param anim]'s rotation and position tracks at [param t] on [param skeleton]'s poses (reset first).
+static func _jog_pose(skeleton: Skeleton3D, anim: Animation, t: float) -> void:
+	skeleton.reset_bone_poses()
+	for k in anim.get_track_count():
+		var bone := skeleton.find_bone(str(anim.track_get_path(k)).get_slice(":", 1))
+		if bone < 0:
+			continue
+		match anim.track_get_type(k):
+			Animation.TYPE_ROTATION_3D:
+				skeleton.set_bone_pose_rotation(bone, anim.rotation_track_interpolate(k, t))
+			Animation.TYPE_POSITION_3D:
+				skeleton.set_bone_pose_position(bone, anim.position_track_interpolate(k, t))
+
+
+## A bone's pose in the skeleton's space, chained by hand from its poses (no skeleton update needed).
+static func _jog_global(skeleton: Skeleton3D, bone: int) -> Transform3D:
+	var own := Transform3D(Basis(skeleton.get_bone_pose_rotation(bone)).scaled(skeleton.get_bone_pose_scale(bone)), skeleton.get_bone_pose_position(bone))
+	var parent := skeleton.get_bone_parent(bone)
+	return own if parent < 0 else _jog_global(skeleton, parent) * own

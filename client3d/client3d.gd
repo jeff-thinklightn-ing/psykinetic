@@ -1750,7 +1750,9 @@ const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "re
 ## 0.62 a player's jog plays at about 1.1 times, in 1.65 m steps. Paces by
 ## tools/gait_pace.gd on each body (hers are shorter legs, 5% slower), scaled
 ## by a person's stature: the jog gives way to the sprint at about 5.2 tiles
-## a second.
+## a second. A person (people_stance) plays the jog as People_Jog_Short, its back held up to about
+## 15 degrees where the pack's pitches 24 to 29 (Jeff, 11-11: "the walk looks like skipping"; every
+## player in motion plays the jog); the orc, kobold and barrow dead keep Jog_Short.
 const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.94], ["Jog_Short", 3.63], ["Sprint_Short", 5.55]]
 ## The draugr: the human skeleton scaled up (art-kit's, 2.1 m and more), its
 ## strides and its hands' sockets with it.
