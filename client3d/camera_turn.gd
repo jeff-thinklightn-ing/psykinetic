@@ -27,14 +27,17 @@ const TURN_SPEED := 120.0
 const MANUAL_HOLD := 6.0
 ## The box turn (decision 801 amended (3)): the same turn for the eye in a building's box (Client3D.eye_boxed_at). First numbers, settled on
 ## ui-design's joined walks of the Mughouse's lane: a standing player's turn starts after BOX_STAND_HOLD and runs at BOX_STAND_SPEED
-## (not a startle); the camera holds a boxed turn till the hand yaw has been clear BOX_BACK_HOLD, then eases back at BOX_BACK_SPEED; a
-## turn to the other side waits BOX_FLIP_COOL after the last ended; the search widens to BOX_TURN_MOST when 45 degrees finds none.
+## (not a startle); the camera holds a box turn of its own (box_off) till the hand yaw has been clear BOX_BACK_HOLD while the player walks
+## well clear of every box (the caller's may_back: none at the door, none while stopped), then eases back at BOX_BACK_SPEED, and never
+## undoes a turn the hidden-player search made; a turn to the other side waits BOX_FLIP_COOL after the last ended; the search widens to
+## BOX_TURN_MOST when 45 degrees finds none, and a search that found none waits BOX_SEARCH_COOL.
 const BOX_STAND_HOLD := 0.3
 const BOX_STAND_SPEED := 45.0
 const BOX_BACK_HOLD := 1.5
 const BOX_BACK_SPEED := 60.0
 const BOX_FLIP_COOL := 1.0
 const BOX_TURN_MOST := 90.0
+const BOX_SEARCH_COOL := 1.0
 
 ## How long they have been hidden.
 var hidden_for := 0.0
@@ -58,6 +61,10 @@ var boxed_for := 0.0
 var back_clear := 0.0
 var flip_cool := 0.0
 var last_dir := 0.0
+## The camera is off the hand yaw by a box turn of this (not by the hidden-player search's, which it never undoes); the cool of a search
+## that found no yaw.
+var box_off := false
+var search_cool := 0.0
 
 
 ## The player turned the camera themselves: any turn stops where it is.
@@ -83,8 +90,10 @@ func step(delta: float, hidden: bool, on: bool) -> bool:
 	return on and held <= 0.0 and cool <= 0.0 and hidden_for >= HIDE_SECONDS
 
 
-## Turn from [param now] to [param target], at [param speed] degrees a second on average.
-func start(now: float, target: float, speed := TURN_SPEED) -> void:
+## Turn from [param now] to [param target], at [param speed] degrees a second on average; [param box]: a box turn (the one turn the
+## camera later eases back from).
+func start(now: float, target: float, speed := TURN_SPEED, box := false) -> void:
+	box_off = box
 	turning = true
 	stuck = false
 	from = now
@@ -98,9 +107,14 @@ func start(now: float, target: float, speed := TURN_SPEED) -> void:
 ## One frame of the box turn: 1 to search for a yaw that clears the eye of its box, 2 to ease back to the hand yaw, 0 for nothing.
 ## [param boxed]: the eye is (or by the player's walk will be) in a box at this yaw; [param hand_boxed]: at the hand yaw; [param standing]:
 ## the player is still; [param off_hand]: the camera is off the hand yaw. A turn of its own under way, the player's turning
-## (held) and the option off all end it. Walking, a boxed eye searches at once; standing, after BOX_STAND_HOLD.
-func box_step(delta: float, boxed: bool, hand_boxed: bool, standing: bool, off_hand: bool, on: bool) -> int:
+## (held) and the option off all end it. Walking, a boxed eye searches at once; standing, after BOX_STAND_HOLD; a search that found none
+## waits BOX_SEARCH_COOL. [param may_back]: the player walks, well clear of every box; only then, and only off the hand yaw by a box turn
+## of this (box_off), does the camera ease back.
+func box_step(delta: float, boxed: bool, hand_boxed: bool, standing: bool, off_hand: bool, on: bool, may_back := true) -> int:
 	flip_cool = maxf(flip_cool - delta, 0.0)
+	search_cool = maxf(search_cool - delta, 0.0)
+	if not off_hand:
+		box_off = false
 	if turning or not on or held > 0.0:
 		boxed_for = 0.0
 		back_clear = 0.0
@@ -108,9 +122,11 @@ func box_step(delta: float, boxed: bool, hand_boxed: bool, standing: bool, off_h
 	if boxed:
 		back_clear = 0.0
 		boxed_for += delta
-		return 0 if standing and boxed_for < BOX_STAND_HOLD else 1
+		if standing and boxed_for < BOX_STAND_HOLD or search_cool > 0.0:
+			return 0
+		return 1
 	boxed_for = 0.0
-	if off_hand and not hand_boxed:
+	if box_off and may_back and off_hand and not hand_boxed:
 		back_clear += delta
 		if back_clear >= BOX_BACK_HOLD:
 			back_clear = 0.0
@@ -173,6 +189,25 @@ static func choose(yaw: float, clear: Callable, walk: Vector2, hand: float, most
 		if down_clear:
 			return down
 	return NAN
+
+
+## The yaw, SEARCH_STEP apart from [param yaw] either way and within [param most] of [param hand], that [param ok] (Callable(yaw) -> bool)
+## says shows the player and whose eye stays out of every box the longest ([param look], Callable(yaw) -> seconds of the walk it is clear
+## for), at least [param least] seconds; of equal looks the nearest. NAN for none. The box turn's fallback when no yaw is clear for the
+## whole long look: the one that lasts longest, so a walk is not turned a step at a time as the look moves on.
+static func choose_longest(yaw: float, look: Callable, ok: Callable, hand: float, most: float, least: float) -> float:
+	var best := NAN
+	var best_look := least - 0.001
+	for k in range(1, int(2.0 * most / SEARCH_STEP) + 1):
+		for side in [1.0, -1.0]:
+			var degrees: float = yaw + side * k * SEARCH_STEP
+			if absf(wrapf(degrees - hand, -180.0, 180.0)) > most + 0.01:
+				continue
+			var seconds: float = look.call(degrees)
+			if seconds > best_look + 0.001 and ok.call(degrees):
+				best = degrees
+				best_look = seconds
+	return best
 
 
 ## The way the camera looks across the ground at [param yaw] (x and z):

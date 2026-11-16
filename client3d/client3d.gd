@@ -506,9 +506,16 @@ const BOX_PULL_IN_RATE := 10.0
 const BOX_PULL_OUT_RATE := 1.2
 const BOX_PULL_HOLD := 1.0
 const BOX_PULL_LEAST := 3.0
-## The box turn (decision 801 amended (3), 801's camera turn for the eye in a building's box): seconds of walk the eye's box is looked ahead,
-## and, rung 4b, how near the eye may come when no yaw clears it (the aim then at its full lift).
-const BOX_LOOK_AHEAD := 0.5
+## The box turn (decision 801 amended (3), 801's camera turn for the eye in a building's box): seconds of walk the eye's box is looked ahead
+## (asked every BOX_LOOK_STEP seconds along the walk's line: a yaw is clear only if its eye is outside every box all that way; ui-design's
+## walks on 6d421b998 had a turn taken to a yaw whose eye entered the box 1.2 s on), the walk under which a player counts as standing,
+## how far from every box the player must be for the camera to ease back to their own yaw, and, rung 4b, how near the eye may come when no
+## yaw clears it (the aim then at its full lift).
+const BOX_LOOK_AHEAD := 1.5
+const BOX_SEEK_AHEAD := 4.0
+const BOX_LOOK_STEP := 0.5
+const BOX_WALK_MIN := 0.3
+const BOX_BACK_MARGIN := 8.0
 const BOX_CLOSE_LEAST := 1.2
 ## Under BOX_PULL_RISE_FROM metres the low camera's aim rises from the
 ## feet, to BOX_PULL_AIM_LIFT over them at BOX_PULL_LEAST, and the lean
@@ -4712,17 +4719,37 @@ func _clear_share(chest: Vector3, full: Vector3, least_m: float) -> float:
 	return clampf(nearest / length, least, 1.0)
 
 
-## Whether the eye would stand inside a roofed building's box at [param degrees] of yaw, at the player's chest as it will be
-## BOX_LOOK_AHEAD seconds on (their walk's velocity; standing, where it is), brought in by the pull to no nearer than
-## BOX_PULL_LEAST: the slab at the lens (the box turn, decision 801 amended (3)). A box the chest is in is not asked.
-func eye_boxed_at(degrees: float) -> bool:
+## Whether the eye would stand inside a roofed building's box at [param degrees] of yaw, at the player's chest now or at any point of
+## their walk's line up to BOX_LOOK_AHEAD seconds on (every BOX_LOOK_STEP; standing, only where it is), brought in by the pull to no
+## nearer than BOX_PULL_LEAST: the slab at the lens (the box turn, decision 801 amended (3)). A box the chest is in is not asked.
+func eye_boxed_at(degrees: float, ahead := BOX_LOOK_AHEAD) -> bool:
 	if not _low or _buildings.is_empty() or _camera == null:
 		return false
-	var chest := _camera_target + Vector3.UP * BOX_PULL_CHEST + Vector3(_walk.x, 0.0, _walk.y) * BOX_LOOK_AHEAD
 	var full := _camera_offset_at(degrees) / maxf(_box_pull, 0.001)
 	if full.length() < 0.001:
 		return false
-	var eye := chest + full * _clear_share(chest, full, BOX_PULL_LEAST)
+	var base := _camera_target + Vector3.UP * BOX_PULL_CHEST
+	var walk := Vector3(_walk.x, 0.0, _walk.y)
+	var steps := int(ahead / BOX_LOOK_STEP) if walk.length() >= BOX_WALK_MIN else 0
+	for i in steps + 1:
+		if _eye_in_box(base + walk * (BOX_LOOK_STEP * i), full, BOX_PULL_LEAST):
+			return true
+	return false
+
+
+## Whether the eye is inside a roofed building's box as the camera stands now (its yaw, and the pull's least as the box turn has set it).
+func eye_in_box_now() -> bool:
+	if not _low or _buildings.is_empty() or _camera == null:
+		return false
+	var full := _camera_offset() / maxf(_box_pull, 0.001)
+	if full.length() < 0.001:
+		return false
+	return _eye_in_box(_camera_target + Vector3.UP * BOX_PULL_CHEST, full, BOX_CLOSE_LEAST if _box_close else BOX_PULL_LEAST)
+
+
+## The eye at [param full] from [param chest], brought in by the pull to no nearer than [param least_m], inside a box the chest is not in.
+func _eye_in_box(chest: Vector3, full: Vector3, least_m: float) -> bool:
+	var eye := chest + full * _clear_share(chest, full, least_m)
 	for building: Dictionary in _buildings:
 		var box := _eye_box(building)
 		if box.size != Vector3.ZERO and not box.has_point(chest) and box.has_point(eye):
@@ -4730,11 +4757,49 @@ func eye_boxed_at(degrees: float) -> bool:
 	return false
 
 
-## A yaw the box turn may end on: the eye outside every box at it, and the player seen whole from it (when there is a player).
+## How far the player stands from the nearest roofed building's box on the ground (metres; INF with none).
+func _box_nearest() -> float:
+	var at := _camera_target
+	var nearest := INF
+	for building: Dictionary in _buildings:
+		var box := _eye_box(building)
+		if box.size == Vector3.ZERO:
+			continue
+		var along_x := maxf(maxf(box.position.x - at.x, at.x - box.end.x), 0.0)
+		var along_z := maxf(maxf(box.position.z - at.z, at.z - box.end.z), 0.0)
+		nearest = minf(nearest, Vector2(along_x, along_z).length())
+	return nearest
+
+
+## A yaw the box turn may end on: the eye outside every box at it along the walk for BOX_SEEK_AHEAD seconds (a yaw clear only for the next
+## second was a turn taken twice: ui-design's walk 1 on 6d421b998 went 135, 150, 180, 105), and the player seen whole from it (when there is
+## a player).
 func _box_clear(degrees: float) -> bool:
-	if eye_boxed_at(degrees):
+	if eye_boxed_at(degrees, BOX_SEEK_AHEAD):
 		return false
 	return _focus_points().size() < FADE_HEIGHTS.size() or _clears(degrees)
+
+
+## The player seen whole from [param degrees] (when there is a player).
+func _box_seen(degrees: float) -> bool:
+	return _focus_points().size() < FADE_HEIGHTS.size() or _clears(degrees)
+
+
+## How many seconds of the walk's line (to BOX_SEEK_AHEAD) the eye stays out of every box at [param degrees]; the fallback's measure when
+## no yaw is clear for all of it (CameraTurn.choose_longest).
+func _box_look(degrees: float) -> float:
+	if not _low or _buildings.is_empty() or _camera == null:
+		return BOX_SEEK_AHEAD
+	var full := _camera_offset_at(degrees) / maxf(_box_pull, 0.001)
+	if full.length() < 0.001:
+		return BOX_SEEK_AHEAD
+	var base := _camera_target + Vector3.UP * BOX_PULL_CHEST
+	var walk := Vector3(_walk.x, 0.0, _walk.y)
+	var steps := int(BOX_SEEK_AHEAD / BOX_LOOK_STEP) if walk.length() >= BOX_WALK_MIN else 0
+	for i in steps + 1:
+		if _eye_in_box(base + walk * (BOX_LOOK_STEP * i), full, BOX_PULL_LEAST):
+			return BOX_LOOK_STEP * i
+	return BOX_SEEK_AHEAD
 
 
 ## How far the low camera's aim has risen (decision 864): 0 at
@@ -22469,35 +22534,61 @@ func _drive_turn(delta: float) -> void:
 ## The box turn (decision 801 amended (3)), each frame outdoors under the low camera: the eye in a roofed building's box (or by the walk about to
 ## be) is turned out of it, as 801 turns for a hidden player: the nearest yaw within TURN_MOST of the hand yaw from which the eye is
 ## outside every box and the player seen whole (rung 1); else within BOX_TURN_MOST (4a); else the eye taken in past BOX_PULL_LEAST to
-## BOX_CLOSE_LEAST with the aim lifted (4b); else today's slab (4c). It holds there, and eases back once the hand yaw has been clear
-## for BOX_BACK_HOLD. Nothing of it with the option off or within MANUAL_HOLD of the player's own turning (CameraTurn.box_step).
+## BOX_CLOSE_LEAST with the aim lifted (4b); else today's slab (4c). A yaw is taken only if its eye is outside every box along the next
+## BOX_LOOK_AHEAD seconds of the walk. It holds there, and eases back only after its own turn, once the hand yaw has been clear for
+## BOX_BACK_HOLD, walking and BOX_BACK_MARGIN from every box. The player's own yaw (turning it, or within MANUAL_HOLD of it) is not turned,
+## but its boxed eye is brought in as 4b does. Nothing at all with the option off (CameraTurn.box_step).
 func _box_turn(delta: float, manual: bool, on: bool) -> void:
 	var standing := _walk.length() < 0.3
 	var boxed := eye_boxed_at(yaw)
 	var off_hand := absf(wrapf(yaw - _hand_yaw, -180.0, 180.0)) > 1.0
-	var act: int = _turn_view.box_step(delta, boxed and not manual, off_hand and eye_boxed_at(_hand_yaw), standing, off_hand, on and not manual)
+	# Back to the player's own yaw only after a box turn of this, walking, and well clear of every box: none at the door, none stopped.
+	var may_back := not standing and _box_nearest() > BOX_BACK_MARGIN
+	var act: int = _turn_view.box_step(delta, boxed and not manual, off_hand and eye_boxed_at(_hand_yaw), standing, off_hand, on and not manual, may_back)
 	if act == 2:
 		_turn_view.start(yaw, _hand_yaw, CameraTurn.BOX_BACK_SPEED)
 		print("[camera] box turn: yaw %.0f back to %.0f, the hand yaw clear" % [yaw, _hand_yaw])
 		return
+	# The pull-in (rung 4b) is for an eye that is in a box now: the look ahead (a straight line, which the walk may leave) only turns.
+	var boxed_now := eye_boxed_at(yaw, 0.0)
 	if act != 1:
-		if not boxed and _box_close:
+		# The player's own yaw (turning it, or within MANUAL_HOLD of it) is not turned, but its eye is still brought in (rung 4b).
+		if on and boxed_now and (manual or _turn_view.held > 0.0):
+			if not _box_close:
+				_box_close = true
+				print("[camera] box pull-in: the hand yaw %.0f boxes the eye, taken in to %.1f m with the aim lifted" % [yaw, BOX_CLOSE_LEAST])
+		elif not boxed_now and _box_close:
 			_box_close = false
 		return
+	# One turn an approach (the coordinator, 11-16): after a box turn the camera holds its yaw while the player is within BOX_BACK_MARGIN of a
+	# box, and a boxed eye is brought in (rung 4b) in place of a second turn.
+	if _turn_view.box_off and _box_nearest() <= BOX_BACK_MARGIN:
+		if boxed_now and not _box_close:
+			_box_close = true
+			print("[camera] box pull-in: after its turn the eye is boxed at yaw %.0f, taken in to %.1f m with the aim lifted" % [yaw, BOX_CLOSE_LEAST])
+		elif not boxed_now and _box_close:
+			_box_close = false
+		return
+	# The rungs, each asked with the long look at the walk (the long look keeps a turn from being taken twice); failing both, within 90 the
+	# yaw whose eye stays out of the boxes longest, if that is at least BOX_LOOK_AHEAD seconds.
 	var rung := "1"
 	var target := CameraTurn.choose(yaw, _box_clear, _walk, _hand_yaw)
 	if is_nan(target):
 		target = CameraTurn.choose(yaw, _box_clear, _walk, _hand_yaw, CameraTurn.BOX_TURN_MOST)
 		rung = "4a"
 	if is_nan(target):
-		if not _box_close:
+		target = CameraTurn.choose_longest(yaw, _box_look, _box_seen, _hand_yaw, CameraTurn.BOX_TURN_MOST, BOX_LOOK_AHEAD)
+		rung = "4a, the longest look"
+	if is_nan(target):
+		_turn_view.search_cool = CameraTurn.BOX_SEARCH_COOL
+		if boxed_now and not _box_close:
 			_box_close = true
 			print("[camera] box turn: no yaw clears the eye (rung 4b), the eye taken in to %.1f m with the aim lifted, boxed %.1f s" % [BOX_CLOSE_LEAST, _turn_view.boxed_for])
 		return
 	if _turn_view.flips(yaw, target):
 		return
 	_box_close = false
-	_turn_view.start(yaw, target, CameraTurn.BOX_STAND_SPEED if standing else CameraTurn.TURN_SPEED)
+	_turn_view.start(yaw, target, CameraTurn.BOX_STAND_SPEED if standing else CameraTurn.TURN_SPEED, true)
 	print("[camera] box turn: yaw %.0f to %.0f (rung %s), eye boxed %.1f s" % [yaw, target, rung, _turn_view.boxed_for])
 
 
