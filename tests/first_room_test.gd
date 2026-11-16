@@ -28,7 +28,7 @@ func _ready() -> void:
 	_test_first_room()
 	_test_settled_at_boot()
 	_test_shell_roof()
-	_test_out_of_shell()
+	await _test_out_of_shell()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -151,3 +151,13 @@ func _test_out_of_shell() -> void:
 	record.tile = Vector2i(185, 200)
 	_check(Main.shell_holding(_main.level, record.tile).is_empty() and _main._out_of_shell(record.tile, "player") == record.tile,
 		"one saved elsewhere is left where he was")
+	# Out of the tavern: travel sets him beside the inn's first link, its doorway; he comes out outside it.
+	var went: bool = _main.travel(peer, "umbrage_tavern", "from_wilds")
+	await get_tree().process_frame
+	bo = _main._players.get(peer)
+	_check(went and bo != null and bo.zone == "umbrage_tavern", "(Bo goes into the tavern: %s)" % [bo.zone if bo else "-"])
+	var back: bool = _main.travel(peer, "wilds")
+	await get_tree().process_frame
+	bo = _main._players.get(peer)
+	_check(back and bo != null and bo.zone == "wilds" and outside.call(bo.tile) and World.distance(bo.tile, Vector2i(181, 208)) <= 2,
+		"out of the tavern he stands outside its door, at %s, not in its doorway" % [bo.tile if bo else "-"])

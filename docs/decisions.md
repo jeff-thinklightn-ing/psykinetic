@@ -51161,16 +51161,19 @@ lifted roof over bare boards was what made the shell read as a broken inside. No
 "[state] wilds: 1 <kind> saved in a shell's footprint set outside its door, from x,y to x,y" (the script's file name
 or "player", the two cells, nothing else), for release to count after the deploy. Residents are not saved by tile
 (they are made at their places, which skip shells), so none is moved; economy finds none of its people placed or
-routed inside I1 and a non-player never steps onto a link. Leaving, on this take alone (before terrain's 947): a
-leaver still arrives where he does on main, (179, 209), now the doorway, a step from the link and every other step
-off it solid but the door's; W held through the card walks him west onto the link and back in, where on main it
-walked him into the shell's corner: 947's held-input guard and arrival outside close that. level_test
+routed inside I1 and a non-player never steps onto a link. Leaving: travel sets a leaver beside the inn's first link,
+(179, 209), the doorway, and its re-join (_join_player, travelled) puts that through the same rule, so he is set
+outside at (181, 208), unsaid (the line counts what a save held, not who walked out). Measured joined on this take
+alone (ui-design, fcf4527e4, the Lenovo, C:/dev/review/ui-design/looks/pocket_fcf4527e4/): 33 entries, 0 in the shell
+(main 13), 3 stopped on the door cell they clicked; 5 leavings, all set down at (181, 208), W held walking on south,
+away from the door; on the doorway he is a silhouette under the eaves, the roof on. The coordinator then let it be
+cut without terrain's 947. level_test
 _test_insides_closed (every level, every building with an inside: a flood from the floor before each door, the links
 as walls, reaches none of its footprint but its doorway's cells beside a link; main: 76 of I1's) and the tavern-zone
 row's pocket (its floor exactly the links and the door's inside cells, the other 76 solid); first_room_test
 _test_shell_roof (on (179, 208) the roof stays on and no wall fades; a walk-in building's roof still lifts) and
 _test_out_of_shell (a cart saved at (175, 208) and a player whose record stands there both come back outside the door,
-on floor, off its door and link cells); view_test _test_tavern_inside (774's row: the roof eased off a player in the
+on floor, off its door and link cells; out of the tavern by travel he stands outside, not in the doorway); view_test _test_tavern_inside (774's row: the roof eased off a player in the
 shell) now walks to the doorway (179, 208), the shell behind it no floor, the roof on (Client3D._shell_at a room field,
 room_fields.gd). Also run alone: view_world_test, relief_test, world_map_test, regen_test, resident_test,
 town_day_test, zone_test, companion_test, protocol_test; load_check. Protocol changed: PROTOCOL_REVISION 59 (release's number): an old client's own

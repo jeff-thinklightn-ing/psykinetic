@@ -8153,7 +8153,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 			record.tile = spawn
 		record.companion["tile"] = null
 	if back:
-		record.tile = _out_of_shell(record.tile, "player")
+		# A travel's arrival too (out of the tavern, set beside its first link, the doorway): outside, unsaid.
+		record.tile = _out_of_shell(record.tile, "player", not travelled)
 	var tile := _nearest_free(record.tile) if back else _free_start_tile()
 	if respawn and at != World.NO_CELL:
 		tile = _nearest_free(at)  # Brought back at a temple or a hut (decision 396).
@@ -22066,15 +22067,17 @@ func _safest_start_tile(fallback: Vector2i) -> Vector2i:
 ## 811 amended (8) (the coordinator's bar on Jeff's report, 11-15: nobody sealed in): [param cell], or, when it is on
 ## the footprint of a building in this zone's level whose "inside" names a level (the inn's shell: solid but its links and
 ## door cells, Level._lay_shells), the nearest free cell to the one a step beyond its front, outside its door and clear
-## of the goers' door cell; said once in the log by [param kind] and the two cells alone (no name, no id). For a saved
-## body, record or thing read at the server's start or a join.
-func _out_of_shell(cell: Vector2i, kind: String) -> Vector2i:
+## of the goers' door cell; said once in the log by [param kind] and the two cells alone (no name, no id) when
+## [param say]. For a saved body, record or thing read at the server's start or a join, and a travel's arrival (unsaid:
+## the line counts what a save held, not who walked out).
+func _out_of_shell(cell: Vector2i, kind: String, say := true) -> Vector2i:
 	var shell := shell_holding(level, cell)
 	if shell.is_empty():
 		return cell
 	var facing: Vector2i = shell["facing"]
 	var at := _nearest_free(Level.front_cell(shell["rect"], facing) + facing)
-	print("[state] %s: 1 %s saved in a shell's footprint set outside its door, from %d,%d to %d,%d" % [World.zone.name if World.zone != null else "", kind, cell.x, cell.y, at.x, at.y])
+	if say:
+		print("[state] %s: 1 %s saved in a shell's footprint set outside its door, from %d,%d to %d,%d" % [World.zone.name if World.zone != null else "", kind, cell.x, cell.y, at.x, at.y])
 	return at
 
 
