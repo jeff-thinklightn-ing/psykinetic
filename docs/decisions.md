@@ -60131,3 +60131,27 @@ deer 31, rabbit 63, wolf 3", in that order). The checks' own count was stale too
 earlier boot of its run, which now holds the area's own groups as well as the one old-grid group it adds, so it
 counts that area's groups in the save it edits and wants that number dropped (hills 28, forest 26); the old grid's
 group gone from the save stays checked by name.
+
+## 958. The day line says why each repair waits; each healer's hut not standing has its own (economy; the coordinator's approval, 2026-11-16)
+
+On the box after v0.1.224 (566 amended (9) in) release read 0 "is to be repaired" and 0 "is repaired, at its" past
+the first turn, which said nothing: a repair ordered under the old code keeps its job in the world file and is printed
+once, and a repair wanted and not started printed nothing at all (only 522 amended (3)'s "goes behind ..." after
+build_wait.behind_days), so a stuck repair read the same as a slow one, and a healer's hut whose keeper could not buy
+its mend's supplies, or that had no keeper, was silent. Now, once a game day:
+- Each town's day line ends "; repairs <kind> <why>, ..." (Towns.repairs_words), one per damaged or disrepair
+  building in name order, left out when there is none. <why>: "not ordered (a build in hand)" or "not ordered yet";
+  "waits a carpenter (none)" (no resident of its kind's built_by trade); "behind (short N wood)"; "waits its wood
+  (short N wood)" ("waits its materials (short ...)" for a kind costing more than wood); "waits a carpenter (the
+  carpenter busy)"; "being worked P%".
+- Each healer's hut not standing: "[towns] day N the healer's hut <id>: <state>; <why>" (Towns.hut_day_words), <why>
+  "no keeper, one comes in D days" (733's healers.vacant_days from its empty_since; "one comes today" at 0), "the
+  keeper can't buy its supplies (short N wood)" from the hut's town store, or "(can't pay)" when the store has them,
+  "mend ordered", "being mended P%".
+Kinds, place ids and counts only: never a name or an id of a person. The coordinator's ruling on the forest's ruined
+hut on the same read: a ruin with no keeper comes back by itself (a new keeper after vacant_days, who buys and mends);
+what a player can see and do about it is its own design. Tests: towns_test _test_repairs_words (nothing damaged, no
+repairs; each reason in turn on a damaged kitchen and a forge in disrepair; on the day line with no name),
+_test_hut_day_words (no keeper and the days left, today, can't pay, short, ordered, being mended, standing none, no
+name). Server only; protocol unchanged; no new class_name; no bullet. Release's daily read counts "; repairs " and
+"the healer's hut" with "day " (fixed words told it at the landing).

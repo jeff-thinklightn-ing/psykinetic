@@ -56,6 +56,8 @@ func _ready() -> void:
 	_test_stands_states()
 	_test_boot_line()
 	_test_day_line()
+	_test_repairs_words()
+	_test_hut_day_words()
 	_test_newcomer_want()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -295,6 +297,91 @@ func _test_day_line() -> void:
 	_towns._day_told = 3
 	_towns._tell_day()
 	_check(_towns._dead_today.is_empty() and _towns._day_told == Townsfolk.day_of(_now), "told once the day turns, the dead count cleared")
+
+## 958: why each damaged or disrepair building waits, on the day line, in each of its reasons; a day line with
+## none says nothing of repairs. Kinds and counts only.
+func _test_repairs_words() -> void:
+	print("
+== the day line says why each repair waits (958) ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	_book = ItemBook.new(clock)
+	_stock = Stockpile.new({}, clock, _book)
+	_stock.deposit(TOWN, "wood", 60, "test")
+	_stock.deposit(TOWN, "ore", 30, "test")
+	_work = Production.new({}, _stock, null, clock, RULES, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new({}, _work, RULES, clock)
+	_check(not _towns.day_line(TOWN, 1).contains("repairs") and _towns.repairs_words(TOWN) == "", "nothing damaged: no repairs on the day line")
+	var houses: Dictionary = _towns._town(TOWN)["buildings"]
+	houses["kitchen"] = {"kind": "kitchen", "level": 1, "state": Towns.DAMAGED, "since": 0, "job": 0}
+	houses["forge"] = {"kind": "forge", "level": 1, "state": Towns.DISREPAIR, "since": 0, "job": 0}
+	_check(_towns.repairs_words(TOWN) == "forge not ordered yet, kitchen not ordered yet", "not ordered yet (%s)" % _towns.repairs_words(TOWN))
+	var inn := _work.order_build(TOWN, "inn", "carpenter", {"wood": 15, "cloth": 5}, 9000)
+	_check(_towns.repairs_words(TOWN) == "forge not ordered (a build in hand), kitchen not ordered (a build in hand)", "a build in hand (%s)" % _towns.repairs_words(TOWN))
+	_work.cancel(inn)
+	_towns._repair(TOWN)
+	_towns._repair(TOWN)
+	var forge_job := int(houses["forge"]["job"])
+	var kitchen_job := int(houses["kitchen"]["job"])
+	_check(forge_job != 0 and kitchen_job != 0 and _towns.repairs_words(TOWN) == "forge waits a carpenter (none), kitchen waits a carpenter (none)",
+		"both ordered, no carpenter in the town (%s)" % _towns.repairs_words(TOWN))
+	_towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	_check(_towns.repairs_words(TOWN) == "forge waits a carpenter (the carpenter busy), kitchen waits a carpenter (the carpenter busy)",
+		"a carpenter, the wood in: waits his turn (%s)" % _towns.repairs_words(TOWN))
+	_stock.take(TOWN, "wood", 60, "test")
+	_check(_towns.repairs_words(TOWN) == "forge waits its materials (short 5 wood), kitchen waits its wood (short 3 wood)",
+		"the store short: what it lacks, by count (%s)" % _towns.repairs_words(TOWN))
+	_work._jobs[kitchen_job]["behind"] = 1
+	_check(_towns.repairs_words(TOWN).ends_with("kitchen behind (short 3 wood)"), "gone behind the other builds (%s)" % _towns.repairs_words(TOWN))
+	_work._jobs[kitchen_job].erase("behind")
+	_stock.deposit(TOWN, "wood", 60, "test")
+	_at(300)
+	_at(900)
+	var words := _towns.repairs_words(TOWN)
+	_check(words.begins_with("forge being worked ") and not words.begins_with("forge being worked 0%") and words.ends_with("kitchen waits a carpenter (the carpenter busy)"),
+		"one at work, a share done; the other waits his hands (%s)" % words)
+	var line := _towns.day_line(TOWN, 2)
+	_check(line.ends_with("; repairs " + words) and not ["Dag", "dag"].any(func(word: String) -> bool: return word in line), "on the day line, no name (%s)" % line)
+
+
+## 958: a healer's hut not standing, its daily words in each state; a standing one none; never its keeper's name.
+func _test_hut_day_words() -> void:
+	print("
+== a healer's hut not standing, once a day (958) ==")
+	var rules := RULES.duplicate(true)
+	rules["healers"] = {"vacant_days": 21, "repair": {"disrepair": {"needs": {"wood": 4}, "steps": 1500}, "ruin": {"needs": {"wood": 10}, "steps": 3000}}}
+	var clock := func() -> int: return _now
+	_book = ItemBook.new(clock)
+	_stock = Stockpile.new({}, clock, _book)
+	_stock.deposit(TOWN, "wood", 60, "test")
+	_work = Production.new({}, _stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new({}, _work, rules, clock)
+	_towns.hut_town = func(_id: String) -> String: return TOWN
+	var day := maxi(DayNight.day_steps, 1)
+	_now = 5 * day
+	_towns._huts["tt/healers_hut"] = {"state": Towns.RUIN, "level": 0, "job": 0, "empty_since": 0}
+	_check(_towns.hut_day_words("tt/healers_hut") == "the healer's hut tt/healers_hut: ruin; no keeper, one comes in 16 days",
+		"a ruin nobody keeps: when one comes (%s)" % _towns.hut_day_words("tt/healers_hut"))
+	_now = 21 * day
+	_check(_towns.hut_day_words("tt/healers_hut").ends_with("no keeper, one comes today"), "the day one comes (%s)" % _towns.hut_day_words("tt/healers_hut"))
+	_work.add_worker("ned", "Ned", ["medicine_man"], "tt/healers_hut", "wilds")
+	_work.add_workshop("tt/healers_hut", "medicine_man", "tt/healers_hut")
+	_work.assign("tt/healers_hut", "ned")
+	_check(_towns.hut_day_words("tt/healers_hut").ends_with("ruin; the keeper can't buy its supplies (can't pay)"),
+		"kept, the store has the wood: he can't pay (%s)" % _towns.hut_day_words("tt/healers_hut"))
+	_stock.take(TOWN, "wood", 56, "test")
+	_check(_towns.hut_day_words("tt/healers_hut").ends_with("the keeper can't buy its supplies (short 6 wood)"), "the store short (%s)" % _towns.hut_day_words("tt/healers_hut"))
+	var mend := _work.order_build("tt/healers_hut", Towns.HUT_REPAIR + "tt/healers_hut", "medicine_man", {"wood": 10}, 3000)
+	_towns._huts["tt/healers_hut"]["job"] = mend
+	_check(_towns.hut_day_words("tt/healers_hut").ends_with("ruin; mend ordered"), "its mend ordered (%s)" % _towns.hut_day_words("tt/healers_hut"))
+	_work._jobs[mend]["state"] = "working"
+	_work._jobs[mend]["worked"] = 1500
+	_work._jobs[mend]["needed"] = 3000
+	var words := _towns.hut_day_words("tt/healers_hut")
+	_check(words.ends_with("ruin; being mended 50%") and not words.contains("Ned") and not words.contains("ned"), "being mended, no name (%s)" % words)
+	_towns._huts["tt/healers_hut"] = {"state": Towns.STANDING, "level": 1, "job": 0}
+	_check(_towns.hut_day_words("tt/healers_hut") == "" and _towns.hut_day_words("tt/no_hut") == "", "standing, or no such hut: nothing")
+
 
 func _check(ok: bool, label: String) -> void:
 	if not ok:

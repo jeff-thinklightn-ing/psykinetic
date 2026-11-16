@@ -472,8 +472,82 @@ func day_line(town: String, day: int) -> String:
 			hungry += 1 if str(who.get("fed", "")) == "hungry" else 0
 		sick += 1 if Townsfolk.is_sick(production, id) else 0
 	var dead := int(_dead_today.get(town, 0))
-	return "day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s" % [day, town, production.stockpile.count(town, "food"),
-		fed, hungry, sick, "; dead %d" % dead if dead > 0 else ""]
+	var repairs := repairs_words(town)
+	return "day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s%s" % [day, town, production.stockpile.count(town, "food"),
+		fed, hungry, sick, "; dead %d" % dead if dead > 0 else "", "; repairs " + repairs if not repairs.is_empty() else ""]
+
+
+## Why each of [param town]'s damaged or disrepair buildings is not yet mended, for its day line (958, the
+## coordinator's approval, 2026-11-16: on the box after v0.1.224 a repair wanted and not started printed
+## nothing, so a stuck repair read the same as a slow one): "<kind> <why>, ..." in name order, "" for none.
+## <why>: "not ordered (a build in hand)" or "not ordered yet"; "waits a carpenter (none)" (no resident of its
+## builder's trade); "behind (short N wood)" (gone behind the town's other builds, 522 amended (3)); "waits its
+## wood (short N wood)"; "waits a carpenter (the carpenter busy)"; "being worked P%". Kinds and counts only.
+func repairs_words(town: String) -> String:
+	var houses: Dictionary = _towns.get(town, {}).get("buildings", {})
+	var out := PackedStringArray()
+	for kind: String in _sorted_keys(houses):
+		var entry: Dictionary = houses[kind]
+		if not str(entry.get("state", "")) in [DAMAGED, DISREPAIR]:
+			continue
+		var job := production.job(int(entry.get("job", 0))) if int(entry.get("job", 0)) != 0 else {}
+		var why := ""
+		if job.is_empty():
+			why = "not ordered (a build in hand)" if production.building_in(town) and not production.builds_stalled(town) else "not ordered yet"
+		elif str(job.get("state", "")) == "working":
+			why = "being worked %d%%" % roundi(100.0 * float(job.get("worked", 0)) / maxf(float(job.get("needed", 0)), 1.0))
+		else:
+			var short := _short_words(town, job.get("cost", {}))
+			var by := str(rules.get("buildings", {}).get(kind, {}).get("built_by", ""))
+			if not by.is_empty() and not has_resident(town, by):
+				why = "waits a %s (none)" % by
+			elif job.has("behind"):
+				why = "behind (short %s)" % short if not short.is_empty() else "behind"
+			elif not short.is_empty():
+				why = "waits its wood (short %s)" % short if (job.get("cost", {}) as Dictionary).keys() == ["wood"] else "waits its materials (short %s)" % short
+			else:
+				why = "waits a %s (the %s busy)" % [by, by]
+		out.append("%s %s" % [kind, why])
+	return ", ".join(out)
+
+
+## What [param town]'s store lacks of [param cost]: "3 wood, 2 hide", "" for nothing short.
+func _short_words(town: String, cost: Dictionary) -> String:
+	var short := PackedStringArray()
+	for what: String in cost:
+		var lacking := int(cost[what]) - production.stockpile.count(town, what)
+		if lacking > 0:
+			short.append("%d %s" % [lacking, what])
+	return ", ".join(short)
+
+
+## Each healer's hut not standing, for the day lines (958): "the healer's hut <id>: <state>; <why>". <why>:
+## "no keeper, one comes in D days" (733's healers.vacant_days from its empty_since; "one comes today" at 0);
+## "the keeper can't buy its supplies (short N wood)" from the hut's town store, or "(can't pay)" when
+## the store has them; "mend ordered"; "being mended P%". Place ids and counts only, never a name.
+func hut_day_words(id: String) -> String:
+	var entry: Dictionary = _huts.get(id, {})
+	if entry.is_empty() or str(entry.get("state", "")) == STANDING:
+		return ""
+	var state := str(entry["state"])
+	var why := ""
+	var job := production.job(int(entry.get("job", 0))) if int(entry.get("job", 0)) != 0 else {}
+	if not job.is_empty():
+		why = "being mended %d%%" % roundi(100.0 * float(job.get("worked", 0)) / maxf(float(job.get("needed", 0)), 1.0)) \
+			if str(job.get("state", "")) == "working" else "mend ordered"
+	elif _keeper_of(id).is_empty():
+		if entry.has("empty_since"):
+			var vacant := int(rules.get("healers", {}).get("vacant_days", 21))
+			var left := maxi(vacant - (now() / maxi(DayNight.day_steps, 1) - int(entry["empty_since"])), 0)
+			why = "no keeper, one comes today" if left == 0 else "no keeper, one comes in %d day%s" % [left, "" if left == 1 else "s"]
+		else:
+			why = "no keeper"
+	else:
+		var needs: Dictionary = rules.get("healers", {}).get("repair", {}).get("ruin" if state == RUIN else "disrepair", {}).get("needs", {})
+		var town := str(hut_town.call(id)) if hut_town.is_valid() else ""
+		var short := _short_words(town, needs) if not town.is_empty() else ""
+		why = "the keeper can't buy its supplies (%s)" % ("short " + short if not short.is_empty() else "can't pay")
+	return "the healer's hut %s: %s; %s" % [id, state, why]
 
 
 ## The day lines, when the game day turns.
@@ -485,6 +559,12 @@ func _tell_day() -> void:
 		for town: String in ids():
 			if is_town(town):
 				print("[towns] " + day_line(town, _day_told))
+		var huts: Array = _huts.keys()
+		huts.sort()
+		for id: String in huts:
+			var words := hut_day_words(id)
+			if not words.is_empty():
+				print("[towns] day %d %s" % [_day_told, words])  # 958: a hut not standing, once a day.
 	_dead_today.clear()
 	_day_told = day
 
