@@ -11600,6 +11600,25 @@ net_test*|*/net_test*, run.ps1's match (^|/)net_test. run_parse_test: free_net_t
 (both fail on the old match), net_test still refused by both; RESULT: PASS. Tools and tests only; protocol unchanged;
 no class_name; no bullet.
 
+394 amended (59) (perf, 2026-11-16; the coordinator's go and conditions after perf's gate reading; the label from
+tools/decision_number.sh): while the land lock reads frozen, the light kinds pass a landing's queued suite as an
+out-of-reach row. At 15:23:02-15:24:57, during release's v0.1.225 cut, nine refused landings (terrain-levelsplit,
+ui-heldnear, seven of perf's) each took the gate again after their five minutes, stood at the head a second as a row
+that would start now, and gave it back on exit 3; by 48 a load_check never jumps a head that would start now but not
+beside it (at 15:24:51, 15.0 GB free and 4.6 owed: the 1.7 GB suite_remote fitted alone, 9.4 < 9.7 beside a 1.0 GB
+load_check), so five load_checks waited up to 749 s on landings that could not land. heavy_job.main_frozen() reads,
+never writes, the land lock's pending mark (<lock>.freeze, its beat) or the lock held with "main frozen" in its what
+(its since), each live only within land_lock.sh's stale time (LAND_LOCK_STALE_SECONDS, 1500), and names the owner;
+jumps() passes a queued row of FROZEN_PASSED_KINDS (suite, suite_remote) that is not the owner's (frozen_passable).
+Running takes are never touched; release's cut suite is the owner's and never passed; the frozen rows keep their
+places and order (only PAST_QUEUE_KINDS pass, a landing behind a frozen one does not); memory still goes first come
+for the light job itself (decide()); a mark gone or stale stops the rule at the next look. heavy_job_test: unfrozen
+held as 48 has it; a pending mark and the lock held for the cut each pass a suite_remote and a local suite; the
+owner's own row, a scene, and a landing behind a frozen landing are held; a 1.0 GB load_check at 8.5 GB does not
+start; a mark unbeaten 1600 s, a landing's own lock, and the mark gone, each held; the lock's files untouched. The
+test points PSYKINETIC_LAND_LOCK at a scratch path for every row (49's import row read the real cut's freeze while
+this was built). RESULT: PASS. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

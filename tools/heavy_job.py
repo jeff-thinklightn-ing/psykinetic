@@ -802,6 +802,64 @@ def memory_short(job, running, free_ram_gb, free_commit_gb=None):
     return free_commit_gb is not None and free_commit_gb - reserved_commit_gb(running) < commit_of(job) + COMMIT_MARGIN_GB
 
 
+## 394 amended (59), the coordinator's go and conditions, 2026-11-16: while the land lock reads
+## frozen (a cut), a queued landing's suite cannot land till the unfreeze. Each refused take came
+## back every five minutes, stood at the head a second as a row that "would start now", and held
+## the load_checks behind it (11-16 15:23-15:25: nine such takes, seven perf's, in two minutes).
+## The light kinds (PAST_QUEUE_KINDS) pass such a row as an out-of-reach one. The lock's files are
+## only read (tools/land_lock.sh: the pending mark <lock>.freeze, or the lock held with "main
+## frozen" in its what), each live only while beaten within its stale time, so a mark nobody beats
+## any more frees nothing. The freeze's owner's own rows (release's cut suite) are never passed,
+## running takes are never touched, and the frozen rows keep their places and order: the
+## unfreeze changes nothing about who lands next. Memory still goes first come for the light job
+## itself (decide()), and the rule stops at the first look after the mark goes.
+LAND_LOCK_ENV = "PSYKINETIC_LAND_LOCK"
+LAND_LOCK_DEFAULT = "/c/dev/land.lock"
+## land_lock.sh's PSYKINETIC_LOCK_STALE: a lock or mark unbeaten this long is passed.
+LAND_LOCK_STALE_SECONDS = 1500
+## The kinds a landing's take queues as (a lean suite keeps its kind, its estimate apart).
+FROZEN_PASSED_KINDS = ("suite", "suite_remote")
+
+
+def _host_path(path):
+    """[param path] as this Python opens it: Git Bash's /c/... as C:/... on Windows."""
+    if os.name == "nt" and len(path) > 2 and path[0] == "/" and path[2] == "/" and path[1].isalpha():
+        return path[1].upper() + ":" + path[2:]
+    return path
+
+
+def _read_text(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read().strip()
+    except OSError:
+        return ""
+
+
+def main_frozen(now=None):
+    """The freeze's owner while the land lock reads frozen (394 amended (59)): its pending mark
+    (<lock>.freeze) beaten within LAND_LOCK_STALE_SECONDS, or the lock held with "main frozen" in
+    its what and beaten as recently; else "". Read only."""
+    now = time.time() if now is None else now
+    lock = _host_path(os.environ.get(LAND_LOCK_ENV) or LAND_LOCK_DEFAULT)
+    for folder, stamp, live in ((lock + ".freeze", "beat", lambda: True),
+            (lock, "since", lambda: "main frozen" in _read_text(os.path.join(lock, "what")).lower())):
+        beat = _read_text(os.path.join(folder, stamp))
+        try:
+            age = now - float(beat)
+        except ValueError:
+            continue
+        if os.path.isdir(folder) and age <= LAND_LOCK_STALE_SECONDS and live():
+            return _read_text(os.path.join(folder, "owner")) or "?"
+    return ""
+
+
+def frozen_passable(row, owner):
+    """Whether queued [row] is a landing's suite that cannot land while the freeze of [owner]
+    lasts (394 amended (59)): passed by the light kinds. The owner's own rows never are."""
+    return bool(owner) and row.get("kind") in FROZEN_PASSED_KINDS and row.get("tree") != owner
+
+
 def jumps(job, ahead, running, free_ram_gb, free_commit_gb=None):
     """Whether [job], of PAST_QUEUE_KINDS, may start past the rows [ahead]
     (394 amended (48)): (ok, holder, why), holder the index of the row that
@@ -820,6 +878,7 @@ def jumps(job, ahead, running, free_ram_gb, free_commit_gb=None):
         return False, None, "a %s running: one past the queue at a time (394 amended (49))" % job.get("kind")
     beside = running + [{"kind": job.get("kind"), "ram_gb": job["ram_gb"], "commit_gb": commit_of(job),
         "using_gb": 0.0, "using_commit_gb": 0.0, "gpu": job.get("gpu", False)}]
+    frozen = main_frozen() if any(each.get("kind") in FROZEN_PASSED_KINDS for each in ahead) else ""
     for place, other in enumerate(ahead):
         if place > 0 and other.get("kind") == job.get("kind") and first_come_only(other):
             continue  # It waits for its turn, not for room; at the head it holds as any row.
@@ -827,6 +886,8 @@ def jumps(job, ahead, running, free_ram_gb, free_commit_gb=None):
             return False, place, "one of its own kind ahead: first come among them (394 amended (49))"
         if out_of_reach(other, running, free_ram_gb, free_commit_gb) or bench_passable(other, running):
             continue
+        if frozen_passable(other, frozen):
+            continue  # 394 amended (59): main frozen, it cannot land till the unfreeze.
         if decide(other, running, True, free_ram_gb, None, free_commit_gb)[0]:
             if other.get("kind") in never:
                 return False, place, "it would start now, and never beside this %s (394 amended (49))" % job.get("kind")

@@ -20,6 +20,9 @@ import time
 sys.dont_write_bytecode = True  # No __pycache__ left in tools/.
 STATE = tempfile.mkdtemp(prefix="heavy_job_test_")
 os.environ["HEAVY_JOBS_DIR"] = STATE
+# 394 amended (59): the gate reads the land lock's freeze; never the real one here (a cut's freeze
+# let an import past the local suite in 49's rows). The rows that want one make their own.
+os.environ["PSYKINETIC_LAND_LOCK"] = os.path.join(STATE, "no_land.lock")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 import heavy_job as gate  # noqa: E402
 # main's GATE_REVISION as this code's, unless a check sets another (394 amended (43)).
@@ -2669,6 +2672,79 @@ check(len(seen) >= 3 and not left, "each long sleeper stopped with its run, none
 # written now; and a sleeper's line is told from a process made after it.
 check(not still_the_sleeper(os.getpid(), time.time() - 3600) and still_the_sleeper(os.getpid(), time.time()) == (gate.started_at(os.getpid()) is not None or os.name != "nt"),
     "an id is its sleeper only if its process was made before the sleeper wrote its line")
+print("== main frozen: the light kinds pass a landing's queued suite (394 amended (59)) ==")
+# 11-16 15:24:51: release's cut froze main; perf-outreach's suite_remote (1.7 GB) stood at the
+# head a second at a time, fitting alone but not beside a 1.0 GB load_check, so the load_checks
+# waited on landings that could not land. Here at 10.0 GB free: the suite_remote alone fits
+# (1.7 + 8), with the load_check beside it does not (2.7 + 8).
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+load59 = dict(gate.KINDS["load_check"], kind="load_check", ram_gb=1.0, commit_gb=1.0)
+remote59 = dict(gate.KINDS["suite_remote"], kind="suite_remote", ram_gb=1.7, commit_gb=1.7, tree="perf-outreach")
+suite59 = dict(gate.KINDS["suite"], kind="suite", ram_gb=1.7, commit_gb=1.7, tree="economy")
+own59 = dict(remote59, tree="psykinetic-release")
+scene59 = dict(gate.KINDS["scene"], kind="scene", ram_gb=1.7, commit_gb=1.0, tree="maps")
+lock59 = os.path.join(STATE, "frozen59", "land.lock")
+was59 = os.environ.get(gate.LAND_LOCK_ENV)
+os.environ[gate.LAND_LOCK_ENV] = lock59
+
+
+def mark59(folder, stamp, age, what=None):
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    for name, text in (("owner", "psykinetic-release"), (stamp, str(int(time.time() - age)))) + ((("what", what),) if what else ()):
+        with open(os.path.join(folder, name), "w") as handle:
+            handle.write(text + "\n")
+
+
+def clear59():
+    shutil.rmtree(os.path.dirname(lock59), ignore_errors=True)
+
+
+clear59()
+ok59, holder59, why59 = gate.jumps(load59, [remote59], [], 10.0, 40.0)
+check(gate.main_frozen() == "" and not ok59 and holder59 == 0 and "not beside" in why59,
+    "unfrozen: a landing's suite_remote that would start now holds it, as 48 has it (%s)" % why59)
+mark59(lock59 + ".freeze", "beat", 10)
+check(gate.main_frozen() == "psykinetic-release", "a pending freeze beaten 10 s ago reads frozen, its owner named")
+check(gate.jumps(load59, [remote59], [], 10.0, 40.0)[0] and gate.jumps(load59, [suite59, remote59], [], 10.0, 40.0)[0],
+    "frozen: past a landing's suite_remote and a local landing suite, which cannot land till the unfreeze")
+check(gate.decide(load59, [], True, 10.0, None, 40.0)[0] and not gate.decide(load59, [], True, 8.5, None, 40.0)[0],
+    "memory still first come: it starts only when its own 1.0 + 8 GB fit (10.0 yes, 8.5 no)")
+ok59, holder59, _ = gate.jumps(load59, [own59], [], 10.0, 40.0)
+check(not ok59 and holder59 == 0, "the freeze's owner's own suite (release's cut) is never passed")
+ok59, holder59, why59 = gate.jumps(load59, [scene59], [], 10.0, 40.0)
+check(not ok59 and "not beside" in why59, "a scene ahead is judged as before: frozen passes only landings' suites (%s)" % why59)
+check(not gate.jumps(dict(remote59, tree="perf-rows"), [remote59], [], 10.0, 40.0)[0],
+    "a landing behind a frozen landing does not pass it: the frozen keep their order among themselves")
+mark59(lock59 + ".freeze", "beat", gate.LAND_LOCK_STALE_SECONDS + 100)
+check(gate.main_frozen() == "" and not gate.jumps(load59, [remote59], [], 10.0, 40.0)[0],
+    "a mark nobody has beaten for %d s (no cut running) frees nothing: held as unfrozen" % (gate.LAND_LOCK_STALE_SECONDS + 100))
+clear59()
+mark59(lock59, "since", 30, what="v0.1.225 cut (main frozen)")
+check(gate.main_frozen() == "psykinetic-release" and gate.jumps(load59, [remote59], [], 10.0, 40.0)[0],
+    "the lock held for the cut, \"main frozen\" in its what: frozen, passed")
+mark59(lock59, "since", 30, what="ui-faraway: the keeper asks again")
+check(gate.main_frozen() == "" and not gate.jumps(load59, [remote59], [], 10.0, 40.0)[0],
+    "the lock held by a landing (no \"main frozen\"): not frozen, held")
+mark59(lock59 + ".freeze", "beat", 10)
+check(gate.jumps(load59, [remote59], [], 10.0, 40.0)[0], "frozen again")
+clear59()
+check(gate.main_frozen() == "" and not gate.jumps(load59, [remote59], [], 10.0, 40.0)[0],
+    "the mark gone: the rule stops at the next look")
+stamp59 = {}
+for each in (lock59 + ".freeze",):
+    mark59(each, "beat", 10)
+    stamp59 = {name: os.path.getmtime(os.path.join(each, name)) for name in os.listdir(each)}
+    gate.main_frozen()
+    gate.jumps(load59, [remote59], [], 10.0, 40.0)
+    check({name: os.path.getmtime(os.path.join(each, name)) for name in os.listdir(each)} == stamp59,
+        "the lock's files only read: nothing written or touched")
+clear59()
+if was59 is None:
+    os.environ.pop(gate.LAND_LOCK_ENV, None)
+else:
+    os.environ[gate.LAND_LOCK_ENV] = was59
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
