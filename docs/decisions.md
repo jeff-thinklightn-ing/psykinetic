@@ -6031,6 +6031,30 @@ at its peak; with Lee told to put (the kit left in the chest) the last four fail
 not a line that passes either way. Its seconds and memory in a landing's net_test on saturn are
 measured before it queues.
 
+279 amended (3) (the script's label; the coordinator's ruling on C:/dev/review/companions/companion_name_log_lines.md):
+no server log line names a companion. Her name is rolled from her player's id (decision 293) and
+kept, and it is her node's name and her label, so 46 prints were a steady stand-in for that player
+across the journal. In main.gd, 35 named her outright: [net] and [spawn] as she joins or not,
+[guide] (leads, stops, takes through, came through, refuses, hears of the raid, will remember),
+[bond] (will leave, parted, left, asked home, asked again, goes again, the town's now, no worker
+there, away twice, asked along, a new companion from a town), [raids] (held, free), [world] back,
+[net] traits rolled, [town] stays and rests, [mind] bumped into, and [net] kept off the world. Each
+now prints Main.pet_tag(player id). Eleven print any entity by its node name, hers when it is her:
+her own [mind] lines in sim/companion.gd (stance, a held line let go, her intent and its target,
+cannot reach), [raids] takes (sim/raids.gd) and six [free] lines of a player's walk round
+whoever is in the way (main.gd). Each now prints Companion.log_name(entity): her tag for a
+companion, the node's name for anyone else (a player's node is "Player<index>"). Her tag is
+Companion.tag(player id), which Main.pet_tag reads: "#n", her player's place in this server run's
+order of first mention, kept in memory only, so it dies with the process and tells two companions
+apart within one journal and never across a restart. Never her name or her seed. The words around
+it are unchanged ("[guide] #2 stops: arrived"). The party log and her mind log, which reach no
+journal line, keep her name; so do [test] lines (test runs only; net_test's phase 7 reads one).
+The first count (34, in the review file) missed the new-companion line and the eleven; a scan of
+every print in main.gd, sim/ and net/, each joined across its lines, found them before landing.
+Monster lines already say "a companion" (Monster.alert_who). Readers: no test, tool or tour reads
+these prints (companion_test's "bumped into" row reads the party log, unchanged); release's box
+greps that matched a name change with the next deploy. Server only, protocol unchanged, no bullet.
+
 ## 320. Companions bandage, and heal only by being bandaged
 
 Companions step 4's last verb. Items' bandaging (#272: World.try_bandage,

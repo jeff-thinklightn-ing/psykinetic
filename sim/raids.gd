@@ -440,7 +440,7 @@ func _on_taken(entity: GridEntity, by: String) -> void:
 		who = "companion:%s" % (entity as Companion).keeper_id
 	if who not in _groups[by]["carries"]["captives"]:
 		_groups[by]["carries"]["captives"].append(who)
-	print("[raids] %s takes %s" % [by, entity.name])
+	print("[raids] %s takes %s" % [by, Companion.log_name(entity)])
 
 
 static func _carries(given: Dictionary) -> Dictionary:

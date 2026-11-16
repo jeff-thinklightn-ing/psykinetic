@@ -6576,7 +6576,7 @@ func _set_stance(wanted: int, serial: int, source: String) -> void:
 	stance = wanted as Stance
 	if stance == Stance.HOLD:
 		hold_tile = tile
-	print("[mind] %s (%s): stance %s" % [name, source, stance_name()])
+	print("[mind] %s (%s): stance %s" % [tag(keeper_id), source, stance_name()])
 
 
 ## Says [param line] (over her, to everyone) unless the rate limit holds it
@@ -6663,7 +6663,7 @@ func _flush_held_line() -> void:
 	_held_line = {}
 	var still: Callable = held["still"]
 	if World.tick > int(held["until"]) or (still.is_valid() and not still.call()):
-		print("[mind] %s: a held line let go" % name)
+		print("[mind] %s: a held line let go" % tag(keeper_id))
 		return
 	_saying_voice = held["voice"]
 	_say(str(held["line"]), true, false, Weight.NEEDED)
@@ -6993,8 +6993,8 @@ func _act() -> void:
 	_point_out_cats()
 	asleep = current_intent == Intent.SLEEP
 	if current_intent != before or intent_target != before_target:
-		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
-			" " + String(intent_target.name) if intent_target != null else "", stance_name()])
+		print("[mind] %s: %s%s (%s)" % [tag(keeper_id), intent_name(),
+			" " + log_name(intent_target) if intent_target != null else "", stance_name()])
 
 
 ## Whether she can bring her downed player back (decision 544): they lie
@@ -7707,7 +7707,7 @@ func _approach(target: Variant, reach: int) -> void:
 		return
 	# A FOLLOW that cannot get closer just waits; anything else gives up.
 	if not _step_toward(target.tile, true) and current_intent != Intent.FOLLOW:
-		print("[mind] %s: cannot reach %s; following" % [name, target.name])
+		print("[mind] %s: cannot reach %s; following" % [tag(keeper_id), log_name(target)])
 		_unreachable[target.get_instance_id()] = {"until": World.tick + UNREACHABLE_TICKS, "her": tile, "its": target.tile}
 		current_intent = Intent.FOLLOW
 		intent_target = null
@@ -8721,6 +8721,28 @@ static func unrename(entries: Variant, her: String) -> void:
 
 static func _name_of(entity: GridEntity) -> String:
 	return entity.label if not entity.label.is_empty() else String(entity.name)
+
+
+## A companion as a server log line (279 amended (3)): "#n", her player's
+## place in this process's order of first mention, kept in memory only, so it
+## dies with the process. Never her name (her node's name and her label), which
+## is rolled from her player's id (293) and kept. Main.pet_tag reads it.
+static func tag(player_id: String) -> String:
+	if not _tags.has(player_id):
+		_tags[player_id] = _tags.size() + 1
+	return "#%d" % _tags[player_id]
+
+
+static var _tags: Dictionary[String, int] = {}
+
+
+## Any entity as a log line: a companion by her tag, anyone else by node name.
+static func log_name(entity: GridEntity) -> String:
+	if entity == null:
+		return "?"
+	if entity is Companion:
+		return tag((entity as Companion).keeper_id)
+	return String(entity.name)
 
 
 ## Safe to call with a freed reference, which a target that died can be.
