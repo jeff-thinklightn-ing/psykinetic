@@ -89,7 +89,15 @@
 			]
 		}
 	],
-	"buildings": [],
+	"buildings": [
+		{
+			"slot": "building.tavern_table",
+			"at": [
+				14,
+				12
+			]
+		}
+	],
 	"decor": [],
 	"places": {},
 	"beds": [
@@ -329,5 +337,56 @@
 				}
 			]
 		}
-	}
+	},
+	"lit_candles": [
+		{
+			"at": [
+				14.5,
+				12.5
+			],
+			"top": 0.79,
+			"up": 1.0,
+			"energy": 0.9,
+			"reach": 4.5,
+			"falloff": 1.0
+		}
+	],
+	"windows": [
+		{
+			"cells": [
+				[
+					17,
+					12
+				]
+			],
+			"side": "east"
+		},
+		{
+			"cells": [
+				[
+					11,
+					0
+				]
+			],
+			"side": "north"
+		},
+		{
+			"cells": [
+				[
+					3,
+					13
+				]
+			],
+			"side": "south"
+		},
+		{
+			"cells": [
+				[
+					0,
+					1
+				]
+			],
+			"side": "west"
+		}
+	]
 }

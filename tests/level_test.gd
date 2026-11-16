@@ -4584,10 +4584,45 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 			if Rect2(Vector2(rect.position) - Vector2(0.5, 0.5), Vector2(rect.size)).has_point(at):
 				on_pieces.append("%s %.2f" % [building["slot"], float(entry["top"])])
 	on_pieces.sort()
+	# 946 amended (1): upstairs, one on the landing's table in the stair room (the coordinator: the stair leads somewhere).
+	var up: Dictionary = floors["umbrage_tavern_up"]
+	var up_lit: Array = up["terrain"].get("lit_candles", [])
+	var landing: Array = (up["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == "building.tavern_table")
 	_check(on_pieces == ["building.bar_counter 1.05", "building.tavern_table 0.79", "building.tavern_table 0.79",
 			"building.tavern_table 0.79", "building.tavern_table 0.79"]
-		and (floors["umbrage_tavern_up"]["terrain"].get("lit_candles", []) as Array).is_empty(),
-		"the Mughouse's lit candles on its four tables and its bar, at their tops, none upstairs (%s)" % [on_pieces])
+		and up_lit.size() == 1 and Vector2(up_lit[0]["at"]) == Vector2(14.5, 12.5) and is_equal_approx(float(up_lit[0]["top"]), 0.79)
+		and landing.size() == 1 and landing[0]["rect"] == Rect2i(14, 12, 2, 2),
+		"the Mughouse's lit candles on its four tables and its bar, at their tops, and one upstairs on the landing's table (%s; up %s)" % [on_pieces, up_lit])
+	# 946 amended (1): each floor's windows marked, on the outside's sides (I1's one wall.wood.window_tall a side, turned in:
+	# the wilds' north, west, east and south walls to the inside's east, north, south and west), each on floor with no floor
+	# across its side (an outer wall), off a link, an arrival, the front door and the hearth's fire; the attic none (no gable art).
+	var marked := {}
+	var bad: Array[String] = []
+	for name: String in names:
+		var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/%s/level.json" % name))
+		marked[name] = []
+		var level: Dictionary = floors[name]
+		var floor_cells := {}
+		for cell: Vector2i in level["terrain"]["floor"]:
+			floor_cells[cell] = true
+		var kept := {}
+		for link: Dictionary in level["links"]:
+			kept[link["tile"]] = true
+		for at: Variant in level["spawn_points"].values():
+			kept[at] = true
+		for cell: Vector2i in level["terrain"]["fire"]:
+			kept[cell] = true
+		var sides := {"north": Vector2i(0, -1), "south": Vector2i(0, 1), "west": Vector2i(-1, 0), "east": Vector2i(1, 0)}
+		for window: Dictionary in config.get("windows", []):
+			for raw: Array in window["cells"]:
+				var cell := Vector2i(int(raw[0]), int(raw[1]))
+				(marked[name] as Array).append("%d,%d %s" % [cell.x, cell.y, window["side"]])
+				if not floor_cells.has(cell) or floor_cells.has(cell + sides.get(window["side"], Vector2i.ZERO)) or kept.has(cell):
+					bad.append("%s %s %s" % [name, cell, window["side"]])
+	var four := ["17,12 east", "11,0 north", "3,13 south", "0,1 west"]
+	_check(marked["umbrage_tavern"] == four and marked["umbrage_tavern_up"] == four
+		and (marked["umbrage_tavern_attic"] as Array).is_empty() and bad.is_empty(),
+		"the Mughouse's windows: four on each of its floors, on its outside's sides, each on an outer wall off its links, arrivals and hearth; none in the attic (%s)" % [bad])
 	var storeys := Level.storeys_of("umbrage_tavern")
 	var beds: Array = storeys["beds"]
 	var laid := beds.filter(func(bed: Dictionary) -> bool:
