@@ -7,21 +7,24 @@ notes (decision 324).
 
 ## Unreleased
 
-- Towns: a dirt lane runs from where a newcomer arrives, south of Umbrage's square, to the Mughouse's door (934 amended (1)).
-- Towns: in the evening each of Umbrage's two market stalls has a small lantern burning under its awning by the left post, lighting the counter top warm (782 amended (3)).
-- Towns: at night a newcomer arriving in Umbrage sees the Mughouse's door lit ahead, its lantern lighting the step and the wall beside the door (927 amended (2)).
-- Towns: a hut's gable ends are upright boards with dark gaps between them, its ridge comes to a point at each end, and its roof has a thin straw edge with a ragged fringe beneath it (art-kit).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
-- Towns: at Umbrage's square the town's own sound leads, with the woods behind the houses, and the forest rises as you walk out past the last buildings; inside a hut, a house or the Mughouse the street is heard faint and dulled through the walls, and in the Mughouse it sits under the hearth (939).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
-- Builder mode: the answer panel shows the start of Claude's answer, with Tab for more, and opens at the left when a window is open at the right or your companion stands there (885 amended (1)).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
+
+## v0.1.220
+
+- Towns: a dirt lane runs from where a newcomer arrives, south of Umbrage's square, to the Mughouse's door (934 amended (1)).
+- Towns: in the evening each of Umbrage's two market stalls has a small lantern burning under its awning by the left post, lighting the counter top warm (782 amended (3)).
+- Towns: at night a newcomer arriving in Umbrage sees the Mughouse's door lit ahead, its lantern lighting the step and the wall beside the door (927 amended (2)).
+- Towns: a hut's gable ends are upright boards with dark gaps between them, its ridge comes to a point at each end, and its roof has a thin straw edge with a ragged fringe beneath it (art-kit).
+- Towns: at Umbrage's square the town's own sound leads, with the woods behind the houses, and the forest rises as you walk out past the last buildings; inside a hut, a house or the Mughouse the street is heard faint and dulled through the walls, and in the Mughouse it sits under the hearth (939).
+- Builder mode: the answer panel shows the start of Claude's answer, with Tab for more, and opens at the left when a window is open at the right or your companion stands there (885 amended (1)).
 - Towns: in the Last Light Mughouse the round tables are planked tops in two browns with a darker rim, and a house's stone chimney shows its stones and mortar, with soot round the pot (art-kit).
 
 ## v0.1.219
