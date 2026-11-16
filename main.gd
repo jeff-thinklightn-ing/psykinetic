@@ -27645,7 +27645,10 @@ func _far_ground_room(rings: Array[Vector2i], uid: int) -> Vector2i:
 ## pack is all bound), or one a quest needs (a catalog tag "key", "relic" or
 ## "token": Brand's key fallen at a full pack's feet, a trophy token);
 ## Regen.GATHERED for one an earlier re-lay moved to the way in (its event
-## "moved", Regen.MOVED) that none of those holds; else "".
+## "moved", Regen.MOVED) that none of those holds; Regen.FOES (790 amended
+## (14)) for one some other holder carried, a foe's leavings (a chest or a
+## cart writes no carrier row, World._carrier_of); else "" (a thing the level
+## laid, or loose remains).
 func ground_claim(uid: int) -> String:
 	var entry := World.items.history(uid)
 	if entry.is_empty():
@@ -27662,6 +27665,8 @@ func ground_claim(uid: int) -> String:
 	for event: Dictionary in entry.get("events", []):
 		if str(event.get("kind", "")) == "moved" and str(event.get("what", "")) == Regen.MOVED:
 			return Regen.GATHERED
+	if not (entry.get("carriers", []) as Array).is_empty():
+		return Regen.FOES
 	return ""
 
 

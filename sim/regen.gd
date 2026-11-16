@@ -918,7 +918,9 @@ static func write(level_name: String, made: Dictionary) -> bool:
 ## lies outside the anchors (a pile, a cart's load), only a CLAIMED thing (a
 ## player's or a companion's) is gathered; any other is lost, as 465 had it.
 ## A GATHERED thing (moved by an earlier re-lay and claimed by nobody since)
-## lying in an anchor, the gathered pile's cell too, is lost with them. Gold,
+## lying in an anchor, the gathered pile's cell too, is lost with them, and
+## so is a FOES thing (790 amended (14): a foe's leavings, carried by a holder
+## who is no player's, fallen in an anchor). Gold,
 ## a count that takes no room, is gathered as before. "unclaimed" counts
 ## the things lost by this sorting (the journal's figure). Without it the
 ## ground is gathered whole, as 790 first had it.
@@ -986,11 +988,13 @@ static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant =
 ## gathered that nobody has claimed since.
 const CLAIMED := "claimed"
 const GATHERED := "gathered"
+const FOES := "foes"
 
 
 ## One saved ground [param pile] sorted by [param claim_of] (keep_section,
 ## 790 amended (12)). [param stays] (in an anchor, or on the gathered pile's
-## cell): it is kept where it lies less any GATHERED thing; else only its
+## cell): it is kept where it lies less any GATHERED or FOES thing (790
+## amended (14)); else only its
 ## CLAIMED things, and its gold, go to [param heap]. What goes is added to
 ## [param lost], what is gathered to [param moved]. How many things were
 ## lost.
@@ -1002,7 +1006,7 @@ static func _sort_pile(pile: Dictionary, claim_of: Callable, stays: bool, heap: 
 	for i in ids.size():
 		var uid := int(uids[i]) if i < uids.size() and (uids[i] is int or uids[i] is float) else 0
 		var claim := str(claim_of.call(uid)) if uid != 0 else ""
-		if (stays and claim != GATHERED) or (not stays and claim == CLAIMED):
+		if (stays and claim != GATHERED and claim != FOES) or (not stays and claim == CLAIMED):
 			var into: Dictionary = left if stays else heap
 			into["ids"].append(ids[i])
 			into["items"].append(uids[i] if i < uids.size() else 0)

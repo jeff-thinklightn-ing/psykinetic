@@ -75,6 +75,7 @@ func _ready() -> void:
 	_test_gathered_by_claim()
 	_test_heap_past_its_room()
 	_test_room_at_the_way_in()
+	_test_foes_in_an_anchor()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -729,10 +730,10 @@ func _test_gathered_by_claim() -> void:
 	World.items.note(claimed_since, "moved", Regen.MOVED, "rg_halls", keep_to)
 	World.items.place(claimed_since, "player:%s" % BO_ID, "player:%s" % BO_ID, "Bo")
 	World.items.place(claimed_since, "rg_halls@4,4")
-	_check(_main.ground_claim(dropped) == Regen.CLAIMED and _main.ground_claim(hers) == Regen.CLAIMED and _main.ground_claim(loot) == ""
+	_check(_main.ground_claim(dropped) == Regen.CLAIMED and _main.ground_claim(hers) == Regen.CLAIMED and _main.ground_claim(loot) == Regen.FOES
 		and _main.ground_claim(remains) == Regen.CLAIMED and _main.ground_claim(key) == Regen.CLAIMED and _main.ground_claim(junk) == Regen.GATHERED
 		and _main.ground_claim(laid) == "" and _main.ground_claim(claimed_since) == Regen.CLAIMED,
-		"claims: Bo's drop and Wren's carrying (a companion's counts as her player's), the remains bound and never carried, Brand's key (a quest's) are claimed; the imp's loot is no one's; gathered junk is gathered; the level's own kit no one's; gathered junk Bo picked up since is his")
+		"claims: Bo's drop and Wren's carrying (a companion's counts as her player's), the remains bound and never carried, Brand's key (a quest's) are claimed; the imp's loot a foe's (790 amended (14)); gathered junk is gathered; the level's own kit no one's; gathered junk Bo picked up since is his")
 	var section := {"tick": 1, "entities": [], "respawns": [], "records": [], "ground": [
 		{"cell": outside, "ids": ["knife", "bandaging_kit", "knife", "holy_remains", "camp_key"], "items": [dropped, hers, loot, remains, key], "gold": 5},
 		{"cell": Vector2i(4, 4), "ids": ["knife", "bandaging_kit", "knife"], "items": [junk, laid, claimed_since], "gold": 0},
@@ -754,6 +755,69 @@ func _test_gathered_by_claim() -> void:
 	var plain := Regen.keep_section(section, anchors, keep_to, World.items.id_of)
 	_check((plain["lost"] as Array).is_empty() and int(plain["unclaimed"]) == 0, "without a claim, 790's first rule: everything gathered, nothing lost")
 	for uid: int in [dropped, hers, loot, remains, key, junk, junk_on_heap, laid, claimed_since]:
+		World.items.end(uid, "test")
+	World.enter(was)
+
+
+## 790 amended (14): a foe's leavings fallen in an anchor go at the re-lay,
+## as they do outside; the level's own thing there and anything a player or a
+## companion carried stay. Brand's tomb_sledge, carried once by a player
+## after he fell, is kept at every later re-lay, set down in an anchor or out.
+func _test_foes_in_an_anchor() -> void:
+	print("
+== 790 amended (14): a foe's leavings in an anchor go at the re-lay; the level's and a player's stay ==")
+	var was := World.enter_named("rg_halls")
+	var keep_to := Vector2i(3, 3)
+	var anchors := [{"rect": GATE, "name": "gatehouse"}, {"rect": DEEP, "name": "deep"}]
+	var inside := Vector2i(4, 4)
+	var outside := Vector2i(12, 8)
+	var dagger := World.items.mint("dagger", "stocked", "Kobold", "rg_halls", inside)
+	World.items.place(dagger, "rg_halls/Kobold1", "rg_halls/Kobold1", "Kobold")
+	World.items.place(dagger, "rg_halls@4,4")
+	var laid := World.items.mint("bandaging_kit", "test", "", "rg_halls", inside)
+	var hers := World.items.mint("bandaging_kit", "test", "", "rg_halls", inside)
+	World.items.place(hers, "companion:%s:Wren" % BO_ID, "companion:%s:Wren" % BO_ID, "Wren")
+	World.items.place(hers, "rg_halls@4,4")
+	var sledge := World.items.mint("tomb_sledge", "stocked", "Brand the Ox", "rg_halls", outside)
+	World.items.place(sledge, "named:brand", "named:brand", "Brand the Ox")
+	World.items.place(sledge, "rg_halls@12,8")
+	var kept_sledge := World.items.mint("tomb_sledge", "stocked", "Brand the Ox", "rg_halls", inside)
+	World.items.place(kept_sledge, "named:brand", "named:brand", "Brand the Ox")
+	World.items.place(kept_sledge, "player:%s" % BO_ID, "player:%s" % BO_ID, "Bo")
+	World.items.place(kept_sledge, "rg_halls@4,4")
+	_check(_main.ground_claim(dagger) == Regen.FOES and _main.ground_claim(sledge) == Regen.FOES and _main.ground_claim(laid) == ""
+		and _main.ground_claim(hers) == Regen.CLAIMED and _main.ground_claim(kept_sledge) == Regen.CLAIMED,
+		"claims: the kobold's dagger and Brand's sledge nobody took are a foe's; the level's kit no one's; Wren's kit and the sledge Bo carried claimed")
+	var section := {"tick": 1, "entities": [], "respawns": [], "records": [], "ground": [
+		{"cell": inside, "ids": ["dagger", "bandaging_kit", "bandaging_kit", "tomb_sledge"], "items": [dagger, laid, hers, kept_sledge], "gold": 3},
+		{"cell": outside, "ids": ["tomb_sledge"], "items": [sledge], "gold": 0}]}
+	var sifted := Regen.keep_section(section, anchors, keep_to, World.items.id_of, {}, _main.ground_claim)
+	var ground: Array = sifted["kept"]["ground"]
+	var room: Array = ground.filter(func(pile: Dictionary) -> bool: return pile["cell"] == inside)
+	var lost: Array = sifted["lost"]
+	lost.sort()
+	var wanted_lost := [dagger, sledge]
+	wanted_lost.sort()
+	_check(lost == wanted_lost and int(sifted["unclaimed"]) == 2,
+		"lost: the kobold's dagger in the gatehouse, as Brand's sledge nobody took outside; 2 counted (%s, %d)" % [lost, sifted["unclaimed"]])
+	_check(room.size() == 1 and (room[0]["items"] as Array) == [laid, hers, kept_sledge] and int(room[0]["gold"]) == 3,
+		"in the gatehouse the level's kit, Wren's kit and the sledge Bo carried stay where they lie, the gold too (%s)" % [room])
+	# Later re-lays: the sledge Bo carried, gathered to the way in once and then set down in
+	# the deep anchor, is kept by both.
+	World.items.note(kept_sledge, "moved", Regen.MOVED, "rg_halls", keep_to)
+	var deep_cell := Vector2i(20, 12)
+	var again := {"tick": 2, "entities": [], "respawns": [], "records": [], "ground": [
+		{"cell": keep_to, "ids": ["tomb_sledge"], "items": [kept_sledge], "gold": 0}]}
+	var on_heap: Array = Regen.keep_section(again, anchors, keep_to, World.items.id_of, {}, _main.ground_claim)["kept"]["ground"]
+	World.items.place(kept_sledge, "rg_halls@20,12")
+	var later := {"tick": 3, "entities": [], "respawns": [], "records": [], "ground": [
+		{"cell": deep_cell, "ids": ["tomb_sledge"], "items": [kept_sledge], "gold": 0}]}
+	var sorted_later := Regen.keep_section(later, anchors, keep_to, World.items.id_of, {}, _main.ground_claim)
+	var in_deep: Array = (sorted_later["kept"]["ground"] as Array).filter(func(pile: Dictionary) -> bool: return pile["cell"] == deep_cell)
+	_check(on_heap.size() == 1 and (on_heap[0]["items"] as Array) == [kept_sledge] and _main.ground_claim(kept_sledge) == Regen.CLAIMED
+		and in_deep.size() == 1 and (in_deep[0]["items"] as Array) == [kept_sledge] and (sorted_later["lost"] as Array).is_empty(),
+		"Brand's sledge, carried once by Bo: kept on the way in's heap at the next re-lay, and in the deep anchor at the one after (%s, %s)" % [on_heap, in_deep])
+	for uid: int in [dagger, laid, hers, sledge, kept_sledge]:
 		World.items.end(uid, "test")
 	World.enter(was)
 
