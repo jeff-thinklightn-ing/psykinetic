@@ -352,6 +352,9 @@ class Part:
 		self.closed = False
 		# Left as built by densify (a small part: a finger, a toe, a rivet).
 		self.sparse = False
+		# The hair cap's hairline, where it meets the bare face ([(ring, point), (ring, point)] segments, hair()):
+		# each corner's distance from it written into the "hairline" UV layer (write_hairline). None: no hairline.
+		self.hairline = None
 
 	def add(self, points: list) -> "Part":
 		self.rings.append(points)
@@ -412,6 +415,8 @@ class Part:
 		obj = bpy.data.objects.new(self.name, mesh)
 		bpy.context.scene.collection.objects.link(obj)
 		obj["region"] = self.region
+		if PEOPLE == "human":
+			write_hairline(mesh, self.rings, self.hairline)
 		if self.rigid:
 			obj.vertex_groups.new(name=self.rigid).add(list(range(len(verts))), 1.0, "REPLACE")
 		elif self.follow:
@@ -440,6 +445,36 @@ class Part:
 					group = obj.vertex_groups.get(bone) or obj.vertex_groups.new(name=bone)
 					group.add(held, w, "REPLACE")
 		return obj
+
+
+def write_hairline(mesh, rings: list, hairline) -> None:
+	"""A human part's two UV layers, in this order: "UVMap" (tools/body_build.py's palette swatch, written there)
+	and "hairline" (the shading row's darker root, ROOTLABEL): on a hair cap ([hairline] its segments,
+	Part.hairline) each corner's distance in metres from the nearest, u, and v 1; on every other part (0, 0), no
+	root (a beard, a brow, the bun, the fall, the tail, a hood, the body). The game reads it as UV2
+	(human_body.gdshader); it keeps the import's light baking off UV2. glTF turns v over (1 - v), so (u, 1 - v)
+	here. Both filled outright: a new layer comes unwrapped face by face, and the export splits every vertex
+	whose corners differ in any layer, which the build's import then keeps (the parts torn at every edge)."""
+	for name in ("UVMap", "hairline"):
+		layer = mesh.uv_layers.new(name=name)
+		for loop in layer.data:
+			loop.uv = (0.0, 1.0)
+	if not hairline:
+		return
+	from mathutils.geometry import intersect_point_line
+	segs = [(rings[a[0]][a[1]], rings[b[0]][b[1]]) for a, b in hairline]
+
+	def far(p: Vector) -> float:
+		best = 1e9
+		for s0, s1 in segs:
+			q, t = intersect_point_line(p, s0, s1)
+			q = s0 if t < 0.0 else s1 if t > 1.0 else q
+			best = min(best, (p - q).length)
+		return best
+
+	at = [far(v.co) for v in mesh.vertices]
+	for loop in mesh.loops:
+		layer.data[loop.index].uv = (at[loop.vertex_index], 0.0)
 
 
 ## How sharply weights fall off with distance from a bone: higher, crisper joints.
@@ -1281,6 +1316,13 @@ def hair(J: dict, nape: bool) -> Part:
 				pts[i] = pts[i] + Z * (0.19 - z) + (-FRONT) * 0.02
 		p.add(pts)
 	clear_of_head(p, J)
+	# Its hairline (write_hairline): the lowest ring all round (the nape, behind the ears, up each temple), and
+	# over the brow the raised front points of every ring below the forehead, across and between those rings.
+	n = len(p.rings[0])
+	raised = [k for k, r in enumerate(rings) if r[0] < 0.19]
+	p.hairline = [((0, i), (0, (i + 1) % n)) for i in range(n)]
+	p.hairline += [((k, i), (k, i + 1)) for k in raised[1:] for i in (2, 3)]
+	p.hairline += [((k, i), (k + 1, i)) for k in raised if k + 1 in raised for i in (2, 3, 4)]
 	return p
 
 
