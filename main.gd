@@ -4351,6 +4351,7 @@ func _load_level(level_name: String, kept := {}, parsed := {}) -> bool:
 	_room_left_at.clear()
 	Companion.know_level(map_name, loaded)
 	_fire_places[map_name] = Level.fires_of(loaded)
+	_keep_decor(map_name, loaded)  # Its seats, bedrolls and carts beside its fires, so no tick reads it again (853 amended (21)).
 	_terrain = loaded["terrain"]
 	# Its felled cells (591): the server's own, a client's as told.
 	if not kept.is_empty():
@@ -4568,6 +4569,8 @@ func reload_zone(zone_name: String, read := {}, message := {}, config := {}) -> 
 		return
 	var was := World.enter_named(zone_name)
 	_counter_cells.erase(zone_name)  # Its buildings may have changed (807 amended (8): read again at the next ask).
+	for kept: Dictionary in [_seat_decor, _camp_bedrolls, _camp_carts]:
+		kept.erase(zone_name)  # Its decor may have changed: kept again from the level laid below (853 amended (21)).
 	Regen.forget()  # An edited level.json may mark it, or no longer.
 	if read.is_empty():
 		_load_level(zone_name)
@@ -9593,7 +9596,9 @@ func _tell_left_at_feet(player: Player, uid: int) -> void:
 ## (FIRE_WHERE), "" if none is within FIRE_TOLD_WITHIN or it has none.
 func _fire_where(zone_name: String, cell: Vector2i) -> String:
 	if not _fire_places.has(zone_name):
-		_fire_places[zone_name] = Level.fires_of(Level.load_level(zone_name)) if Level.exists(zone_name) else []
+		var read := Level.load_level(zone_name) if Level.exists(zone_name) else {}
+		_fire_places[zone_name] = Level.fires_of(read)
+		_keep_decor(zone_name, read)
 	var best := ""
 	var nearest := FIRE_TOLD_WITHIN + 1
 	for place: Dictionary in _fire_places[zone_name]:
@@ -17827,7 +17832,7 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 					var seated := fire_seat_spots(fire, key, _seat_cells(zone))
 					if not seated.is_empty():
 						spots["fire"] = seated
-		World.resident_part("places: fire seats", ft)  # A zone's seat cells read from its level once (785 amended (1)).
+		World.resident_part("places: fire seats", ft)  # A zone's seat cells, kept as its level is read (853 amended (21)).
 	if not spots.is_empty():
 		out["spots"] = spots
 	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, a bedroll outside
@@ -24838,25 +24843,45 @@ static func seat_cells_of(decor: Array, kinds: Dictionary) -> Dictionary:
 	return cells
 
 
-## [param zone]'s seat cells (Main.seat_cells_of), read once a zone.
+## [param zone]'s seat cells (Main.seat_cells_of), kept when its level is read (_keep_decor).
 var _seat_decor: Dictionary = {}
 func _seat_cells(zone: String) -> Dictionary:
 	if not _seat_decor.has(zone):
-		_seat_decor[zone] = seat_cells_of(Level.load_level(zone).get("terrain", {}).get("decor", []), Level.DECOR_KINDS) if Level.exists(zone) else {}
+		_keep_decor(zone, Level.load_level(zone) if Level.exists(zone) else {})
 	return _seat_decor[zone]
 
 
+## [param zone]'s seat cells, bedrolls and carts from [param read], its level as Level.load_level gives it, each kept
+## once (one already kept stays: a test's seats set before Main boots). Filled where its fires are, as _load_level
+## lays it and where _fire_where reads it (853 amended (21), perf's in npc's place on the coordinator's ruling,
+## 2026-11-16): _seat_cells read the wilds from disk at the first sync, about 370 ms of tick 30's residents part,
+## and the camp's two readers did the same at a camp's first night. Their own reads stay for a zone never laid.
+func _keep_decor(zone: String, read: Dictionary) -> void:
+	var decor: Array = read.get("terrain", {}).get("decor", [])
+	if not _seat_decor.has(zone):
+		_seat_decor[zone] = seat_cells_of(decor, Level.DECOR_KINDS)
+	if _camp_bedrolls.has(zone) and _camp_carts.has(zone):
+		return
+	var rolls := {}
+	var carts: Array = []
+	for piece: Variant in decor:
+		if piece is Dictionary and str(piece.get("kind", "")) == "bedroll" and piece.get("out") is Vector2i:
+			rolls[piece["cell"]] = piece["out"]
+		elif piece is Dictionary and str(piece.get("kind", "")) == "cart":
+			carts.append(piece["cell"])
+	if not _camp_bedrolls.has(zone):
+		_camp_bedrolls[zone] = rolls
+	if not _camp_carts.has(zone):
+		_camp_carts[zone] = carts
+
+
 ## The step of the "bedroll" decor piece on [param cell] in this zone (799 amended (3)), zero for none: a flat
-## faced piece, its +z along the step, its head (art-kit's -z) against it. Read once a zone.
+## faced piece, its +z along the step, its head (art-kit's -z) against it. Kept when its level is read (_keep_decor).
 var _camp_bedrolls: Dictionary = {}
 func _camp_bedroll_out(cell: Vector2i) -> Vector2i:
 	var zone := World.zone.name
 	if not _camp_bedrolls.has(zone):
-		var rolls := {}
-		for piece: Variant in Level.load_level(zone).get("terrain", {}).get("decor", []):
-			if piece is Dictionary and str(piece.get("kind", "")) == "bedroll" and piece.get("out") is Vector2i:
-				rolls[piece["cell"]] = piece["out"]
-		_camp_bedrolls[zone] = rolls
+		_keep_decor(zone, Level.load_level(zone))
 	return (_camp_bedrolls[zone] as Dictionary).get(cell, Vector2i.ZERO)
 
 
@@ -24866,11 +24891,7 @@ func _camp_bedroll_out(cell: Vector2i) -> Vector2i:
 func _camp_cover(at: Vector2i, rect: Rect2i) -> Vector2i:
 	var zone := World.zone.name
 	if not _camp_carts.has(zone):
-		var carts: Array = []
-		for piece: Variant in Level.load_level(zone).get("terrain", {}).get("decor", []):
-			if piece is Dictionary and str(piece.get("kind", "")) == "cart":
-				carts.append(piece["cell"])
-		_camp_carts[zone] = carts
+		_keep_decor(zone, Level.load_level(zone))
 	var cart := Vector2i(-1, -1)
 	for cell: Vector2i in _camp_carts[zone]:
 		if rect.has_point(cell) and (cart.x < 0 or World.distance(cell, at) < World.distance(cart, at)):

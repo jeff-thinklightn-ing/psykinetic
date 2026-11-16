@@ -55394,6 +55394,29 @@ value, ^X the Y$: "Brand the Ox" (named_enemies' name, the one titled name in th
 words open a rumour in small letters. resident_test _test_lower_first: the rumour said "It is said that when
 Hollowfell ...", "Those" and "That's" lowered, Brand still a name. No player-facing line changes but that
 rumour's capital; no bullet.
+853 amended (21) (perf's, carried in npc's place on the coordinator's ruling of 2026-11-16 while npc's session is
+stopped; the label from tools/decision_number.sh): a zone's seat cells, and its camps' bedrolls and carts, are
+kept from the level already read, where its fires are, so no tick reads a level from disk for them. 785 amended
+(1)'s breakdown line named tick 30's hitch on a probe boot: places: fire seats 370.9 ms of residents 402.2, 0 path
+searches. Main._seat_cells read the wilds again with Level.load_level (no cache: the whole level parsed, about 370
+ms) at the first sync, and 150 of 187 joined laptop runs printed residents 512-932 ms at tick 30 (the box 631 ms);
+the camp's _camp_bedroll_out and _camp_cover did the same at a camp's first night. Main._keep_decor(zone, read)
+fills the three from a level as Level.load_level gives it: _load_level calls it beside _fire_places, and
+_fire_where with its own read; each is kept once (one already kept stays: fire_night_test and town_day_test set
+the wilds' seats before Main boots), and the three readers' own reads stay for a zone never laid. reload_zone
+drops the three with _counter_cells, so a builder's edit is kept again from the level it lays (before, its seats
+were never seen till a restart). Level.loads counts load_level's reads by name, for tests; never timed. The other
+first reads a tick meets, each not this shape (no read of the level beside it to fill from), listed for the
+coordinator and left: Apex._places_of reads each apex's lair and land levels at tick 1 (raids, 406-476 ms on a
+probe boot); Main._zone_level reads the tavern's level, never laid at the boot, for its inn spots at the first
+sync (about 20 ms); Companion.here_name reads its zone's level on every call, uncached (a companion's first words
+at step 600, 343 ms of companion turns). hut_town_test _test_first_sync_reads: on the boot, before any tick, the
+wilds' seats, bedrolls and carts kept as its level holds them; the residents part's calls as the tick makes them
+read no laid level (the tavern's one read printed), and a second reads none at all; _test_reload_keeps_decor:
+stale seats and carts replaced by the reloaded level's, one read, the reload's own. On the old code the first-sync
+rows fail ("wilds": 1 read). A probe boot with the mend prints no slow tick 30 (residents under 50 ms).
+hut_town_test, interest_test, resident_test, fire_night_test, town_day_test, zone_test PASS. Server only; protocol
+unchanged; no new class_name; no bullet.
 
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 

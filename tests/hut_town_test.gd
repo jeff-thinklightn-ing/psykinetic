@@ -33,6 +33,7 @@ func _run() -> void:
 	add_child(main)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_test_first_sync_reads(main)
 	print("== a healer's hut buys its mend from the nearest town by route (733 amended (1)) ==")
 	_check(not World.holdings.place(FOREST).is_empty() and not World.holdings.place(WILDS).is_empty(), "(the forest's and the wilds' huts on the laid world)")
 	_check(main._hut_town(WILDS) == UMBRAGE, "the wilds' hut: Umbrage's store, its own area's (%s)" % main._hut_town(WILDS))
@@ -90,9 +91,64 @@ func _run() -> void:
 	World.towns._huts[NOWHERE]["state"] = Towns.RUIN
 	World.towns._huts[NOWHERE]["level"] = 0
 	_check(not main._hut_shut(NOWHERE) and main.care_rule(NOWHERE) is Dictionary, "a ruin, kept, no town: still open")
+	_test_reload_keeps_decor(main)
 	print("RESULT: %s (%d failed)" % ["PASS" if _failed == 0 else "FAIL", _failed])
 	Net.state_path = ""
 	get_tree().quit(0 if _failed == 0 else 1)
+
+
+## 853 amended (21) (perf's, in npc's place on the coordinator's ruling, 2026-11-16): the wilds' seat cells, bedrolls
+## and carts are kept as its level is laid, so the residents part never reads it from disk. Its first sync read the
+## wilds again for the fire's seats (Main._seat_cells), about 370 ms of tick 30 on every boot. Here on the boot, before
+## any tick (World is not processing), then the residents part's calls as Main's tick makes them, the reads counted
+## (Level.loads), never timed. The tavern's level, never laid at the boot, is still read once at the first sync
+## (Main._zone_level, its inn spots): printed, not failed; listed for the coordinator.
+func _test_first_sync_reads(main: Node) -> void:
+	print("== the first sync reads no laid level from disk (853 amended (21)) ==")
+	var decor: Array = Level.load_level("wilds").get("terrain", {}).get("decor", [])
+	var seats: Dictionary = Main.seat_cells_of(decor, Level.DECOR_KINDS)
+	_check(World.tick < Main.RESIDENT_SYNC_TICKS and main._seat_decor.has("wilds") and main._seat_decor["wilds"] == seats,
+		"before the first sync (tick %d) the wilds' seat cells are kept, as its level holds them (%d; none till maps' logs are in)" % [World.tick, seats.size()])
+	_check(main._camp_bedrolls.has("wilds") and main._camp_carts.has("wilds"), "and its bedrolls and carts (%d, %d)"
+		% [(main._camp_bedrolls.get("wilds", {}) as Dictionary).size(), (main._camp_carts.get("wilds", []) as Array).size()])
+	var fire := false
+	for each: Dictionary in main._fire_places.get("wilds", []):
+		fire = fire or not str(each.get("town", "")).is_empty()
+	_check(fire, "(the wilds lays a town's fire: the sync reaches the fire's seats)")
+	var laid: Array = []
+	for zone: Zone in World.zones.values():
+		laid.append(zone.name)
+	for sync in 2:
+		var before := Level.loads.duplicate()
+		main._sync_residents()
+		main._sync_bands()
+		main._warm_rests()
+		World.burn_hearths()
+		var read := {}
+		for level_name: String in Level.loads:
+			if Level.loads[level_name] != int(before.get(level_name, 0)):
+				read[level_name] = Level.loads[level_name] - int(before.get(level_name, 0))
+		var again := read.keys().filter(func(level_name: String) -> bool: return level_name in laid)
+		if sync == 0:
+			_check(again.is_empty(), "the first residents part reads no laid level (%s laid; read: %s)" % [", ".join(laid), read])
+		else:
+			_check(read.is_empty(), "the second reads no level at all (read: %s)" % read)
+
+
+## A zone reloaded (a builder's accept, Main.reload_zone) keeps its decor again from the level it lays, not what was
+## kept before (853 amended (21)): read once a zone, an edit's seats were never seen till a restart.
+func _test_reload_keeps_decor(main: Node) -> void:
+	print("== a reloaded zone's decor kept again from the level laid (853 amended (21)) ==")
+	var stale := {Vector2i(-9, -9): true}
+	main._seat_decor["wilds"] = stale
+	main._camp_carts["wilds"] = [Vector2i(-9, -9)]
+	var before := Level.loads.duplicate()
+	main.reload_zone("wilds")
+	var seats: Dictionary = Main.seat_cells_of(main.level.get("terrain", {}).get("decor", []), Level.DECOR_KINDS)
+	_check(main._seat_decor.get("wilds") == seats and not (main._camp_carts.get("wilds", []) as Array).has(Vector2i(-9, -9)),
+		"after the reload the wilds' seats and carts are the laid level's (%d seats), not the stale ones" % seats.size())
+	_check(int(Level.loads.get("wilds", 0)) - int(before.get("wilds", 0)) == 1, "one read, the reload's own (%d)"
+		% (int(Level.loads.get("wilds", 0)) - int(before.get("wilds", 0))))
 
 
 func _check(ok: bool, label: String) -> void:

@@ -830,9 +830,15 @@ static func source_at(folder: String) -> Dictionary:
 		"relief": _image(folder + "relief.png")}
 
 
+## How many times load_level has read each level from disk this run, by name (853 amended (21): a test counts the
+## reads a tick makes, never times them).
+static var loads: Dictionary[String, int] = {}
+
+
 ## Reads level [param level_name] (see the class doc). {} with a warning
 ## printed when there is none.
 static func load_level(level_name: String) -> Dictionary:
+	loads[level_name] = loads.get(level_name, 0) + 1
 	var made := source(level_name)
 	var layout: Image = made["layout"]
 	if layout == null:
