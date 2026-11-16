@@ -2828,7 +2828,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s %s: %d bodies, %d records | `main.gd` _bodies_command() |
 |  | not the authority | `main.gd` admin_command() |
 |  | map load is now zone reset <name>; zones: %s | `main.gd` admin_command() |
-|  | builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); edited levels: %s | `main.gd` admin_command() |
+|  | builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); %s | `main.gd` admin_command() |
 |  | %s rebuilt from the map; %d player records kept; %s | `main.gd` admin_command() |
 |  | no dead companions to bring back | `main.gd` admin_command() |
 |  | companions brought back: %s | `main.gd` admin_command() |
