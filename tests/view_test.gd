@@ -287,6 +287,7 @@ func _ready() -> void:
 		_test_options_panel()
 		await _test_preview_tunic()
 		_test_hair_covers_head()
+		_test_hair_root()
 		_test_hair_value()
 		_test_look_pins()
 		_test_hair_pick_kept()
@@ -835,6 +836,65 @@ func _test_bandaging() -> void:
 	patient.free()
 	player.free()
 	bandaging.free()
+
+
+## The hair's darker root (ROOTLABEL): the human bodies carry body_gen's "hairline" layer as UV2, which human_body.gdshader
+## darkens the hair by. On each hair cap (Hair_Cropped, Hair_Bound, the cap of Hair_Long) y is 1 and x its distance from the
+## hairline, from 0 at the line to over 10 cm at the crown; the cap's forehead line (in front of the head, over the brow) is
+## at the line. Every other part, a beard, the bun, the tail, long hair's fall, a hood, a hat and the body with its brows,
+## is (0, 0): no root. And the import keeps light baking off UV2 (meshes/light_baking 1): at 2 Godot unwraps into UV2
+## over the hairline without a word (art-kit's watch point).
+func _test_hair_root() -> void:
+	print("
+== the hair's darker root: the hairline in UV2 on the hair caps alone (ROOTLABEL) ==")
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var import_text := FileAccess.get_file_as_string(String(build[1]) + ".import")
+		_check(import_text.contains("meshes/light_baking=1"), "%s: the import keeps light baking off UV2" % build[0])
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		var body := model.find_child("Body", true, false) as MeshInstance3D
+		var skeleton := body.get_parent() as Skeleton3D
+		var head := skeleton.get_bone_global_rest(skeleton.find_bone("Head")).origin
+		var others: Array = []
+		for node in model.find_children("*", "MeshInstance3D", true, false):
+			var mi := node as MeshInstance3D
+			var on := 0
+			var off := 0
+			var bad := 0
+			var least := INF
+			var most := 0.0
+			var brow_line := 0
+			for s in mi.mesh.get_surface_count():
+				var arrays := mi.mesh.surface_get_arrays(s)
+				var uv2: Variant = arrays[Mesh.ARRAY_TEX_UV2]
+				if uv2 == null:
+					off += (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+					continue
+				var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				for i in (uv2 as PackedVector2Array).size():
+					var at: Vector2 = uv2[i]
+					if is_equal_approx(at.y, 1.0):
+						on += 1
+						least = minf(least, at.x)
+						most = maxf(most, at.x)
+						var rel: Vector3 = verts[i] - head
+						if at.x < 0.002 and rel.z > 0.05 and rel.y > 0.15:
+							brow_line += 1
+					elif at.is_zero_approx():
+						off += 1
+					else:
+						bad += 1
+			if String(mi.name) in ["Hair_Cropped", "Hair_Bound"]:
+				_check(on > 0 and off == 0 and bad == 0 and least < 0.002 and most > 0.10 and brow_line >= 3,
+					"%s %s: every point on the cap, from the line (%.3f m) to the crown (%.3f m), %d on the forehead's line" % [
+						build[0], mi.name, least, most, brow_line])
+			elif String(mi.name) == "Hair_Long":
+				_check(on > 0 and off > 0 and bad == 0 and least < 0.002 and most > 0.10 and brow_line >= 3,
+					"%s Hair_Long: the cap carries its hairline (%d points, %.3f..%.3f m), the fall none (%d)" % [
+						build[0], on, least, most, off])
+			elif on > 0 or bad > 0:
+				others.append("%s %d/%d" % [mi.name, on, bad])
+		_check(others.is_empty(), "%s: no root on any other part (a beard, the bun, the tail, a hood, a hat, the body) %s" % [build[0], others])
+		model.free()
 
 
 ## The hair caps cover the back of a person's head (body_gen's clear_of_head, 419 amended (3)): every point of the Body's head
