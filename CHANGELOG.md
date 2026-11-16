@@ -6,23 +6,26 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
-- A sleeping person's name shows over their head (865 amended (8)).
 
-- Towns: Umbrage's two handcarts stand at the square's north-west edge beside the town's store, clear of a newcomer's way from the arrival to the Mughouse (774 amended (6)).
-- Towns: of an evening Umbrage's townsfolk go inside the Last Light Mughouse and stay a while (875).
-- Towns: click someone from a little way off, such as the healer in his hut, and their window opens with what they sell once you're beside them (852 amended (8)).
-- Wilds: the old grey snarls as his bite's warning shows and his jaws snap shut as it lands, on you or on the air, and his lunge comes with a snarl and a bark (955).
-- Towns: gold you give toward a building stays in its fund and pays for that building's materials; the town window's card counts your gift at once, and the total it shows falls as the materials come in (918 amended (2)).
-- Long hair falls down the back, and in Options hair can be tied back in a tail and a man's beard grown long (419 amended (11)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
-- Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and there's low talk among the townsfolk inside (920).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.225
+
+- A sleeping person's name shows over their head (865 amended (8)).
+- Towns: Umbrage's two handcarts stand at the square's north-west edge beside the town's store, clear of a newcomer's way from the arrival to the Mughouse (774 amended (6)).
+- Towns: in the Mughouse of an evening, townsfolk sit on three-legged stools at its tables and round the hearth, and in Umbrage's temple they sit on the pews facing the altar (875).
+- Towns: click someone from a little way off, such as the healer in his hut, and their window opens with what they sell once you're beside them (852 amended (8)).
+- Wilds: the old grey snarls as his bite's warning shows and his jaws snap shut as it lands, on you or on the air, and his lunge comes with a snarl and a bark (955).
+- Towns: gold you give toward a building stays in its fund and pays for that building's materials; the town window's card counts your gift at once, and the total it shows falls as the materials come in (918 amended (2)).
+- Long hair falls down the back, and in Options hair can be tied back in a tail and a man's beard grown long (419 amended (11)).
+- Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and there's low talk among the townsfolk inside (920).
 
 ## v0.1.224
 
