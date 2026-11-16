@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
+	_test_held_through_card()
 	_test_bow_click_walks()
 	await _test_lob_tap_through_main()
 	_test_friend_click()
@@ -571,6 +572,31 @@ func _test_schemes_are_inert_outside() -> void:
 	Net.controls = "wasd"
 	_check(_main._free_intent(player, own).length() > 0.99, "wasd: it walks")
 	Net.test_walk = [] as Array[Dictionary]
+	Net.controls = saved
+	_free_rig(rig)
+
+
+## 947 (Jeff 11-15, the Mughouse): W held out of the tavern the whole way through the
+## arrival card walks nothing, under it or after it, till it is let go; a fresh press walks.
+func _test_held_through_card() -> void:
+	print("
+== 947: a key held through the arrival card walks nothing till let go; a fresh press walks ==")
+	var saved: String = Net.controls
+	var rig := _rig()
+	Net.controls = "wasd"
+	var player := _place_player(Vector2i(11, 3))
+	var own: RefCounted = _main._free_own(player)
+	_main.test_keys_held = "w"
+	rig.building_room = true
+	_check(_main._free_intent(player, own) == Vector2.ZERO, "under the card, W held: he stands")
+	rig.building_room = false
+	_check(_main._free_intent(player, own) == Vector2.ZERO, "the card lifted, W still held from before it: he stands")
+	_check(_main._free_intent(player, own) == Vector2.ZERO, "and the frame after")
+	_main.test_keys_held = ""
+	_check(_main._free_intent(player, own) == Vector2.ZERO, "let go: still")
+	_main.test_keys_held = "w"
+	_check(_main._free_intent(player, own).length() > 0.99, "a fresh press walks him")
+	_main.test_keys_held = ""
 	Net.controls = saved
 	_free_rig(rig)
 

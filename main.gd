@@ -901,6 +901,7 @@ func _ready() -> void:
 	# After every other node: see _process.
 	process_priority = 10
 	seamless_crossings = "--seamless" in OS.get_cmdline_user_args()  # 822, off till switched on.
+	held_left = not "--no-held-left" in OS.get_cmdline_user_args()  # 822 amended (6), on.
 	var probe := Vector2i(3, 5)
 	if not ground.map_to_local(probe).is_equal_approx(Iso.tile_to_local(probe)):
 		push_error("Iso math disagrees with the TileSet: %s vs %s" % [
@@ -2526,9 +2527,27 @@ func _held_key_names() -> String:
 		return _test_walk_keys()
 	if is_typing():
 		return ""
+	if not test_keys_held.is_empty():
+		return test_keys_held
 	if DisplayServer.get_name() == "headless":
 		return ""
 	return Keys.walk_held()
+
+
+## 947: a person's keys held as a test's (controls_test's row), read as Keys.walk_held is.
+var test_keys_held := ""
+## 947: a walk key or the button held while the arrival card held the hands: it walks
+## nothing till everything is let go, so W held out of the tavern never walks him on
+## into the shell or back through the door. A scripted walk (--test-walk, latency) is
+## a test's, not a hand's, and walks on as before.
+var _held_through := false
+
+
+## Whether a person's hand holds a walk key or the button now (947).
+func _hand_holds() -> bool:
+	if not Net.test_walk.is_empty() or Net.test_latency > 0:
+		return false
+	return not _held_key_names().is_empty() or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 
 
 ## (D - A, W - S) for [param keys] as _held_key_names gives them.
@@ -3072,6 +3091,13 @@ func _on_own_winding(direction: Vector2i, ticks: int) -> void:
 func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	if is_typing():
 		return Vector2.ZERO
+	if _arriving() and Net.test_walk.is_empty() and Net.test_latency <= 0:
+		_held_through = _held_through or _hand_holds()
+		return Vector2.ZERO  # 947: the hands wait under the card, held keys and routes too.
+	if _held_through:
+		if _hand_holds():
+			return Vector2.ZERO
+		_held_through = false
 	var at := own.shown(player)
 	if Net.controls == "wasd":
 		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
@@ -4119,9 +4145,13 @@ func _ground_tile(look: String, height: int) -> int:
 ## Reads level [param level_name] and makes it this peer's terrain and spawn
 ## table; the default map if there is no such level. False if neither loads.
 ## [param kept]: that level already read, its felled cells and plots laid
-## (the held neighbour's, 822), taken as it is.
-func _load_level(level_name: String, kept := {}) -> bool:
-	var loaded := kept if not kept.is_empty() else Level.load_level(level_name)
+## (the held neighbour's, 822), taken as it is. [param parsed]: that level
+## read and not yet laid (the left level's clean read, 822 amended (6)), laid
+## here as a level read now is.
+func _load_level(level_name: String, kept := {}, parsed := {}) -> bool:
+	var loaded := kept if not kept.is_empty() else parsed if not parsed.is_empty() else Level.load_level(level_name)
+	if kept.is_empty() and parsed.is_empty():
+		level_reads[level_name] = int(level_reads.get(level_name, 0)) + 1
 	if loaded.is_empty() and level_name != Level.DEFAULT_MAP:
 		push_warning("[level] no map %s; loading %s" % [level_name, Level.DEFAULT_MAP])
 		loaded = Level.load_level(Level.DEFAULT_MAP)
@@ -4810,6 +4840,7 @@ func _on_terrain(data: Dictionary) -> void:
 	if Net.is_authority() or not BuilderHost.register_terrain(data):
 		return
 	var level_name := str(data.get("name", ""))
+	_terrain_hash[level_name] = terrain_hash(data)  # The left level's test (822 amended (6)).
 	_counter_cells.erase(level_name)  # A level changed live (a builder's accept): its counters are read again (807 amended (8)).
 	if level_name == map_name:
 		_load_level(level_name)
@@ -4929,7 +4960,15 @@ func _repaint(crossing := false) -> void:
 	if minimap != null:
 		_door_marks_at = -1  # A new level: its doors.
 		var made := _held_map if swapping and str(_held_map.get("level", {}).get("name", "")) == map_name else {}
+		if not swapping and is_same(_left_made.get("level"), level):
+			made = _left_made  # The left level's own map, held (822 amended (6)).
+		_left_made = {}
+		if made.is_empty():
+			maps_made[map_name] = int(maps_made.get(map_name, 0)) + 1
 		minimap.rebuild(level, made)
+		# Its felled cells and plots as this map was made: a map held with the
+		# level is shown again only if they are the same (822 amended (6)).
+		_map_print = [map_name, _clearing_print(map_name) if not swapping and not Net.is_authority() else ""]
 	if _client3d != null:
 		# The towns and folds go on the room once it is whole (_on_room_built).
 		if swapping:
@@ -4949,6 +4988,7 @@ func _repaint(crossing := false) -> void:
 ## The 3D room is whole (decision 660): what is drawn over it, the card
 ## lifted, the player's hands given back.
 func _on_room_built() -> void:
+	_read_left_clean()  # Its room whole: the left level's clean read may start (822 amended (6)).
 	_show_towns()
 	_show_folds()
 	_show_night_places()
@@ -5625,12 +5665,13 @@ func _show_home_zone() -> void:
 ## node and spawner go (its entities with them), the new map loads, and the
 ## new zone's entities arrive under its own node.
 func _client_zone(zone_name: String) -> void:
+	_drop_own_route()  # 947: the old body's route, in the old place (689 amended (13)'s, for a joined client).
 	if entities != null:
 		entities.free()
 	if spawner != null:
 		spawner.free()
 	World.mirror_reset()
-	_load_level(zone_name, _neighbour_level if seamless_crossings and zone_name == _neighbour_zone else {})
+	_enter_level(zone_name)
 	_zone_nodes(zone_name)
 	World.mirror_terrain(_terrain)
 	_repaint(true)
@@ -5639,10 +5680,28 @@ func _client_zone(zone_name: String) -> void:
 	print("[zone] now in %s" % zone_name)
 
 
+## A client's crossing into [param zone_name], its level: the held
+## neighbour's (822), else the level left by a door, held (822 amended (6)),
+## else read; the level it leaves held if it is left by a door.
+func _enter_level(zone_name: String) -> void:
+	var kept: Dictionary = _neighbour_level if seamless_crossings and zone_name == _neighbour_zone else {}
+	_hold_left(zone_name)
+	var left := _take_left(zone_name)  # Let go into any other plane zone, a swap's too.
+	if not kept.is_empty():
+		left = {}
+	kept = kept if not kept.is_empty() else left.get("kept", {})
+	_left_made = left.get("made", {})
+	_load_level(zone_name, kept, left.get("parsed", {}))
+	_loaded_generation = map_generation if _generation_sent else -1
+	if _client3d == null:
+		_read_left_clean()  # No room to wait for (a headless client).
+
+
 ## Server: [param peer]'s player joins the game in their own zone (the
 ## record's, else the default), opened if need be.
 func _admit(peer: int, id: String, player_name: String) -> void:
 	var record: PlayerRecord = _records.get(id)
+	_link_guard.erase(peer)  # 947: a join is no travel; nothing guarded.
 	var wanted := record.zone if record != null and Level.playable(record.zone) else default_zone()
 	var into := _open_zone(wanted)
 	if into == null:
@@ -5884,11 +5943,8 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 		# its old body's, in the old place. A host's travel (a link, a waystone, a rescue, a move)
 		# re-makes the body within one frame, so _free_drive never saw a frame without one and the
 		# old route was walked on from the new place (physics' tavern door run). A route set after
-		# this is the new body's and stands.
-		_free["path"] = []
-		_free["chase"] = null
-		_free["held"] = false
-		_free_waiting = {}
+		# this is the new body's and stands. A joined client drops it at its zone change (947).
+		_drop_own_route()
 	# A regenerating level due is laid again before anyone arrives
 	# (decision 465); a zone already open does the same here.
 	_regenerate_if_due(to_map)
@@ -5927,7 +5983,15 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	# way to the stair.
 	if stair != World.NO_CELL and spawns.has(to_spawn) and _at_other_way_back(level, from_name, Vector2i(spawns[to_spawn])):
 		stair = World.NO_CELL
-	if edge.is_empty() and stair != World.NO_CELL:
+	var shell := shell_of(level, stair)
+	if edge.is_empty() and not shell.is_empty():
+		# 947: out of a building whose inside is a level of its own (the Mughouse's shell), never into
+		# its footprint: the link's own spawn when it stands free outside, else the nearest free cell
+		# outside its doors, facing away from it.
+		var out := out_of_shell(level, shell, Vector2i(spawns[to_spawn]) if spawns.has(to_spawn) else World.NO_CELL)
+		record.tile = out[0]
+		record.facing = out[1]
+	elif edge.is_empty() and stair != World.NO_CELL:
 		record.tile = _beside_link(level, stair)  # Up the stair into the building that carries it (714), wherever it now stands.
 	if at != World.NO_CELL:
 		record.tile = at
@@ -5939,6 +6003,7 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	_show_zone_to(peer, to_map, leaving)
 	_join_player(peer, id, record.name, false, World.NO_CELL, true)  # A travel's re-join: --test-foe leaves the hands (392 amended (12)).
 	_shelter_arrival(peer, id)
+	_guard_way_back(peer, to_map, from_name)
 	if to_spawn == "from_below":
 		_reveal_from_below(to_map)  # The hidden door pushed open from behind (608).
 	print("[zone] %s went from %s to %s" % [record.name, from_name, to_map])
@@ -5957,6 +6022,110 @@ static func building_link_back(level: Dictionary, from_map: String) -> Vector2i:
 		if str(link.get("to_map", "")) == from_map and not str(link.get("building", "")).is_empty():
 			return link["tile"]
 	return World.NO_CELL
+
+
+## 947: the building in [param level] carrying the link at [param stair]
+## when its inside is a level of its own (the inn's shell: "inside" names
+## umbrage_tavern), {} for any other (a walk-in temple's stair, 714) or none.
+static func shell_of(level: Dictionary, stair: Vector2i) -> Dictionary:
+	if stair == World.NO_CELL:
+		return {}
+	for link: Dictionary in level.get("links", []):
+		if link["tile"] != stair or str(link.get("building", "")).is_empty():
+			continue
+		for building: Dictionary in level.get("buildings", []):
+			if str(link["building"]) in [str(building.get("code", "")), str(building.get("slot", ""))]:
+				return building if not str(building.get("inside", "")).is_empty() and building.has("rect") else {}
+	return {}
+
+
+## 947: where one coming out of [param building] (shell_of's) stands, and
+## the way they face: [param spawn] when it is free and outside the
+## footprint, else the first free cell outside one of its doors (the door's
+## outer cell, facing out through it), else the nearest free cell outside
+## the footprint to its front. World in that level's zone.
+func out_of_shell(level_now: Dictionary, building: Dictionary, spawn: Vector2i) -> Array:
+	var rect: Rect2i = building["rect"]
+	var facing: Vector2i = building["facing"] if building.get("facing") is Vector2i else Vector2i(0, 1)
+	var links: Array = level_now.get("terrain", {}).get("links_at", [])
+	var away := func(cell: Vector2i) -> Vector2i:
+		var off := cell - (rect.position + rect.size / 2)
+		return Vector2i(signi(off.x), 0) if absi(off.x) * rect.size.y >= absi(off.y) * rect.size.x else Vector2i(0, signi(off.y))
+	if spawn != World.NO_CELL and not rect.has_point(spawn) and World.is_free(spawn) and not spawn in links:
+		return [spawn, away.call(spawn)]
+	var fronts: Array[Vector2i] = []
+	for key: Vector3i in Level.entrances(building):
+		var cells := Terrain.edge_cells(key)
+		for i in 2:
+			if not rect.has_point(cells[i]) and rect.has_point(cells[1 - i]) and World.is_free(cells[i]) and not cells[i] in links:
+				return [cells[i], cells[i] - cells[1 - i]]
+			if not rect.has_point(cells[i]):
+				fronts.append(cells[i])
+	var start: Vector2i = fronts[0] if not fronts.is_empty() else Level.front_cell(rect, facing)
+	var queue: Array[Vector2i] = [start]
+	var seen: Dictionary[Vector2i, bool] = {start: true}
+	while not queue.is_empty() and seen.size() < 2000:
+		var tile: Vector2i = queue.pop_front()
+		if not rect.has_point(tile) and World.is_free(tile) and not tile in links:
+			return [tile, away.call(tile)]
+		for direction in World.DIRECTIONS:
+			var next := tile + direction
+			if not seen.has(next) and not rect.has_point(next) and World.is_walkable(next):
+				seen[next] = true
+				queue.append(next)
+	return [_nearest_free(start), facing]
+
+
+## 947: by peer, the cells that do not take them through a link again since
+## their last travel ({zone, cells, told}), when it set them down on one of
+## them (one arriving off them has stood off already): the links in their new
+## level back to where they came from, and the door cells of the building
+## carrying them. Their first step onto any other cell ends it (_on_entity_moved), and
+## their card's lift (view_ready): under the card a key held from the old
+## place (an older client's walk) or a stale route never sends them straight
+## back, and a fresh click after it (ui's click on the door) always does;
+## arriving on one of the cells, they step off it as anywhere.
+var _link_guard: Dictionary[int, Dictionary] = {}
+
+
+## 947: [param peer] has just come into [param to_map] from [param from_name]
+## (World in to_map's zone): its ways back are guarded (_link_guard).
+func _guard_way_back(peer: int, to_map: String, from_name: String) -> void:
+	_link_guard.erase(peer)
+	var cells: Dictionary[Vector2i, bool] = {}
+	for link: Dictionary in level.get("links", []):
+		if str(link["to_map"]) != from_name:
+			continue
+		cells[link["tile"]] = true
+		var building := shell_of(level, link["tile"])
+		for key: Vector3i in Level.entrances(building) if not building.is_empty() else []:
+			for cell: Vector2i in Terrain.edge_cells(key):
+				cells[cell] = true
+	var body: Player = _players.get(peer)
+	if is_instance_valid(body) and cells.has(body.tile):
+		_link_guard[peer] = {"zone": to_map, "cells": cells, "told": false}  # Set down on one: not stood off yet.
+
+
+## Whether [param entity] (a player) stands guarded at [param to] (947): it
+## came through a way back to there and has not stepped off its cells since.
+func _held_off_link(entity: GridEntity, to: Vector2i) -> bool:
+	var guard: Dictionary = _link_guard.get(entity.owner_peer, {})
+	if guard.is_empty() or str(guard["zone"]) != str(entity.zone) or not (guard["cells"] as Dictionary).has(to):
+		return false
+	if not guard["told"]:
+		guard["told"] = true
+		print("[level] %s at the link at %s held: just came through, not stepped off yet" % [_display_name(entity), to])
+	return true
+
+
+## The local player's click route, chase, held steer and waiting click
+## dropped (689 amended (13)'s, a host's travel; 947, a joined client's zone
+## change): they were the old body's, in the old place.
+func _drop_own_route() -> void:
+	_free["path"] = []
+	_free["chase"] = null
+	_free["held"] = false
+	_free_waiting = {}
 
 
 ## Whether [param cell] stands within one step of a link in [param level]
@@ -6005,6 +6174,7 @@ func _shelter_arrival(peer: int, id: String) -> void:
 func _view_ready(player: Player, zone_name: String) -> void:
 	if zone_name != player.zone:
 		return
+	_link_guard.erase(player.owner_peer)  # 947: his card is up; a press from now is his own (a click on the door takes him back).
 	World.unshelter(player, SPAWN_GRACE_TICKS)
 	var arrived_at: int = int(_lift_awaited.get(player.owner_peer, -1))
 	_lift_awaited.erase(player.owner_peer)
@@ -6136,6 +6306,7 @@ static func plane_offset(from: String, to: String) -> Vector3:
 ## any other neighbour is let go before, so two are never held.
 func _update_neighbour() -> void:
 	_poll_neighbour_read()
+	_poll_left_read()
 	if Engine.get_process_frames() % NEIGHBOUR_LOOK_FRAMES != 0:
 		return
 	for holder: Client3D in _room_holders.duplicate():
@@ -6210,6 +6381,178 @@ func drop_neighbour() -> void:
 	_neighbour_level = {}
 	_neighbour_asked = ""
 	_held_map = {}
+
+
+# --- The level left by a door (decision 822 amended (6)) ------------------------------
+
+## On for every client (--no-held-left turns it off, for a test): the plane
+## level last left through a door or stair link (the wilds into the barrow,
+## the inn, the smithy) held while inside, so stepping back out reads it
+## from disk no more (the wilds', 497 ms in the crossing's frame on the
+## Atlas) and makes its map no more (111 ms). Not 822's package: no second
+## view, only the level and its map. A host keeps every zone loaded and
+## never reads one again; this is a client's.
+var held_left := true
+## What is held: {zone, level (the live level as it was left, laid), map
+## (its live minimap, {level, cells, image}), print (its felled cells and
+## plots as told when it was left), map_print (as told when its map was
+## made), terrain (the "terrain" message's hash it was read from, "" for
+## none), generation (the "map" message's), clean (the level read again on a
+## worker once the room inside is whole, not laid: for felled cells or plots
+## changed while away)}; {} for none.
+var _left := {}
+## The clean read on a worker: the task, [zone, terrain hash] it was started
+## for, and what it read.
+var _left_task := -1
+var _left_reading: Array = []
+var _left_read := {}
+## The held map given to the next _repaint (its level the one loaded).
+var _left_made := {}
+## Each level's last "terrain" message's hash, by name (a client's).
+var _terrain_hash: Dictionary = {}
+## Whether the last "map" message carried a generation, and the generation
+## of the level loaded (-1: not sent).
+var _generation_sent := false
+var _loaded_generation := -1
+## [level name, its felled cells and plots' print] as the live minimap was made.
+var _map_print: Array = ["", ""]
+## Levels read from disk by _load_level and minimaps made on the main thread,
+## by level name (seamless_test's counts).
+var level_reads: Dictionary = {}
+var maps_made: Dictionary = {}
+
+
+## The hash of a "terrain" message: its layout, height and relief as sent
+## and its config.
+static func terrain_hash(data: Dictionary) -> String:
+	var hashing := HashingContext.new()
+	hashing.start(HashingContext.HASH_MD5)
+	for key: String in ["layout", "height", "relief"]:
+		# As var_to_bytes: never empty (an empty update is an engine error), its length in it.
+		hashing.update(var_to_bytes(key))
+		hashing.update(var_to_bytes(data.get(key, PackedByteArray())))
+	hashing.update(var_to_bytes(data.get("config", {})))
+	return hashing.finish().hex_encode()
+
+
+## Level [param zone]'s felled cells and plots as this client was told them
+## (_clearing_told, _plots_told), as one print; the cells in order.
+func _clearing_print(zone: String) -> String:
+	var parts := PackedStringArray()
+	parts.append("told %s" % _clearing_told.has(zone))
+	var cells: Dictionary = _clearing_told.get(zone, {})
+	var keys := cells.keys()
+	keys.sort()
+	for cell: Vector2i in keys:
+		parts.append("%d,%d,%s" % [cell.x, cell.y, cells[cell]])
+	parts.append("plots")
+	for plot: Variant in _plots_told.get(zone, []):
+		parts.append(var_to_str(plot))
+	return "|".join(parts).md5_text()
+
+
+## A client crossing into [param to_zone]: from a level on the world plane
+## into one that is not (a door or a stair), the level left is held, as it
+## was shown, laid, with its map. Into a plane zone, nothing (_take_left);
+## from an interior, what is held stays held. Held only when everything it is
+## checked by on the way back is known.
+func _hold_left(to_zone: String) -> void:
+	if not held_left or Net.is_authority():
+		return
+	var zones: Dictionary = Level.world_plane().get("zones", {})
+	if zones.has(to_zone) or not zones.has(map_name) or str(level.get("name", "")) != map_name:
+		return
+	drop_left()
+	if _loaded_generation < 0 or Regen.marked(map_name):
+		return
+	var map := {}
+	if minimap != null and minimap.image != null and str(_map_print[0]) == map_name and str(_map_print[1]) != "":
+		map = {"level": level, "cells": minimap.cells, "image": minimap.image}
+	_left = {"zone": map_name, "level": level, "map": map, "print": _clearing_print(map_name),
+		"map_print": str(_map_print[1]) if not map.is_empty() else "", "terrain": str(_terrain_hash.get(map_name, "")),
+		"generation": _loaded_generation, "clean": {}}
+
+
+## A client crossing into [param zone]: the level held, if it is that zone's
+## and still what the server would have it read: {kept} (its live level, and
+## {made}, its map, when the felled cells and plots it was left and drawn with
+## are still the told ones), {parsed} (its clean read, when they changed while
+## away), else {} (read as ever). Into a plane zone it is let go either way;
+## any doubt lets it go.
+func _take_left(zone: String) -> Dictionary:
+	if _left.is_empty() or not held_left or Net.is_authority():
+		return {}
+	var zones: Dictionary = Level.world_plane().get("zones", {})
+	if zone != str(_left["zone"]):
+		if zones.has(zone):
+			print("[zone] %s let go: crossed into %s (822 amended (6))" % [_left["zone"], zone])
+			drop_left()
+		return {}
+	var held := _left
+	drop_left()
+	var why := ""
+	if str((held["level"] as Dictionary).get("name", "")) != zone:
+		why = "another level's"
+	elif not _generation_sent or int(held["generation"]) < 0 or int(held["generation"]) != map_generation:
+		why = "its generation not the same, or not sent"
+	elif str(_terrain_hash.get(zone, "")) != str(held["terrain"]):
+		why = "its terrain changed"
+	elif Regen.marked(zone):
+		why = "a regenerating level"
+	if not why.is_empty():
+		print("[zone] %s held, let go (%s): read again (822 amended (6))" % [zone, why])
+		return {}
+	var now := _clearing_print(zone)
+	if now == str(held["print"]):
+		var made: Dictionary = held["map"] if not (held["map"] as Dictionary).is_empty() and str(held["map_print"]) == now else {}
+		print("[zone] %s held: not read again%s (822 amended (6))" % [zone, "" if not made.is_empty() else ", its map made again"])
+		return {"kept": held["level"], "made": made}
+	var clean: Dictionary = held["clean"]
+	if str(clean.get("name", "")) == zone:
+		print("[zone] %s held: its felled cells or plots changed while away, its clean read laid (822 amended (6))" % zone)
+		return {"parsed": clean}
+	print("[zone] %s held, let go (its felled cells or plots changed, no clean read yet): read again (822 amended (6))" % zone)
+	return {}
+
+
+## The level held let go (a read under way finishes; what it read is dropped).
+func drop_left() -> void:
+	_left = {}
+
+
+## The held level's clean read started on a worker, once (the room inside
+## whole: the read does not fight its build).
+func _read_left_clean() -> void:
+	if _left.is_empty() or _left_task != -1 or not (_left["clean"] as Dictionary).is_empty() or map_name == str(_left["zone"]):
+		return
+	var zone := str(_left["zone"])
+	_left_reading = [zone, str(_terrain_hash.get(zone, ""))]
+	_left_task = WorkerThreadPool.add_task(_read_left.bind(zone), false, "left level")
+
+
+## On a worker: zone [param zone]'s level read (as _read_neighbour).
+func _read_left(zone: String) -> void:
+	_left_read = Level.load_level(zone)
+
+
+## Each frame: a clean read done is kept with the level held if it is still
+## that zone's, read from the terrain it was held with.
+func _poll_left_read() -> void:
+	if _left_task == -1 or not WorkerThreadPool.is_task_completed(_left_task):
+		return
+	WorkerThreadPool.wait_for_task_completion(_left_task)
+	_left_task = -1
+	var read := _left_read
+	_left_read = {}
+	var reading := _left_reading
+	_left_reading = []
+	if _left.is_empty() or read.is_empty() or reading.size() != 2:
+		return
+	var zone := str(_left["zone"])
+	if str(read.get("name", "")) != zone or str(reading[0]) != zone or str(reading[1]) != str(_left["terrain"]) \
+			or str(reading[1]) != str(_terrain_hash.get(zone, "")):
+		return
+	_left["clean"] = read
 
 
 ## Client: the server's "near" answer (822): the zone's state came before
@@ -6352,6 +6695,9 @@ func _on_entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 	_tell_draft(entity, to)
 	_tell_hall_ahead(entity, to)
 	_leave_dead(entity, to)
+	var guard: Dictionary = _link_guard.get(entity.owner_peer, {})
+	if not guard.is_empty() and (str(guard["zone"]) != str(entity.zone) or not (guard["cells"] as Dictionary).has(to)):
+		_link_guard.erase(entity.owner_peer)  # 947: stepped off the way back.
 	_take_link(entity, to)
 
 
@@ -6372,6 +6718,8 @@ const SEALED_LINES := {"barrow_deep": "The stair down is barred from below."}
 ## [param entity] (a player) at level link [param to] goes through it, or is
 ## told it is closed or sealed; off any link, told again next time.
 func _take_link(entity: GridEntity, to: Vector2i) -> void:
+	if _held_off_link(entity, to):
+		return
 	for link: Dictionary in level.get("links", []):
 		if link["tile"] == to and (link.get("closed", false) or not shell_stands(link)):
 			# Shown, not travelled yet (decision 463): said once a stand.
@@ -19330,6 +19678,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var wanted := str(data.get("name", ""))
 		Net.server_version = str(data.get("server", Net.server_version))
 		map_generation = int(data.get("generation", 0))
+		_generation_sent = data.has("generation")  # A held left level needs it (822 amended (6)).
 		if not Net.is_authority() and Net.newer_version(Net.server_version, Net.claimed_version()) and not _told_newer:
 			# The same protocol, so it plays; the next start updates it.
 			_told_newer = true
@@ -27498,6 +27847,7 @@ func _reconnect() -> void:
 	_reconnecting = true
 	print("[net] lost the server; reconnecting every %d s for %d s" % [RECONNECT_EVERY, RECONNECT_FOR])
 	_drop_zone_entities()
+	drop_left()  # The server may come back changed (822 amended (6)).
 	var started := Time.get_ticks_msec()
 	var tries := 0
 	_connect_status("the server is restarting; trying again")

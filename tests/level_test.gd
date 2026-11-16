@@ -77,6 +77,7 @@ func _ready() -> void:
 	await _test_links_kept_clear()
 	await _test_sealed_link()
 	await _test_temple_stair()
+	await _test_out_of_the_shell()
 	_test_temple_town()
 	_test_barrow_won()
 	await _test_hall_door()
@@ -3267,6 +3268,71 @@ func _test_temple_town() -> void:
 ## The temple's stair (714, dungeon's side (2), on buildings' 715): the
 ## way up from the level below comes out beside the stair the building
 ## carries, wherever it stands, and the stair down sealed says its own line.
+## 947 (Jeff 11-15 18:48: "often you end up in the shell of the mughouse instead of the
+## zone"): out of the tavern he stands outside the inn's door, facing away, never in its
+## footprint; and set down on a way back, it does not take him till he steps off or his card lifts.
+func _test_out_of_the_shell() -> void:
+	print("
+== out of the Mughouse (947): outside its door, facing away; set down on a way back, held till a step off or the lift ==")
+	var wilds := Level.load_level("wilds")
+	var inns: Array = (wilds["buildings"] as Array).filter(func(each: Dictionary) -> bool: return str(each.get("inside", "")) == "umbrage_tavern")
+	_check(inns.size() == 1, "the wilds' inn with the Mughouse inside (%d)" % inns.size())
+	if inns.size() != 1:
+		return
+	var rect: Rect2i = inns[0]["rect"]
+	var ins: Array = (wilds["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "umbrage_tavern")
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "umbrage_tavern", "from_wilds")
+	await get_tree().process_frame
+	var tavern := Level.load_level("umbrage_tavern")
+	var outs: Array = (tavern["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "wilds")
+	_main.travel(Net.local_id, "wilds", str(outs[0]["to_spawn"]) if not outs.is_empty() else "from_tavern")
+	await get_tree().process_frame
+	var player := _player()
+	var at: Vector2i = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "wilds" and player != null and not rect.has_point(at) and World.distance(at, Rect2i(rect.position - Vector2i.ONE, rect.size + 2 * Vector2i.ONE).get_center()) < 12,
+		"out of the tavern: in the wilds, outside the inn's footprint %s, by it (%s)" % [rect, at])
+	var inward := Vector2i(clampi(rect.get_center().x - at.x, -1, 1), clampi(rect.get_center().y - at.y, -1, 1))
+	_check(player != null and player.facing != Vector2i.ZERO and player.facing.x * inward.x + player.facing.y * inward.y < 0, "facing away from it (%s, the inn %s)" % [player.facing if player else null, inward])
+	# Set down off the ways back, he has stood off them: a way in straight away takes him (a fresh click).
+	var link_in: Vector2i = ins[0]["tile"] if not ins.is_empty() else World.NO_CELL
+	_main._take_link(player, link_in)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "umbrage_tavern", "arrived off the ways back: the way in takes him at once (%s)" % _main.map_name)
+	# Set down ON a way back (main's (179,209), the inside door cell): held till he steps off, or his card lifts.
+	var door_cell := Vector2i(rect.end.x - 1, link_in.y)
+	for ends: String in ["step", "lift"]:
+		_main.travel(Net.local_id, "wilds", "from_tavern", {}, door_cell)
+		await get_tree().process_frame
+		player = _player()
+		_main._take_link(player, link_in)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check(_main.map_name == "wilds" and player != null and player.tile == door_cell, "set down on the door cell %s, a way in before %s: held" % [door_cell, ends])
+		if ends == "step":
+			_main._on_entity_moved(player, door_cell, door_cell + Vector2i(2, 0))
+		else:
+			_main._on_command(player, "view_ready", {"zone": player.zone})
+		_main._take_link(player, link_in)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check(_main.map_name == "umbrage_tavern", "after his %s, the way in takes him (%s)" % [ends, _main.map_name])
+	# Every shell in the wilds: its way out stands outside it, on a free cell, by its rule.
+	var was := World.enter_named("wilds")
+	var bad: Array[String] = []
+	for link: Dictionary in wilds["links"]:
+		var shell: Dictionary = Main.shell_of(wilds, link["tile"])
+		if shell.is_empty():
+			continue
+		var out: Array = _main.out_of_shell(wilds, shell, World.NO_CELL)
+		if (shell["rect"] as Rect2i).has_point(out[0]) or not World.is_free(out[0]) or (out[1] as Vector2i) == Vector2i.ZERO:
+			bad.append("%s %s" % [link["tile"], out])
+	World.enter(was)
+	_check(bad.is_empty(), "every shell's way out by its doors: outside, free, facing out (%s)" % [bad])
+	_main.load_map("test_room")
+
+
 func _test_temple_stair() -> void:
 	print("
 == the temple's stair (714): up beside it, wherever the temple stands; barred from below ==")

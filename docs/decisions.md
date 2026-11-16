@@ -52617,6 +52617,47 @@ card's build over frames gets it too; nothing drawn changes. Headless, the neigh
 611 -> 67 ms. seamless_test: the neighbour's glimpses' levels all read and kept before its land.
 Client only, protocol unchanged, no new class_name.
 
+822 amended (6): the level left by a door, held (the coordinator's approval, 11-15; the label from
+tools/decision_number.sh). Back out of the barrow into the wilds, a client read the wilds again in
+the "map" message's frame (perf's probe 5 on the Atlas: Level.load_level 497 ms, minimap.rebuild 111
+ms, of a 704 to 823 ms frame). Nothing held it: 822 holds only a neighbour across a plane link
+(_update_neighbour, plane_links), the barrow is not on the plane, and the crossing in drops what a
+neighbour holds (_repaint, drop_neighbour). Main now holds one more thing, beside the neighbour and
+not of its package: the plane level a client last left by a door or stair link (the wilds into the
+barrow, the inn, the smithy; the castle into its halls), held_left, on for every client from its
+first build (--no-held-left turns it off, for a test). What is held is the live level and the live
+minimap as they were shown, at no cost: after the crossing nothing writes that dictionary
+(_on_clearing and _on_clearing_changed lay only the zone in play, World._set_terrain copies it,
+Client3D and Minimap write no terrain key). With it, how it was laid and drawn: a print of the felled
+cells and plots as told when it was left and when its map was made (_clearing_print), the "terrain"
+message's hash it was read from (terrain_hash, "" when none came) and the "map" message's
+generation. Once the interior's room is whole (_on_room_built; a headless client at once), a clean
+read of the level is made on a worker, as the neighbour's is (Level.load_level; nothing laid on the
+worker, so no Clearing code runs off the main thread). Back out (_enter_level, which _client_zone
+now loads by), the level is taken: the same prints, its live level and map shown, nothing read, no
+map made (the kept path: its entities, starts, centre, fires and stamp set fresh as ever, only the
+lay skipped, the print proving it current); its felled cells or plots told otherwise while away
+(residents fell in the wilds), the clean read laid by today's path and its map made again (only the
+read saved; the live one can't be laid again: lay_plots appends, and a cell grown back and no longer
+told would stay felled); any doubt (another level's name, a generation changed or not sent, the
+terrain's hash changed, a regenerating level, no clean read in yet for a changed print) lets it go
+and reads as ever, never waiting. Held through deeper interiors (barrow, its deep, barrow, wilds); let
+go into any other plane zone, at a reconnect, and when another is held. One: a plane level is the only
+costly read (the barrow's 10 ms here, the wilds' 304 ms headless on this PC, 497 on the Atlas). Held,
+about 26 MB on this PC (OS static memory: the live wilds kept rather than freed, 12.7 MB, its map 0.3,
+the clean read 12.7). Headless here, the wilds' level step back out (_enter_level) 241 -> 3.3 ms;
+perf's pair (on both laptops, against --no-held-left) names the frame. A host holds every zone open and never reads one again; nothing changes there.
+The huts and homes are inside the wilds' own level, no crossing. left_test: on by default; the join
+reads as ever and holds nothing; into the barrow the wilds held, its own level and map; no clean read
+while the barrow's room builds, one once it is whole; back out nothing read, no map made, set fresh;
+a quick in and out, and barrow, deep, barrow, wilds, held throughout; a stump told while away lays
+the clean read and makes the map; changed before the clean read is in, read; a changed terrain,
+another generation, none sent, a level loaded with none sent, another plane zone each let go;
+--no-held-left today's path; a host holds nothing; a reconnect lets go. view_test's
+_test_fields_own_state (660 amended (10)) lists Main's functions on _neighbour_level: _client_zone's
+read of the kept level (seamless only) moved into _enter_level, the list with it. Client only,
+protocol unchanged, no new class_name.
+
 Still to come, each behind the flag. Next, the maps step: the five corridors, each neighbour's plane
 origin 16 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam
 − 8 with spawns on the same world cell, and a level_test check that both maps agree in the overlap.
@@ -58770,3 +58811,42 @@ rest within 8), and beside sleepers; each played line names its source, its acti
 and each sound _idle_people makes and each one too far to hear has a line of its own.
 
 Client sound only; protocol unchanged; no new class_name.
+## 947. Out of a building with an inside, outside its door; no way straight back; held hands wait out the card (terrain)
+
+Jeff, 2026-11-15 18:48 (v0.1.219, joined): "next work on two things with the mughouse, 1 entry is buggy, often
+you end up in the shell of the mughouse instead of the zone". The coordinator split the mend: maps has the
+level's side (where the inn's links sit, what Level._building_links allows, the footprint, the boot rule, the
+level rows); terrain has the crossing's side, its (2) and (3), approved as drawn. Main.travel's 714 override put
+one coming out of the tavern beside the wilds' first link back (_beside_link, east first): (179,208), the inn's
+inside door cell, in its footprint behind a shut door and one cell from the link he came through; with the links
+moved onto the door cells it would have been (178,208), deeper in. And Main._arriving held only new presses under
+the arrival card: a walk key or the button held from the tavern walked the new body on (_free_drive is no input
+event), straight back through the door or into the shell.
+(2) A link back carried by a building whose "inside" names a level (Main.shell_of: the inn, not the walk-in
+temple, whose stair keeps 714) brings him out by Main.out_of_shell: the link's own spawn when it is free and
+outside the footprint (the wilds' from_tavern, (181,208)), else the first free outer cell of one of its doors,
+facing out through it, else the nearest free cell outside the footprint from its front. His record's facing is
+set away from the building, so he stands facing out. It reads the building's rect, doors and "inside" and the
+link's "building", never which cell a link sits on, so maps' take lands before or after it.
+(3a) A travel that sets him down ON one of its ways back guards them (Main._link_guard, by peer): the new level's
+links to the level he came from, and the door cells of the building carrying them (one set down off them has
+stood off them already: the castle's arrival beside its link, the tavern's (5,13), the wilds' from_tavern).
+_take_link does not take him through one of them (said once in
+the server log: "[level] X at the link at C held: just came through, not stepped off yet") until his first step
+onto any other cell (_on_entity_moved) or his card's lift (view_ready, _view_ready) ends it: it is for a key
+held from the old place (an older client's, under the card) and a stale route, never a fresh click (the
+coordinator's ruling: with ui's click on the door, a leaver who clicks it goes back in). Arriving on a guarded cell, he steps off it as anywhere; a join
+(_admit) carries none, so a body the boot rule sets on a front cell is under no guard. Travel itself (a waystone,
+the console's move, a test) is not guarded.
+(3b) While the card holds the hands (_arriving), _free_intent walks nothing, a held key's or a route's; a walk key
+or the button held at any frame under it (Main._held_through) walks nothing after the lift either, till all are
+let go; a fresh press walks. A scripted walk (--test-walk, --test-latency) is a test's and walks on as before.
+(3c) A joined client drops its own route, chase, held steer and waiting click at its zone change (_client_zone),
+as 689 amended (13) does at a host's travel (Main._drop_own_route, both).
+Rows: level_test _test_out_of_the_shell (the real wilds and tavern: out outside the inn's footprint, facing away;
+set down off the ways back, the way in at once; set down on the inside door cell, the way in held till a step off
+and, again, till the lift; every wilds shell's way out outside, free, facing out), failing on main at the first
+((179,209)) and the held rows; controls_test
+_test_held_through_card (W held under the card and after the lift walks nothing; let go; a fresh press walks),
+failing on main under the card. (3c) by reading; ui-design's joined after-run (60 entries, 20 leavings with
+nothing held, W held and a route queued) is its proof. Server and client; protocol unchanged; no new class_name.

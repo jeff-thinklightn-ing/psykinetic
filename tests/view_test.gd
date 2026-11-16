@@ -16608,7 +16608,8 @@ func _test_fields_own_state() -> void:
 				touching.append(name)
 				break
 	touching.sort()
-	var expected: Array[String] = ["_can_swap", "_client_zone", "_lay_neighbour", "_open_kept", "_poll_neighbour_read", "_swap_neighbour", "drop_neighbour"]
+	# 822 amended (6): _client_zone's read (the kept level, seamless only) moved into _enter_level.
+	var expected: Array[String] = ["_can_swap", "_enter_level", "_lay_neighbour", "_open_kept", "_poll_neighbour_read", "_swap_neighbour", "drop_neighbour"]
 	var drop_text := "\n".join(PackedStringArray(main_bodies.get("drop_neighbour", [])))
 	var release_text := "\n".join(PackedStringArray(_bodies_of("res://client3d/client3d.gd").get("release_room", [])))
 	var chain := drop_text.contains("release_room()") and release_text.contains("_end_fields_task()")
