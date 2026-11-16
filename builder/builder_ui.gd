@@ -20,6 +20,9 @@ var _drag_from := Vector2i(-1, -1)
 var panel: BuilderPanel
 var _box: LineEdit
 var _status: Label
+## The status line's backed plate (ui-design, 2026-11-16: the bare line was pale on Umbrage's pale wall):
+## the HUD key hints' dark plate, hugging the words, at the top centre.
+var _status_plate: PanelContainer
 ## The cursor's cell and the player's, while on (decision 537).
 var _coords: Label
 var _coords_at := Vector2i(-2, -2)
@@ -36,18 +39,21 @@ var _test_unfold := false
 
 
 func _ready() -> void:
+	_status_plate = PanelContainer.new()
+	_status_plate.name = "BuilderStatusPlate"
+	_status_plate.theme_type_variation = &"HintStrip"
+	_status_plate.anchor_left = 0.5
+	_status_plate.anchor_right = 0.5
+	_status_plate.offset_top = 90
+	_status_plate.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_status_plate.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_status_plate.visible = false
+	main.get_node("HUD").add_child(_status_plate)
 	_status = Label.new()
 	_status.name = "BuilderStatus"
-	_status.anchor_left = 0.5
-	_status.anchor_right = 0.5
-	_status.offset_left = -900
-	_status.offset_right = 900
-	_status.offset_top = 90
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.theme_type_variation = &"Outlined"
-	_status.visible = false
-	main.get_node("HUD").add_child(_status)
+	_status.theme_type_variation = &"HintWords"
+	_status_plate.add_child(_status)
 	_coords = Label.new()
 	_coords.name = "BuilderCoords"
 	_coords.anchor_left = 0.5
@@ -265,7 +271,7 @@ func toggle() -> void:
 		if state == "proposal":
 			_send({"op": "discard"})
 		_reset()
-		_status.visible = false
+		_status_plate.visible = false
 
 
 ## Esc: the proposal discarded, else the box closed, else the area let go.
@@ -347,7 +353,8 @@ func _place_panel(kept := "") -> void:
 	var points := outline_points()
 	# The bodies count only as the home is first chosen (the ask, a new area); an answer keeps it.
 	var bodies := body_rects() if kept == "" else {}
-	var home := choose_home(points, pane, screen, taken, kept, bodies)
+	var marks := answer_marks() if kept != "" else {}
+	var home := choose_home(points, pane, screen, taken, kept, bodies, marks)
 	panel.place(home)
 	# A still's log says which home and why (its outline seen from the camera as it stood then).
 	var middle := Vector2.ZERO
@@ -358,12 +365,45 @@ func _place_panel(kept := "") -> void:
 		home, kept if kept != "" else "none", (middle / maxf(points.size(), 1)).round(), shown, points.size(), screen.round(), taken.size(),
 		", one at the right, so left" if window_at_right(pane, screen, taken) else "",
 		"not counted" if kept != "" else "on the lines below"])
+	if not marks.is_empty():
+		print("[builder]   the ghost's marks under each home: left %d of %d counted (%d of %d in all), right %d (%d)" % [
+			covered(marks["counted"], BuilderPanel.home_rect("left", pane, screen)), marks["counted"].size(),
+			covered(marks["all"], BuilderPanel.home_rect("left", pane, screen)), marks["all"].size(),
+			covered(marks["counted"], BuilderPanel.home_rect("right", pane, screen)), covered(marks["all"], BuilderPanel.home_rect("right", pane, screen))])
 	# One line a box, short (stills12's one line was cut off at the companion's box): x, y, width, height.
 	for who: String in ["player", "companion"]:
 		for box: Rect2 in bodies.get(who, []):
 			print("[builder]   %s's box: x %d, y %d, %d wide, %d high" % [who, box.position.x, box.position.y, box.size.x, box.size.y])
 	for why: String in bodies.get("unseen", []):
 		print("[builder]   an own companion unseen: %s" % why)
+
+
+## The answer's ghost as drawn on the screen (HUD units, as outline_points'), for choose_home at an answer:
+## {"counted": the marks of what the change takes up or alters (gone and changed spots, changed cells),
+## "all": those and the new and kept spots}; each spot its mark with its arrow (Client3D.spot_mark_rect),
+## each cell its square. Empty without the view or an answer.
+func answer_marks() -> Dictionary:
+	var view: Client3D = main._client3d
+	if view == null or _proposal.is_empty():
+		return {}
+	var counted: Array = []
+	var all: Array = []
+	for spot: Variant in _proposal.get("spots", []):
+		if not spot is Array or (spot as Array).size() < 7:
+			continue
+		var rect := view.spot_mark_rect(spot)
+		if not rect.has_area():
+			continue
+		all.append(rect)
+		if str(spot[6]) in ["gone", "changed"]:
+			counted.append(rect)
+	for cell: Variant in _proposal.get("cells", []):
+		if cell is Array and (cell as Array).size() >= 2:
+			var rect := view.cell_screen_rect(Vector2i(int(cell[0]), int(cell[1])))
+			if rect.has_area():
+				counted.append(rect)
+				all.append(rect)
+	return {"counted": counted, "all": all}
 
 
 ## The player's and his own companions' figures on the screen ({"player": [Rect2], "companion":
@@ -411,12 +451,29 @@ func body_rects() -> Dictionary:
 ## stills12, 2026-11-15: a person outranks a line on the ground, so the bodies come before the outline).
 ## Equal on bodies, the home covering fewer of the points, and on a tie the one whose middle is farther
 ## from the points' middle (the side away from the area), left if those are equal too.
-static func choose_home(points: Array, pane: Vector2, screen: Vector2, taken: Array, kept := "", bodies := {}) -> String:
+##
+## At an answer, [param marks] ({"counted": [Rect2], "all": [Rect2]}, the ghost's marks as drawn on the
+## screen: answer_marks) may move it once (ui-design's ruling, 2026-11-16, on builderlook_bd50a9723: the
+## one spot an ask took up lay under the pane's corner): the home covering fewer of the counted marks (gone
+## and changed spots, changed cells), each grown MARK_ROOM; on a tie the one covering fewer of all of them,
+## new ones too; still tied, the kept home. The other home must be free of [param taken], else the kept
+## one stays whatever it covers.
+static func choose_home(points: Array, pane: Vector2, screen: Vector2, taken: Array, kept := "", bodies := {}, marks := {}) -> String:
 	var left := BuilderPanel.home_rect("left", pane, screen)
 	var right := BuilderPanel.home_rect("right", pane, screen)
 	if window_at_right(pane, screen, taken):
 		return "left"
 	if kept in ["left", "right"]:
+		var other := "right" if kept == "left" else "left"
+		var other_rect := right if other == "right" else left
+		var kept_rect := left if other == "right" else right
+		if marks.is_empty() or taken.any(func(rect: Variant) -> bool: return rect is Rect2 and (rect as Rect2).intersects(other_rect)):
+			return kept
+		for key: String in ["counted", "all"]:
+			var on_kept := covered(marks.get(key, []), kept_rect)
+			var on_other := covered(marks.get(key, []), other_rect)
+			if on_kept != on_other:
+				return other if on_other < on_kept else kept
 		return kept
 	var under := func(home: Rect2) -> int: return points.filter(func(point: Variant) -> bool: return home.has_point(point)).size()
 	var on_left: int = under.call(left)
@@ -440,6 +497,15 @@ static func choose_home(points: Array, pane: Vector2, screen: Vector2, taken: Ar
 		middle += point
 	middle /= points.size()
 	return "right" if right.get_center().distance_to(middle) > left.get_center().distance_to(middle) else "left"
+
+
+## How far round a ghost's mark a home counts it as covered (HUD px; ui-design, 2026-11-16).
+const MARK_ROOM := 12.0
+
+
+## How many of [param rects] (marks as drawn) meet [param home] once grown by MARK_ROOM.
+static func covered(rects: Array, home: Rect2) -> int:
+	return rects.filter(func(rect: Variant) -> bool: return rect is Rect2 and (rect as Rect2).grow(MARK_ROOM).intersects(home)).size()
 
 
 ## Whether a rect of [param taken] meets the room a [param pane] pane may take in the right home on a
@@ -511,7 +577,7 @@ func on_message(data: Dictionary) -> void:
 			var beyond := "" if made.is_empty() else "A new level, %s (%d x %d), beyond the %s edge (outlined in orange)." % [
 				made.get("name", ""), int(made.get("size", [0, 0])[0]), int(made.get("size", [0, 0])[1]), made.get("side", "")]
 			# The answer is the panel's (885); the status line stands aside.
-			_status.visible = false
+			_status_plate.visible = false
 			panel.show_answer(data, beyond)
 			if _test_unfold:
 				panel.unfold_all()
@@ -643,5 +709,8 @@ var _test_answer_exit := 0.0
 
 func _say(text: String) -> void:
 	_status.text = text
-	_status.visible = true
+	_status_plate.visible = true
+	var wide := _status_plate.get_combined_minimum_size().x  # Hugging the words, about the top centre.
+	_status_plate.offset_left = -wide / 2.0
+	_status_plate.offset_right = wide / 2.0
 	print("[builder] " + text.get_slice("\n", 0))

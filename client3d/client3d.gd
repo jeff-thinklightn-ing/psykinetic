@@ -6560,6 +6560,41 @@ func _add_spot_mark(spot: Array) -> void:
 		_builder_marks.add_child(cross)
 
 
+## [param spot]'s mark (a show_builder row: x, y, face x, face y, pose, use, state) as drawn on the
+## screen, in viewport coordinates as screen_of_tile's: its cell's square and its arrow to the face cell
+## with the head's width (the builder pane's home keeps off what an answer takes up, ui-design 2026-11-16).
+## Empty without the camera.
+func spot_mark_rect(spot: Array) -> Rect2:
+	if _camera == null:
+		return Rect2()
+	var at := Vector2i(int(spot[0]), int(spot[1]))
+	var face := Vector2(int(spot[2]) - at.x, int(spot[3]) - at.y)
+	var y := _height_in(at, Vector2(at)) + ON_FLOOR * 5.0
+	var corners: Array[Vector2] = [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]
+	if face != Vector2.ZERO:
+		var ahead := face.normalized()
+		var side := Vector2(-ahead.y, ahead.x)
+		corners.append(ahead * SPOT_TIP + side * SPOT_HEAD)
+		corners.append(ahead * SPOT_TIP - side * SPOT_HEAD)
+	var rect := Rect2()
+	for i in corners.size():
+		var on := _camera.unproject_position(Vector3(at.x + corners[i].x, y, at.y + corners[i].y))
+		rect = Rect2(on, Vector2.ZERO) if i == 0 else rect.expand(on)
+	return rect
+
+
+## [param cell]'s square as drawn on the ground, on the screen (viewport coordinates); empty without
+## the camera.
+func cell_screen_rect(cell: Vector2i) -> Rect2:
+	if _camera == null:
+		return Rect2()
+	var y := _height_in(cell, Vector2(cell))
+	var rect := Rect2(_camera.unproject_position(Vector3(cell.x - 0.5, y, cell.y - 0.5)), Vector2.ZERO)
+	for corner: Vector2 in [Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]:
+		rect = rect.expand(_camera.unproject_position(Vector3(cell.x + corner.x, y, cell.y + corner.y)))
+	return rect
+
+
 ## A spot mark's arrow to its face: its shaft's half-width, where the head
 ## starts, its tip (a cell out, on the face cell's middle) and the head's half-width.
 const SPOT_SHAFT := 0.08

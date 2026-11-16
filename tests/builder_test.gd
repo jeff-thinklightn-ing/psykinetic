@@ -2474,6 +2474,31 @@ The temple's door opens on the square."], "fault": false},
 		"both homes over a body: the player's kept clear before the companion's; equal on bodies, the outline decides")
 	_check(BuilderUI.choose_home(low_left, pane, screen, [], "right", {"player": [under_right], "companion": [under_right]}) == "right",
 		"an answer keeps its home though a body walked under it")
+	# The ghost's marks at an answer (ui-design, 2026-11-16, builderlook_bd50a9723: the one spot taken up lay
+	# under the pane's corner): a home over fewer gone or changed marks, each grown MARK_ROOM; a tie on them, fewer
+	# of all; still tied, the kept home; the other home held by a window, the kept home whatever it covers.
+	var left_home := BuilderPanel.home_rect("left", pane, screen)
+	var corner := Rect2(left_home.position.x + left_home.size.x + 4.0, left_home.end.y - 40.0, 60.0, 60.0)  # Just past its corner.
+	var far_mark := Rect2(1800, 1700, 60, 60)
+	_check(not corner.intersects(left_home) and BuilderUI.covered([corner], left_home) == 1
+		and BuilderUI.choose_home(low_left, pane, screen, [], "left", {}, {"counted": [corner], "all": [corner, far_mark]}) == "right",
+		"a gone mark at the left home's corner (outside it, inside MARK_ROOM): the answer moves the pane right")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [], "left", {}, {"counted": [far_mark], "all": [far_mark]}) == "left"
+		and BuilderUI.choose_home(low_left, pane, screen, [], "right", {}, {"counted": [], "all": []}) == "right",
+		"under neither home, or no marks: the home chosen at the ask")
+	var new_on_left := Rect2(left_home.position + Vector2(40, 40), Vector2(60, 60))
+	var right_corner := Rect2(right_home.position + Vector2(10, 10), Vector2(60, 60))
+	_check(BuilderUI.choose_home(low_left, pane, screen, [], "left", {}, {"counted": [corner, right_corner], "all": [corner, right_corner, new_on_left]}) == "right"
+		and BuilderUI.choose_home(low_left, pane, screen, [], "right", {}, {"counted": [corner, right_corner], "all": [corner, right_corner]}) == "right",
+		"a tie on the counted marks: the home over fewer of all of them, new ones too; tied on those, the kept home")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [Rect2(3000, 1000, 600, 400)], "left", {}, {"counted": [corner], "all": [corner]}) == "left"
+		and BuilderUI.choose_home(low_left, pane, screen, [Rect2(100, 400, 600, 400)], "right", {}, {"counted": [right_corner], "all": [right_corner]}) == "right",
+		"the other home held by a window: the kept home stays, though a mark lies under it")
+	# The cut-down answer's separator (ui-design, 2026-11-16): "; " between results, a space after a head's ":".
+	_check(BuilderPanel.brief_of(PackedStringArray(["(Stub) Spots laid where I could:", "laid a fire spot at (192, 210), sit facing (193, 210)", "",
+		"  ", "laid a square spot at (194, 210), stand facing (195, 210)"]))
+		== "(Stub) Spots laid where I could: laid a fire spot at (192, 210), sit facing (193, 210); laid a square spot at (194, 210), stand facing (195, 210)",
+		"the cut-down answer: a head and two results read as one line, '; ' between them, blank lines none")
 	# The right home's reach: the pack below the corner map (its rect at 16:9, ui's open_window_rects) misses the
 	# reading pane but not the full one, which opens in the same home; a window at the left does not count.
 	var pack_at := Rect2(2194, 1309, 1606, 811)

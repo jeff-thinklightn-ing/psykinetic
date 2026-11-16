@@ -56956,6 +56956,26 @@ bone and his head and is narrower than his Body's rest box; his column alone run
 play is unchanged. Client, and the server's stub (tools only); protocol unchanged, no new class_name; a
 bullet in voice's words.
 
+885 amended (2) (the decision-number script's label; ui-design's ruling, 2026-11-16, on its joined look of an ask in Umbrage,
+C:/dev/review/ui-design/looks/builderlook_bd50a9723/, brought to the coordinator as that look's worst): the one spot the ask
+took up (gone, 188,205) lay under the pane's lower-left corner, a faint arc showing, so a builder could not see what the
+change took away before Enter. Now at an answer (and there only: placed once, nothing moves after, the camera's pans
+included) BuilderUI.choose_home takes the ghost's marks (answer_marks: each spot's mark with its arrow,
+Client3D.spot_mark_rect; each changed cell's square, cell_screen_rect; on the screen as drawn): the home covering fewer of
+the gone and changed spot marks and changed cells, each grown MARK_ROOM (12 HUD px; the mark's centre sat clear while its
+arc was hidden), on a tie the one covering fewer of all the answer's marks, new and kept ones too, and still tied the home
+chosen at the ask, as 885 amended (1) has it. The other home must be free of Main.open_window_rects, else the kept home stays
+whatever it covers. The home's log line says how many marks each home covers. Two more from the look, the same take: the
+cut-down answer joined its lines with a space, so the stub's results ran into one another ("...sit facing (193, 210) laid
+a square spot..."); BuilderPanel.brief_of joins them with "; " (a result line reads as a clause), a plain space after a
+line ending in ":" or a sentence's own stop, blank lines none (Tab's whole answer keeps its lines). And the status line
+("Built. Drag out another area, ...") was small pale text on Umbrage's pale wall: it sits on the HUD key hints' dark plate
+(a PanelContainer, HintStrip, the words HintWords for Outlined) at the same top centre, hugging the words; no theme entry,
+colour or size in the script. builder_test: a gone mark just past the left home's corner, inside MARK_ROOM, moves the pane
+right; under neither home or no marks, the ask's home; a tie on the counted marks goes to the home over fewer of all, tied
+again the kept home; the other home held by a window keeps the kept home; a head and two results read as one line with
+"; ". Client only; protocol unchanged; no new class_name; a bullet.
+
 878 amended (1): saturn's slot is taken over at once from a landing gone on this PC (release's ask and conditions, the
 coordinator's approval and its added case, 2026-11-13; label from tools/decision_number.sh). perf-timed's landing lost
 its turn at 22:50: its prepare waited the full 10 minutes on a slot ("physics 2b928b9f7", 1332 s) whose landing had

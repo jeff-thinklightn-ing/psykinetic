@@ -248,7 +248,7 @@ func show_answer(data: Dictionary, beyond := "") -> void:
 			_body.add_child(_part(head, lines), true)
 	_brief_wraps(true)
 	_working_dots.visible = false
-	_brief_words.text = keep_whole(" ".join(said))
+	_brief_words.text = keep_whole(brief_of(said))
 	_brief_words.max_lines_visible = BRIEF_LINES
 	_brief_fault.visible = not fault.is_empty()
 	_brief_fault_head.text = str(fault.get("head", ""))
@@ -356,6 +356,22 @@ func brief_text() -> String:
 
 ## [param text] with each coordinate "(190, 199)" and size "14 x 10" held
 ## together by no-break spaces, so a line never breaks inside one.
+## The answer's lines as the cut-down pane reads them, one line (ui-design, 2026-11-16, on
+## builderlook_bd50a9723: joined by a space the stub's results ran into one another): joined with "; ", a
+## result line being a clause; after a line ending in ":" (a head) or a sentence's own stop, a plain space.
+## Blank lines and runs of them count as none; the overrun's ellipsis is the Label's, after no separator.
+static func brief_of(lines: PackedStringArray) -> String:
+	var out := ""
+	for line in lines:
+		var said := line.strip_edges()
+		if said.is_empty():
+			continue
+		if not out.is_empty():
+			out += " " if out.right(1) in [":", ".", "!", "?"] else "; "
+		out += said
+	return out
+
+
 static func keep_whole(text: String) -> String:
 	if _whole == null:
 		_whole = RegEx.create_from_string("\\((-?[0-9]+), (-?[0-9]+)\\)|([0-9]+) x ([0-9]+)")
