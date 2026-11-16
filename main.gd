@@ -1825,6 +1825,12 @@ func talks_on_click(entity: GridEntity) -> bool:
 ## opens at once (_open_talk); from afar the player walks beside them and
 ## it opens on arrival (_update_talk). Holding the button does not steer
 ## this walk away.
+## The most cells a walk to a talk's stand cell closes before it gives up (935 amended (3)): a stand cell is a few cells from its
+## person, and the worst real route to one on Umbrage's lattice closes 904 (click_route_test's survey, 2297 routes), so a stand cell a
+## wall or a body shuts off ends at this, not at the zone's CLICK_SEARCH_TILES, and the walk goes at his own cell.
+const TALK_STAND_SEARCH_TILES := 2500
+
+
 func _talk_to(player: Player, friend: GridEntity) -> void:
 	# Your own companion beside you: she makes way (the hands, as a bump;
 	# the server's "make_way"). Jeff on v0.1.166, body-blocked by Pip.
@@ -1839,7 +1845,7 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
 	if beside == NONE:
 		return
-	_move_click(player, beside)
+	_move_click(player, beside, true, TALK_STAND_SEARCH_TILES)
 	# 935 amended (3): a stand cell no route reaches (the healer at work in the one cell inside his shut door: his body shuts the
 	# hut's inside off, so every cell beside him is walled in, and the click did nothing) is walked at his own cell instead: a route
 	# to an occupied goal exists, and the walk stops at his shut door for the step to open (_update_talk). The route the click just
@@ -3009,7 +3015,7 @@ func _apply_azimuth() -> void:
 ## A move click: the player's route to [param tile] (NONE: nowhere near the
 ## floor, a stop) and a ripple there. Held, the button steers to the cursor
 ## (_free_intent). Nothing before its body's free state is heard (703).
-func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
+func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles := World.CLICK_SEARCH_TILES) -> void:
 	_pack_wanted = null
 	_cast_wanted = NONE  # 805 amended (11): a walk ordered drops a far cast (_fish_click sets it after).
 	_throne_wanted = NONE  # 896: likewise a far throne (_throne_click sets it after).
@@ -3022,7 +3028,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 		if player != null and tile != NONE:
 			_free_waiting = {"tile": tile, "zone": String(player.zone), "until": Time.get_ticks_msec() + FREE_WAIT_MSEC}
 		return
-	_free_route(player, tile)
+	_free_route(player, tile, search_tiles)
 	if _test_holding:
 		_test_hold_counts["orders"] += 1
 	if ripple_it and tile != NONE:
@@ -3839,7 +3845,7 @@ func _guide_taken_over(player: Player) -> void:
 
 ## A click on [param tile]: its route (World.walk_path's cells), steered
 ## along; the button held from here steers to the cursor instead.
-func _free_route(player: Player, tile: Vector2i) -> void:
+func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEARCH_TILES) -> void:
 	_free_taken_over(player)
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
@@ -3856,7 +3862,7 @@ func _free_route(player: Player, tile: Vector2i) -> void:
 	# finish (the latency table's click stop went on 0.4 cells into it).
 	tile = clear_of_fire(tile, from, World.is_burning, World.is_walkable)
 	if tile != NONE and tile != from and tile != Vector2i(shown.round()):
-		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
+		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, search_tiles):
 			path.append(cell)
 	_free["path"] = path
 

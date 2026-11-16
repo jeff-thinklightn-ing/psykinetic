@@ -50,6 +50,7 @@ func _ready() -> void:
 		_test_go_in()
 		_test_footprint_click()
 		_test_door_talk()
+		_test_stand_cell_routes()
 	await _test_click_routes_agree()
 	print("\nRESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -257,10 +258,14 @@ func _test_door_talk() -> void:
 	var stand: Vector2i = _main._stand_to_talk(body, street)
 	var routed := not World.walk_path(World.free_cell(player, Vector2(player.tile)), stand, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES).is_empty()
 	_check(stand != Main.NONE and not routed, "the stand cell beside him inside the hut, %s, has no route (his body shuts the entry)" % stand)
+	var closed0 := World.path_closed
 	_main._talk_to(player, body)
+	var closed_by := World.path_closed - closed0
 	var path: Array = _main._free.get("path", [])
 	_check(_main._talk_wanted == body and not path.is_empty() and path.back() == inside,
 		"the click walks at his own cell %s (%d cells), and the talk is wanted on arrival" % [inside, path.size()])
+	_check(closed_by <= Main.TALK_STAND_SEARCH_TILES + 300,
+		"the stand cell's search ended at its own bound %d, not the zone's %d (the click closed %d cells in all)" % [Main.TALK_STAND_SEARCH_TILES, World.CLICK_SEARCH_TILES, closed_by])
 	# The walk does not open a shut door; the step does (E's "door" command). Every walked talk: two cells off it waits, at the door's step
 	# the door is opened, then the talk is let through; with him at the entry (the walk at his cell) and off it (a stand cell inside).
 	for him: Vector2i in [inside, Vector2i(150, 233)]:
@@ -322,6 +327,58 @@ func _test_door_talk() -> void:
 			"in the open: the walk is to the stand cell %s beside him, as before (%s)" % [stand_open, way.back() if not way.is_empty() else "none"])
 	_main._talk_wanted = null
 	_main._free["path"] = []
+
+
+## 935 amended (3): how many cells a real stand-cell route ever closes, for a cap on the stand cell's own search (perf's and ui's design).
+## A talker at every fifth cell of Umbrage's room, a player starting from the eight ways at 4 and at 10 cells off: the stand cell
+## Main._stand_to_talk gives, the route the click plans to it (World.walk_path as _free_route plans it), the cells closed; the worst is
+## printed with its talker's cell and the start, and any stand cell with no route is counted (the healer in his entry is one).
+func _test_stand_cell_routes() -> void:
+	print("
+== the cells a stand cell's route closes, Umbrage's lattice (935 amended (3)) ==")
+	var player := _player()
+	var body: GridEntity = null
+	for entity: GridEntity in World.get_entities():
+		if entity != player and entity.spawned and not entity is Player:
+			body = entity
+			break
+	var room := Rect2i(165, 185, 71, 56)  # The wilds' room "umbrage" (levels/wilds/level.json).
+	if player == null or body == null:
+		_check(false, "a player and a body")
+		return
+	var routes := 0
+	var none := 0
+	var worst := {"closed": -1, "talker": Vector2i.ZERO, "start": Vector2i.ZERO, "stand": Vector2i.ZERO, "length": 0}
+	var worst_near := 0
+	for y in range(room.position.y, room.end.y, 5):
+		for x in range(room.position.x, room.end.x, 5):
+			var talker := Vector2i(x, y)
+			if not World.is_walkable(talker) or World.get_entity_at(talker) != null:
+				continue
+			World._relocate(body, talker)
+			for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1)]:
+				for reach in [4, 10]:
+					var start: Vector2i = talker + way * reach
+					if not World.is_walkable(start) or World.get_entity_at(start) != null or World.distance(start, talker) <= Main.TALK_REACH:
+						continue
+					var stand: Vector2i = _main._stand_to_talk(body, start)
+					if stand == Main.NONE or stand == start:
+						continue
+					var c0 := World.path_closed
+					var path := World.walk_path(start, stand, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES)
+					var closed := World.path_closed - c0
+					if path.is_empty():
+						none += 1
+						continue
+					routes += 1
+					if closed > int(worst["closed"]):
+						worst = {"closed": closed, "talker": talker, "start": start, "stand": stand, "length": path.size()}
+	print("  %d stand-cell routes read, %d with no route; the worst closes %d cells (talker %s, from %s, stand cell %s, %d cells long); bound %d" % [
+		routes, none, worst["closed"], worst["talker"], worst["start"], worst["stand"], worst["length"], World.CLICK_SEARCH_TILES])
+	_check(routes > 100 and int(worst["closed"]) <= World.CLICK_SEARCH_TILES / 2,
+		"every stand-cell route that exists closes at most half the bound (%d of %d)" % [worst["closed"], World.CLICK_SEARCH_TILES / 2])
+	World._relocate(body, Vector2i(152, 233))
+	World._relocate(player, Vector2i(149, 231))
 
 
 ## Every zone the game loads (Level.names(), and each regenerating level's
