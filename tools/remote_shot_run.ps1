@@ -43,7 +43,7 @@
 #   -Mode parse   a tour's scripts (-Dir: its name) checked in the clone, parse errors only
 #   -Mode cache   the cache's warm and keep steps alone on a scratch run folder (the test's)
 param(
-	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args", "cache")][string]$Mode,
+	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args", "cache", "load")][string]$Mode,
 	[string]$Dir = "",
 	[string]$Root = "D:\psykinetic",
 	[string]$Runs = "D:\psykinetic-runs",
@@ -81,6 +81,53 @@ function Power-State {
 	$scheme = (& powercfg.exe /getactivescheme 2>$null) -replace '^.*\(', '('
 	$gpu = try { (& nvidia-smi.exe --query-gpu=pstate,clocks.gr,clocks.mem,temperature.gpu,power.draw --format=csv,noheader 2>$null) -join "; " } catch { "no nvidia-smi" }
 	return "$(if ($battery) { $battery -join '; ' } else { 'no battery' }); scheme $scheme; GPU pstate, clock, mem clock, C, W: $gpu"
+}
+
+## The laptop's load at a moment, for runner.log (828 amended (14), the coordinator's ask after
+## an Atlas run starved with 363 MB available, 2026-11-16): totals only, read-only, naming no
+## process. Available physical memory (Win32_OperatingSystem's FreePhysicalMemory, Task
+## Manager's "Available": free, zeroed and standby), the RAM, commit in use against its limit,
+## and with -Cpu the whole laptop's CPU busy share over about 2 s (
+## Win32_Processor's load, read three times). {line; avail (MB, -1 unread); cpu (%, -1 unread or
+## not asked); starved (why, or "")}.
+## Starved at start: under STARVED_AVAIL_MB available, or over STARVED_CPU % busy.
+$STARVED_AVAIL_MB = 2048
+$STARVED_CPU = 50
+function Load-State([switch]$Cpu) {
+	$avail = -1
+	$text = "memory unread"
+	try {
+		$os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+		$avail = [int]($os.FreePhysicalMemory / 1KB)
+		$ram = [int]($os.TotalVisibleMemorySize / 1KB)
+		$limit = [int]($os.TotalVirtualMemorySize / 1KB)
+		$used = $limit - [int]($os.FreeVirtualMemory / 1KB)
+		$text = "available $avail MB of $ram MB RAM; commit $used of $limit MB"
+	} catch {}
+	$busy = -1
+	if ($Cpu) {
+		try {
+			# Win32_Processor's LoadPercentage is each socket's busy share over its last second
+			# (locale-free, unlike a performance counter's path): three reads 1 s apart, averaged.
+			$reads = @()
+			for ($i = 0; $i -lt 3; $i++) {
+				if ($i -gt 0) { Start-Sleep -Seconds 1 }
+				$reads += @(Get-CimInstance Win32_Processor -ErrorAction Stop | ForEach-Object { [double]$_.LoadPercentage })
+			}
+			if ($reads.Count -gt 0) { $busy = [int][Math]::Round(($reads | Measure-Object -Average).Average) }
+		} catch { $busy = -1 }
+		$text += "; CPU busy $(if ($busy -ge 0) { "$busy%" } else { 'unread' }) over 2 s"
+	}
+	$why = @()
+	if ($avail -ge 0 -and $avail -lt $STARVED_AVAIL_MB) { $why += "$avail MB available, under $STARVED_AVAIL_MB" }
+	if ($busy -gt $STARVED_CPU) { $why += "CPU $busy% busy, over $STARVED_CPU" }
+	return @{ line = $text; avail = $avail; cpu = $busy; starved = ($why -join ", ") }
+}
+
+## Available physical memory alone, in MB (-1 unread): the run's lowest is kept from a read
+## every 5 s while its game runs (828 amended (14)).
+function Avail-Mb {
+	try { return [int]((Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).FreePhysicalMemory / 1KB) } catch { return -1 }
 }
 
 function Wait-Stop([System.Diagnostics.Process]$process, [int]$minutes) {
@@ -274,6 +321,15 @@ switch ($Mode) {
 		Write-Output "$(if ($verdict.ok) { 'OK' } else { 'STOP' }) $($verdict.line)"
 		exit 0
 	}
+	# The load read alone (828 amended (14)), for tests/remote_shot_sockets_test.sh: the line a run
+	# writes before its Godots start, and its verdict; -Dir, when given, a whole number of MB to
+	# judge as the starved mark in place of STARVED_AVAIL_MB (the test's way to see a flag).
+	"load" {
+		if ($Dir -match '^\d+$') { $STARVED_AVAIL_MB = [int]$Dir }
+		$state = Load-State -Cpu
+		Write-Output "LOAD $($state.line) | starved [$($state.starved)]"
+		exit 0
+	}
 	"lock" {
 		New-Item -ItemType Directory -Force $Runs | Out-Null
 		if (Test-Path $lock) {
@@ -399,6 +455,15 @@ public static class Job {
 		if (handle == IntPtr.Zero) return -1;
 		return AssignProcessToJobObject(handle, process) ? 0 : Marshal.GetLastWin32Error();
 	}
+	[DllImport("kernel32.dll", SetLastError = true)] static extern bool QueryInformationJobObject(IntPtr job, int infoClass, out EXTENDED info, uint size, IntPtr returned);
+	// 828 amended (14): the most memory the run's processes held committed at once, and the most
+	// one of them did, in bytes (Windows counts both for the job); -1 when unread.
+	public static long[] Peaks() {
+		if (handle == IntPtr.Zero) return new long[] { -1, -1 };
+		EXTENDED info;
+		if (!QueryInformationJobObject(handle, 9, out info, (uint)Marshal.SizeOf(typeof(EXTENDED)), IntPtr.Zero)) return new long[] { -1, -1 };
+		return new long[] { (long)info.PeakJobMemoryUsed.ToUInt64(), (long)info.PeakProcessMemoryUsed.ToUInt64() };
+	}
 }
 // 828 amended (4): a firewall prompt on the laptop's screen, found by its title among the
 // visible top-level windows of this session. Read only: nothing is clicked or closed.
@@ -447,6 +512,12 @@ public static class Dialogs {
 		$icon.Visible = $true
 		$icon.ShowBalloonTip(6000, "Psykinetic: a run on screen", "$name, a Claude session's run. Click the tray icon to stop it.", [System.Windows.Forms.ToolTipIcon]::Info)
 		$powerBefore = Power-State
+		# 828 amended (14): the laptop's load before any Godot of the run starts (totals, no names).
+		$loadStart = Load-State -Cpu
+		$lowAvail = -1
+		$lowAt = 0
+		$lowReads = 0
+		$nextAvail = Get-Date
 		$idleBefore = [Idle]::Seconds()
 		$since = [Idle]::LastTick()
 		[Idle]::Hold()
@@ -620,6 +691,16 @@ public static class Dialogs {
 			$nextLook = $clientStart
 			while (-not $process.HasExited -or ($bot2 -ne $null -and -not $bot2.HasExited)) {
 				[System.Windows.Forms.Application]::DoEvents(); if (Test-Path $stopFile) { $asked.stop = $true }
+				# The laptop's available memory every 5 s while the game runs; the lowest kept, with its
+				# time from this pass's game start (828 amended (14)).
+				if ((Get-Date) -ge $nextAvail) {
+					$nextAvail = (Get-Date).AddSeconds(5)
+					$mb = Avail-Mb
+					if ($mb -ge 0) {
+						$lowReads += 1
+						if ($lowAvail -lt 0 -or $mb -lt $lowAvail) { $lowAvail = $mb; $lowAt = [int]((Get-Date) - $clientStart).TotalSeconds }
+					}
+				}
 				# The second bot (828 amended (10)): once the first has joined, if the laptop has 4 GB
 				# free; its args the first's with its own name, fixed test id and bot number, its own
 				# log, window (1536x864), settings and user data, all in the run's folder; in the job.
@@ -763,6 +844,17 @@ public static class Dialogs {
 			Remove-Item Env:PSYKINETIC_TOKEN -ErrorAction SilentlyContinue
 		}
 		$used = [Idle]::LastTick() -ne $since
+		# 828 amended (14): the load at the end, and the most the run's own processes held at once.
+		$loadEnd = Load-State
+		$peaks = try { [Job]::Peaks() } catch { @(-1, -1) }
+		$STARVED_LOW_MB = 500
+		$loadLines = @(
+			"load at start (before any Godot): $($loadStart.line)",
+			$(if ($loadStart.starved) { "STARVED AT START: $($loadStart.starved); this run's timings and stalls do not count" } else { "starved at start: no (under $STARVED_AVAIL_MB MB available or over $STARVED_CPU% CPU would be)" }),
+			"load during the game: $(if ($lowReads -gt 0) { "lowest available $lowAvail MB at $lowAt s after the game's start ($lowReads reads, every 5 s)" } else { 'not read' })",
+			$(if ($lowReads -gt 0 -and $lowAvail -lt $STARVED_LOW_MB) { "STARVED DURING THE GAME: $lowAvail MB available at $lowAt s, under $STARVED_LOW_MB; a stall near then is the laptop's until a run with room shows it" } else { "starved during the game: no" }),
+			"load at end: $($loadEnd.line)",
+			"run's peak memory: $(if ($peaks[0] -ge 0) { "its processes $([int]($peaks[0] / 1MB)) MB committed at once, the most of one $([int]($peaks[1] / 1MB)) MB (the job's count)" } else { 'unread' })")
 		$icon.Visible = $false
 		$icon.Dispose()
 		[Idle]::Release()
@@ -798,7 +890,7 @@ public static class Dialogs {
 		# The runner that ran, by its own file's hash (828 amended (4)): remote_shot.sh prints the
 		# hash of the copy it sent, and says so when they differ.
 		$runnerSha = try { (Get-FileHash -Algorithm SHA256 $PSCommandPath).Hash.ToLower().Substring(0, 16) } catch { "unread" }
-		Add-Content -Encoding utf8 $log ($joinedLines + @($firewallLine) + @(
+		Add-Content -Encoding utf8 $log ($joinedLines + @($firewallLine) + $loadLines + @(
 			"runner: $(Split-Path -Leaf $PSCommandPath), sha256 $runnerSha",
 			"job: $(if ($jobMade -eq 0) { 'kill on close' } else { "not made (error $jobMade): processes stopped by PID only" }); $($jobbed -join '; ')",
 			"full speed: $full",

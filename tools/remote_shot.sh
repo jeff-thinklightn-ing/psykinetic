@@ -472,6 +472,10 @@ ran_sha="$([ -f "$REVIEW/runner.log" ] && tr -d '\357\273\277\r' < "$REVIEW/runn
 if [ -n "$ran_sha" ] && [ "$ran_sha" != "$RUNNER_SHA" ]; then
 	echo "remote_shot: the runner that ran (sha256 $ran_sha) is not the one sent ($RUNNER_SHA): this run's results are another tool's"; exit 1
 fi
+# The laptop's load (828 amended (14)): said for every run, a starved one first, so a report that
+# reads timings or stalls sees it before them.
+grep -h "^STARVED" "$REVIEW/runner.log" 2>/dev/null | sed 's/^/remote_shot: /'
+grep -h "^load at start\|^load during\|^run's peak" "$REVIEW/runner.log" 2>/dev/null
 # A joined run's client that never joined its server: the connect screen over whatever it drew;
 # its stills are void (828 amended (4)). runner.log's joined lines say why.
 if [ $JOINED -eq 1 ]; then
@@ -493,7 +497,9 @@ if [ $JOINED -eq 1 ]; then
 			counts="$counts; bot 1: ${one:-unread} (godot.log); bot 2: ${two:-unread} (bot2/godot.log)"
 		fi
 		if [ -f "$REVIEW/report.md" ]; then
-			{ printf '%s\n\n' "$counts"; cat "$REVIEW/report.md"; } >"$TMP/report.md"
+			# A starved laptop's lines head the report, above the counts (828 amended (14)).
+			starved="$(grep -h "^STARVED" "$REVIEW/runner.log" 2>/dev/null | tr -d '\357\273\277\r')"
+			{ [ -n "$starved" ] && printf '%s\n\n' "$starved"; printf '%s\n\n' "$counts"; cat "$REVIEW/report.md"; } >"$TMP/report.md"
 			mv "$TMP/report.md" "$REVIEW/report.md"
 		else
 			echo "remote_shot: the tour wrote no report.md"

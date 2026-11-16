@@ -54440,6 +54440,40 @@ row (rat;bow) says the new set; a --tour dry run with --test-foe=imp:bold,,1,aro
 written; on the old runner that row fails (exit 2). Tools and tests only; protocol unchanged; no
 class_name; no bullet.
 
+828 amended (14) (perf; the coordinator's ask and approval, 2026-11-16; label from
+tools/decision_number.sh): a starved laptop names itself in runner.log. A joined run on the Atlas
+(stallnc_5abf18ba5) froze 6.8 s at its first click; its server, a separate process on the same laptop,
+took 7.7 s over one tick in the same seconds, and the tour's probe read 363 MB available physical memory
+there (Godot's get_memory_info() "free" on Windows is PhysicalAvailable; its "available" is the commit
+limit, which never moves), against 950 to 986 MB in three clean runs. The whole laptop was starved and
+nothing said so. The runner (one script on both laptops) now reads the laptop's load as totals only, from
+the operating system's own counters, and names no process (what Jeff runs on his own laptop is his):
+Load-State, Win32_OperatingSystem's FreePhysicalMemory (Task Manager's Available), TotalVisibleMemorySize
+and the commit limit and commit free, and with -Cpu Win32_Processor's LoadPercentage, three reads a
+second apart, averaged. runner.log, every run: "load at start (before any Godot): available N MB of N MB
+RAM; commit N of N MB; CPU busy N% over 2 s"; "STARVED AT START: <why>; this run's timings and stalls do
+not count" under STARVED_AVAIL_MB (2048) available or over STARVED_CPU (50) % busy, else "starved at
+start: no"; "load during the game: lowest available N MB at T s after the game's start (K reads, every
+5 s)" (the runner knows no click; a report sets the lowest's time beside its gaps); "STARVED DURING THE
+GAME: N MB available at T s, under 500; a stall near then is the laptop's until a run with room shows it",
+else "no"; "load at end: ..."; and "run's peak memory: its processes N MB committed at once, the most of
+one N MB", the run's own job object's PeakJobMemoryUsed and PeakProcessMemoryUsed (Job.Peaks,
+QueryInformationJobObject on the job 828 amended (4) makes), so server, client and any bot 2 count
+together and nothing else does. remote_shot.sh says any STARVED line first ("remote_shot: STARVED ...")
+and the three load lines for every run, and heads a tour's report.md with the STARVED lines above the
+SCRIPT ERROR counts; its exit code does not change (a look is still a look; the coordinator's word). A new
+read-only -Mode load prints the start line and its verdict, the test's way in.
+tests/remote_shot_sockets_test.sh, five rows: the line's shape read on this PC; the flag as its own
+figures say; a mark above what is available flags and names the figure; no process read in Load-State
+or Avail-Mb; the runner.log lines and remote_shot.sh's relay present. The job's peak was checked by hand
+here: a child holding 300 MB read 365 MB. Laptop proof, on ui-design's slots: the Lenovo (hosted wilds
+map_bench, 11:18): 7507 MB available of 16263 MB at the start, CPU 5%, lowest 5364 MB at 57 s, end 7445
+MB, the run's peak 3038 MB, not starved; the Atlas (the same, 11:28): 4251 MB available of 8044 MB at
+the start, CPU 4%, lowest 2213 MB at 71 s, end 4219 MB, the run's peak 2910 MB, not starved. One hosted
+Godot takes the Atlas from about 4.2 GB to 2.2 GB; a joined run's two to about 1 GB, as its probes read,
+which is why joined timings and stall reads go to the Lenovo (the coordinator's ruling, 11-16). Tools and
+tests only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

@@ -277,6 +277,44 @@ else
 	echo "  FAIL  a bench's BENCH ran: line and runner.log's SHOT line say the cache"; failed=$((failed + 1))
 fi
 
+# The laptop's load (828 amended (14)): totals read before a run's Godots start, no process
+# named; starved under the available-memory mark or over the CPU mark. Read here on this PC by
+# the runner's own -Mode load (read-only).
+load() { powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$runner" -Mode load ${1:+-Dir "$1"} 2>&1 | tr -d '\r'; }
+got="$(load)"
+if printf '%s' "$got" | grep -qE '^LOAD available [0-9]+ MB of [0-9]+ MB RAM; commit [0-9]+ of [0-9]+ MB; CPU busy [0-9]+% over 2 s \| starved \['; then
+	echo "  PASS  the load line: available, RAM, commit and CPU busy, all totals ($got)"
+else
+	echo "  FAIL  the load line: got [$got]"; failed=$((failed + 1))
+fi
+avail="$(printf '%s' "$got" | sed -n 's/^LOAD available \([0-9]*\) MB.*/\1/p')"
+cpu="$(printf '%s' "$got" | sed -n 's/.*CPU busy \([0-9]*\)%.*/\1/p')"
+flag="$(printf '%s' "$got" | sed -n 's/.*starved \[\(.*\)\]$/\1/p')"
+want=""
+if { [ -n "$avail" ] && [ "$avail" -lt 2048 ]; } || { [ -n "$cpu" ] && [ "$cpu" -gt 50 ]; }; then want="flag"; fi
+if { [ -n "$want" ] && [ -n "$flag" ]; } || { [ -z "$want" ] && [ -z "$flag" ]; }; then
+	echo "  PASS  starved as its figures say (available $avail MB against 2048, CPU $cpu% against 50: [$flag])"
+else
+	echo "  FAIL  starved as its figures say: available $avail, CPU $cpu, flag [$flag]"; failed=$((failed + 1))
+fi
+got="$(load 99999999)"
+if printf '%s' "$got" | grep -qE 'starved \[[0-9]+ MB available, under 99999999'; then
+	echo "  PASS  a mark above what is available: starved, the figure named"
+else
+	echo "  FAIL  a mark above what is available: got [$got]"; failed=$((failed + 1))
+fi
+if sed -n '/^function Load-State/,/^function Wait-Stop/p' tools/remote_shot_run.ps1 | grep -q "Get-Process\|ProcessName\|Win32_Process\b"; then
+	echo "  FAIL  the load read names no process"; failed=$((failed + 1))
+else
+	echo "  PASS  the load read names no process (no process list in Load-State or Avail-Mb)"
+fi
+if grep -qF 'grep -h "^STARVED" "$REVIEW/runner.log"' tools/remote_shot.sh && grep -qF '"STARVED AT START: ' tools/remote_shot_run.ps1 \
+	&& grep -qF '"STARVED DURING THE GAME: ' tools/remote_shot_run.ps1 && grep -qF '[Job]::Peaks()' tools/remote_shot_run.ps1; then
+	echo "  PASS  runner.log carries the start, during and end loads and the job's peak; remote_shot.sh says a STARVED line first and heads a tour's report with it"
+else
+	echo "  FAIL  runner.log's load lines or remote_shot.sh's STARVED relay missing"; failed=$((failed + 1))
+fi
+
 # The whole runner parses (its run mode needs a laptop's session; its proof is a laptop run).
 parsed="$(powershell -NoProfile -NonInteractive -Command "\$e = \$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$runner', [ref]\$null, [ref]\$e); \$e.Count" 2>&1 | tr -d '\r')"
 if [ "$parsed" = "0" ]; then echo "  PASS  the runner parses"; else echo "  FAIL  the runner parses: $parsed"; failed=$((failed + 1)); fi
