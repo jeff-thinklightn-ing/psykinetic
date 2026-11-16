@@ -1829,6 +1829,8 @@ func talks_on_click(entity: GridEntity) -> bool:
 ## person, and the worst real route to one on Umbrage's lattice closes 904 (click_route_test's survey, 2297 routes), so a stand cell a
 ## wall or a body shuts off ends at this, not at the zone's CLICK_SEARCH_TILES, and the walk goes at his own cell.
 const TALK_STAND_SEARCH_TILES := 2500
+## The bound in force (a test lowers it to cut a real route short).
+var talk_stand_search_tiles := TALK_STAND_SEARCH_TILES
 
 
 func _talk_to(player: Player, friend: GridEntity) -> void:
@@ -1845,7 +1847,7 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
 	if beside == NONE:
 		return
-	_move_click(player, beside, true, TALK_STAND_SEARCH_TILES)
+	_move_click(player, beside, true, talk_stand_search_tiles)
 	# 935 amended (3): a stand cell no route reaches (the healer at work in the one cell inside his shut door: his body shuts the
 	# hut's inside off, so every cell beside him is walled in, and the click did nothing) is walked at his own cell instead: a route
 	# to an occupied goal exists, and the walk stops at his shut door for the step to open (_update_talk). The route the click just

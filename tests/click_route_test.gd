@@ -325,6 +325,24 @@ func _test_door_talk() -> void:
 		var way: Array = _main._free.get("path", [])
 		_check(stand_open != Main.NONE and not way.is_empty() and way.back() == stand_open and way.back() != open_cell,
 			"in the open: the walk is to the stand cell %s beside him, as before (%s)" % [stand_open, way.back() if not way.is_empty() else "none"])
+	# A stand cell whose real route needs more than its bound (a small one here): the search is cut, and the click still walks at him and
+	# arrives: the bound only bounds the cost, never a click that does nothing.
+	if open_cell != Vector2i(-1, -1):
+		World._relocate(body, open_cell)
+		World._relocate(player, street)
+		_main._free_taken_over(player)
+		var stand_far: Vector2i = _main._stand_to_talk(body, street)
+		var whole := World.walk_path(World.free_cell(player, Vector2(player.tile)), stand_far, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES)
+		var cut_closed0 := World.path_closed
+		var cut := World.walk_path(World.free_cell(player, Vector2(player.tile)), stand_far, player, World.PATH_FIRE_EXTRA, 3)
+		var needs := World.path_closed - cut_closed0
+		_main.talk_stand_search_tiles = 3
+		_main._talk_to(player, body)
+		_main.talk_stand_search_tiles = Main.TALK_STAND_SEARCH_TILES
+		var walk_at: Array = _main._free.get("path", [])
+		_check(not whole.is_empty() and cut.is_empty() and not walk_at.is_empty() and walk_at.back() == open_cell,
+			"a stand cell %s whose real route (%d cells) needs more than its bound (3): cut, and the click walks at him and arrives at %s" % [
+				stand_far, whole.size(), walk_at.back() if not walk_at.is_empty() else "none"])
 	_main._talk_wanted = null
 	_main._free["path"] = []
 
@@ -342,14 +360,14 @@ func _test_stand_cell_routes() -> void:
 		if entity != player and entity.spawned and not entity is Player:
 			body = entity
 			break
-	var room := Rect2i(165, 185, 71, 56)  # The wilds' room "umbrage" (levels/wilds/level.json).
+	var room := Rect2i(140, 185, 96, 56)  # Umbrage's room (165, 185, 71, 56) and the west of it to Hob's hut (152, 233).
 	if player == null or body == null:
 		_check(false, "a player and a body")
 		return
 	var routes := 0
 	var none := 0
 	var worst := {"closed": -1, "talker": Vector2i.ZERO, "start": Vector2i.ZERO, "stand": Vector2i.ZERO, "length": 0}
-	var worst_near := 0
+	var over_cap := 0
 	for y in range(room.position.y, room.end.y, 5):
 		for x in range(room.position.x, room.end.x, 5):
 			var talker := Vector2i(x, y)
@@ -357,7 +375,7 @@ func _test_stand_cell_routes() -> void:
 				continue
 			World._relocate(body, talker)
 			for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1)]:
-				for reach in [4, 10]:
+				for reach in [4, 10, 20, 32]:
 					var start: Vector2i = talker + way * reach
 					if not World.is_walkable(start) or World.get_entity_at(start) != null or World.distance(start, talker) <= Main.TALK_REACH:
 						continue
@@ -371,12 +389,15 @@ func _test_stand_cell_routes() -> void:
 						none += 1
 						continue
 					routes += 1
+					if closed > Main.TALK_STAND_SEARCH_TILES:
+						over_cap += 1
 					if closed > int(worst["closed"]):
 						worst = {"closed": closed, "talker": talker, "start": start, "stand": stand, "length": path.size()}
 	print("  %d stand-cell routes read, %d with no route; the worst closes %d cells (talker %s, from %s, stand cell %s, %d cells long); bound %d" % [
 		routes, none, worst["closed"], worst["talker"], worst["start"], worst["stand"], worst["length"], World.CLICK_SEARCH_TILES])
-	_check(routes > 100 and int(worst["closed"]) <= World.CLICK_SEARCH_TILES / 2,
-		"every stand-cell route that exists closes at most half the bound (%d of %d)" % [worst["closed"], World.CLICK_SEARCH_TILES / 2])
+	_check(routes > 100 and int(worst["closed"]) <= World.CLICK_SEARCH_TILES,
+		"every stand-cell route that exists closes at most the zone's bound (%d of %d); over the stand bound %d: %d (each falls back to the walk at him)" % [
+			worst["closed"], World.CLICK_SEARCH_TILES, Main.TALK_STAND_SEARCH_TILES, over_cap])
 	World._relocate(body, Vector2i(152, 233))
 	World._relocate(player, Vector2i(149, 231))
 
