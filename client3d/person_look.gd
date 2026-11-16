@@ -49,6 +49,17 @@ const HAIR_COLOURS := {"black": "1f1a17", "dark": "3b2a20", "brown": "564135", "
 ## the skin never moves (it is what a player picked). Where both ways reach the step, the smaller move; else the way
 ## ending further apart. Seven pairs stop short at the cap or the name (view_test _test_hair_value lists each).
 const HAIR_STEP := 16.0
+## SCRATCH (the coordinator's two-light rule, not for landing as is): the step also judged as the game draws hair and
+## face, at noon and at 18:00, measured off ui-design's two 64-still grids (hairgrid2_noon_8529d2d65,
+## hairgrid3_low18_8529d2d65): a crown's drawn L* by its colour's L* at 0, 5 .. 100, and a face's drawn L* by its skin's
+## (the eight SKINS). A hair takes the noon-drawn move (_hair_drawn_move) in place of today's only where it stands
+## further from the face at noon and no nearer at 18:00 (_hair_moved).
+const HAIR_LIT := {"noon": [33.2, 33.2, 35.6, 37.4, 40.7, 45.2, 49.7, 55.8, 60.6, 65.8, 71.0, 76.2, 80.8, 86.2, 90.6, 92.4,
+	93.9, 95.3, 95.3, 95.3, 95.3], "evening": [27.3, 27.3, 28.0, 30.0, 33.9, 37.1, 40.2, 44.8, 49.4, 52.1, 56.7, 62.5, 65.9,
+	69.5, 75.2, 80.1, 83.3, 84.1, 84.1, 84.1, 84.1]}
+const FACE_SKIN_L := [27.8, 37.4, 46.2, 55.2, 64.1, 71.3, 78.1, 86.5]
+const FACE_LIT := {"noon": [35.5, 41.6, 47.7, 54.3, 60.9, 66.4, 70.9, 78.6], "evening": [26.2, 28.4, 32.1, 34.2, 38.5, 40.5,
+	44.3, 47.4]}
 const HAIR_MOVE_MAX := 13.0
 const HAIR_MOVE_GRAIN := 0.25
 ## What a beard's front loses beside the cheek as drawn: it faces down, out of the sun (faces7's stills on skin 7: 3.1 L* on
@@ -390,6 +401,66 @@ static func hair_against(name: String, skin: Color) -> Color:
 
 
 static func _hair_moved(name: String, skin: Color) -> Color:
+	var today := _hair_palette_move(name, skin)
+	var drawn := _hair_drawn_move(name, skin)
+	var ls := lab_of(skin).x
+	var t := lab_of(today).x
+	var d := lab_of(drawn).x
+	if absf(d - t) > 0.01 and absf(lit_hair(d, "noon") - lit_face(ls, "noon")) > absf(lit_hair(t, "noon") - lit_face(ls, "noon")) + 0.01 			and absf(lit_hair(d, "evening") - lit_face(ls, "evening")) >= absf(lit_hair(t, "evening") - lit_face(ls, "evening")) - 0.01:
+		return drawn
+	return today
+
+
+## A crown of L* [param l] as drawn in [param light] (HAIR_LIT).
+static func lit_hair(l: float, light: String) -> float:
+	var knots: Array = HAIR_LIT[light]
+	var at := clampf(l / 5.0, 0.0, knots.size() - 1.001)
+	var i := int(at)
+	return lerpf(knots[i], knots[i + 1], at - i)
+
+
+## A face of skin L* [param l] as drawn in [param light] (FACE_LIT by FACE_SKIN_L).
+static func lit_face(l: float, light: String) -> float:
+	var drawn: Array = FACE_LIT[light]
+	if l <= FACE_SKIN_L[0]:
+		return drawn[0]
+	for i in FACE_SKIN_L.size() - 1:
+		if l <= FACE_SKIN_L[i + 1]:
+			return lerpf(drawn[i], drawn[i + 1], (l - FACE_SKIN_L[i]) / (FACE_SKIN_L[i + 1] - FACE_SKIN_L[i]))
+	return drawn[drawn.size() - 1]
+
+
+## The move the rule makes judged on the noon-drawn values (HAIR_LIT, FACE_LIT), as the palette rule below.
+static func _hair_drawn_move(name: String, skin: Color) -> Color:
+	var hair := Color(HAIR_COLOURS[name])
+	var ls := lit_face(lab_of(skin).x, "noon")
+	var h := lab_of(hair)
+	var d := lit_hair(h.x, "noon") - ls
+	if absf(d) >= HAIR_STEP:
+		return hair
+	var away := 1.0 if d > 0.0 else -1.0
+	var a := _hair_reach_lit(name, h, ls, away)
+	var b := _hair_reach_lit(name, h, ls, -away)
+	var pick := a
+	if a.x >= HAIR_STEP - 0.1 and b.x >= HAIR_STEP - 0.1:
+		pick = a if absf(a.y) <= absf(b.y) else b
+	elif b.x > a.x + 0.01:
+		pick = b
+	return from_lab(Vector3(h.x + pick.y, h.y, h.z))
+
+
+static func _hair_reach_lit(name: String, h: Vector3, ls: float, sign_: float) -> Vector2:
+	var move := 0.0
+	while move + HAIR_MOVE_GRAIN <= HAIR_MOVE_MAX and sign_ * (lit_hair(h.x + sign_ * move, "noon") - ls) < HAIR_STEP:
+		var next := h.x + sign_ * (move + HAIR_MOVE_GRAIN)
+		if next <= 0.0 or next >= 100.0 or nearest_hair(from_lab(Vector3(next, h.y, h.z))) != name:
+			break
+		move += HAIR_MOVE_GRAIN
+	return Vector2(absf(lit_hair(h.x + sign_ * move, "noon") - ls), sign_ * move)
+
+
+## Today's rule: the step judged on the palette's L*.
+static func _hair_palette_move(name: String, skin: Color) -> Color:
 	var hair := Color(HAIR_COLOURS[name])
 	var ls := lab_of(skin).x
 	var h := lab_of(hair)
