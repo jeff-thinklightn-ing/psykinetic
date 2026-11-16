@@ -749,6 +749,9 @@ var _loose_sent := false
 ## The cell a lob was let go at while the body still lobs (677 amended (4): a tap before the
 ## first step is held by the server till then): the arc and ring hold on it; NONE otherwise.
 var lob_let_at := NONE
+## Where that tap's lob will come down and its circle (677 amended (5); World.lob_first_fall, read
+## at the let-go): [cell, radius], the volley's ring shown there till the volley's own; [] for none.
+var lob_tap_fall := []
 ## When the arc first showed, for its fade-in (msec).
 var _aim_since := 0
 ## The 2D view's arc, made on first use.
@@ -2245,6 +2248,7 @@ func _raise_off_hand(player: Player) -> bool:
 func _raise_lob(player: Player) -> void:
 	_stance = "lob"
 	lob_let_at = NONE
+	lob_tap_fall = []
 	_toss_target = null
 	World.command(player, "stance", {"kind": "draw", "lob": true})
 
@@ -2258,7 +2262,15 @@ func _show_lob(player: Player, lobbing: bool) -> void:
 		return
 	if not lobbing:
 		lob_let_at = NONE
+		lob_tap_fall = []
 		_client3d.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
+		_client3d.lob_tap(Vector2i.ZERO, 0.0, 0)
+		return
+	if not lob_tap_fall.is_empty():
+		# 677 amended (5): a tap let go before the first step has no arc (its aim is its own cell
+		# till then); the volley's ring stands where it will come down till the volley's own.
+		_client3d.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
+		_client3d.lob_tap(lob_tap_fall[0], lob_tap_fall[1], player.get_instance_id())
 		return
 	var aimed := lob_let_at if lob_let_at != NONE else _mouse_tile()  # 677 amended (4): let go, it holds there.
 	var cell := World.lob_aim(player, aimed)
@@ -2318,6 +2330,8 @@ func _lower_off_hand(player: Player) -> void:
 		var at := _mouse_tile()
 		World.command(player, "lob", {"at": [at.x, at.y]})  # 677: the server draws it in to the reach.
 		lob_let_at = at  # 677 amended (4): let go before the first step, the lob waits for it on this cell.
+		var fall := World.lob_first_fall(player, at)  # 677 amended (5): the tap's ring, read at the let-go.
+		lob_tap_fall = [] if fall[0] == World.NO_CELL else fall
 	elif _stance == "block":
 		World.command(player, "stance", {"kind": ""})
 	_stance = ""

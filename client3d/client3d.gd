@@ -2856,6 +2856,13 @@ var _aim_mark: MeshInstance3D
 var _lob_arc: MeshInstance3D
 var _lob_ring: MeshInstance3D
 var _lob_key := []
+## The tap's ring (677 amended (5); ui-design): a lob let go before its first step draws no arc
+## (its aim is its own cell till then), so the volley's ring (_volley_ring_flat, its own look)
+## stands on the cell it will come down on from the let-go until the volley's own ring takes
+## over (_on_lobbed of [member _lob_tap_id]) or Main hides it (lob_tap). Null till first shown.
+var _lob_tap_ring: MeshInstance3D
+var _lob_tap_id := 0
+var _lob_tap_key := []
 ## The full-strength edge on the aim (decision 669): drawn past full draw,
 ## where the bow's full draw reaches, so what lies beyond takes less.
 var _aim_full_mark: MeshInstance3D
@@ -29499,6 +29506,11 @@ func _on_lobbed(to: Vector2i, ticks: int, radius: float, falls: PackedVector2Arr
 		falls = PackedVector2Array([Vector2(to)])
 	var last := flight + float(falls.size() - 1) / World.TICK_RATE
 	_volley_ring(to, radius, last)
+	if _lob_tap_id == id and is_instance_valid(_lob_tap_ring):
+		# 677 amended (5): the volley's ring takes over from the tap's. The key is kept, so Main's
+		# next frame, its body still lobbing till that is heard, does not show the tap's again.
+		_lob_tap_ring.visible = false
+		_lob_tap_id = 0
 	for i in falls.size():
 		_volley_fall(shooter, falls[i], way, flight + float(i) / World.TICK_RATE)
 
@@ -29530,17 +29542,48 @@ func _loose_up(shooter: GridEntity, parent: Node, from: Vector3, way: Vector2, f
 ## least) round [param cell] on the ground in the alarm colour, from now
 ## till [param seconds] on, when the last arrow is down.
 func _volley_ring(cell: Vector2i, radius: float, seconds: float) -> void:
-	var base := _height_in(cell, Vector2(cell))
-	var ring := _make_flat(_ground_arc_mesh(Vector2(cell), maxf(radius, LOB_RING_MIN), AIM_LINE, 0.0, PI, base),
-		Color(UiTheme.color("alarm"), 0.85))
+	var ring := _volley_ring_flat(cell, radius)
 	ring.name = "VolleyRing"
-	ring.position = Vector3(cell.x, base + ON_FLOOR * 2.0, cell.y)
 	add_child(ring, true)
 	var ids_ring := ring.get_instance_id()
 	get_tree().create_timer(seconds + VOLLEY_RING_AFTER).timeout.connect(func() -> void:
 		var fired_ring := instance_from_id(ids_ring) as Node
 		if is_instance_valid(fired_ring):
 			fired_ring.queue_free())
+
+
+## The volley's circle as drawn (677 amended (2)): [param radius] (LOB_RING_MIN at least) round
+## [param cell] on the ground in the alarm colour, placed there, not yet hung; the volley's ring
+## and the tap's (lob_tap, 677 amended (5)) both, so they are one look.
+func _volley_ring_flat(cell: Vector2i, radius: float) -> MeshInstance3D:
+	var base := _height_in(cell, Vector2(cell))
+	var ring := _make_flat(_ground_arc_mesh(Vector2(cell), maxf(radius, LOB_RING_MIN), AIM_LINE, 0.0, PI, base),
+		Color(UiTheme.color("alarm"), 0.85))
+	ring.position = Vector3(cell.x, base + ON_FLOOR * 2.0, cell.y)
+	return ring
+
+
+## The tap's ring (677 amended (5); Main, each frame from a lob's let-go before its first step):
+## the volley's ring (_volley_ring_flat) on [param cell], [param radius] across, for the body
+## [param id]'s lob; hidden with [param id] 0. Its volley's own ring hides it (_on_lobbed), and
+## it stays hidden for that let-go till Main hides it.
+func lob_tap(cell: Vector2i, radius: float, id: int) -> void:
+	if id == 0:
+		if is_instance_valid(_lob_tap_ring):
+			_lob_tap_ring.visible = false
+		_lob_tap_id = 0
+		_lob_tap_key = []
+		return
+	var key := [cell, snappedf(radius, 0.01), id]
+	if key == _lob_tap_key:
+		return  # Shown already, or its volley's ring has taken over (the key kept till Main hides it).
+	if is_instance_valid(_lob_tap_ring):
+		_lob_tap_ring.queue_free()
+	_lob_tap_ring = _volley_ring_flat(cell, radius)
+	_lob_tap_ring.name = "LobTapRing"
+	add_child(_lob_tap_ring, true)
+	_lob_tap_id = id
+	_lob_tap_key = key
 
 
 ## One of the volley's arrows (677 amended (2)): it rains down steeply

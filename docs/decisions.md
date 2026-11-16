@@ -36316,6 +36316,31 @@ nothing; a blow or the bow gone between drops it); controls_test `_test_lob_tap_
 lob up at 5 there). Client and server; protocol unchanged (lobbing and raised already
 replicate); no new class_name.
 
+677 amended (5): the tap's ring (ui-design's joined watch of 677 amended (4); the coordinator's
+ruling and rows, 2026-11-15; label from tools/decision_number.sh). A tap let go before the first
+step showed nothing until the volley's ring appeared, 250 to 600 ms on: World.lob_aim gives the
+body's own cell before the first step, so Main drew no arc. Now Main reads where it will come down
+at the let-go, World.lob_first_fall: the cell let go at drawn in to the first step's reach and that
+step's circle, as try_lob reads them the tick the step counts (lob_aim, lob_circle_at and
+lob_radius take an optional step, DRAWN_NOW otherwise), or nothing when try_lob would loose nothing
+(let go before hold_from, its own cell, ground under a roof). The ring stands where the lob will
+come down, never where she let go when that is farther (the coordinator: a marker that jumped when
+the volley's ring appeared would be worse than none): a let-go past the first step's reach shows it
+nearer than the cursor, on the cell the volley's ring then appears on. Client3D.lob_tap stands the volley's
+ring on that cell from the let-go's frame, its own look (_volley_ring_flat, made for both: the same
+mesh and material, no colour, size or strength of the tap's own), with no arc; the volley's ring
+hides it as it appears (_on_lobbed of that body), and it stays hidden for that let-go though the
+body is still heard lobbing; a draw ended in the wait (a knockdown: lobbing false) hides it. If it must read
+as "about to fall" rather than "falling", ui-design says how and owns that value. A held lob is
+unchanged (its arc, no ring). Tests: controls_test `_test_lob_tap_ring` (through Main with a view:
+a tap at 2 ticks, no ring or arc before the let-go, the ring on the cell every frame from the
+let-go's to the lob's and no arc, the volley's ring appears and the tap's is gone and stays gone,
+its cell and circle the lob's own; a tap let go past the first step's reach, the ring nearer, on the cell the lob would come down on
+cell, unmoved till it; a knockdown in the wait takes the ring and the lob (a let-down alone keeps both, as 677 amended (4)); a tap
+under a roof, no ring, no lob; Esc in the draw, no ring; a lob held past the first step, its arc
+and no ring). Client only (World's new reads are pure); protocol unchanged; no new class_name; no
+bullet of its own.
+
 ## 676. Items as mass, step 1: load_arms and load_body
 
 Jeff, testing the bow in plate: "items shouldnt have direct impacts, they

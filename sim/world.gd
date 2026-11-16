@@ -339,6 +339,8 @@ const GROUND_PER_CELL := 4
 const GROUND_SPILL := 3
 ## No cell: what put_on_ground gives when there is nowhere to put a thing.
 const NO_CELL := Vector2i(-99999, -99999)
+## The step a bow's lob reads (lob_radius, lob_circle_at, lob_aim) when none is named: the one drawn now.
+const DRAWN_NOW := -2
 ## Throwing (try_throw): reach is THROW_PER_STRENGTH x strength / the square
 ## root of the weight, 1 to THROW_MAX cells; the thing flies as a hurl at
 ## throw_speed (606 amended).
@@ -7490,11 +7492,12 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 
 ## The radius in cells of the circle [param entity]'s lob comes down in
 ## now (decision 677): its verb's lob_circle at its step; -1 when not
-## lobbing or before the first step.
-func lob_radius(entity: GridEntity) -> float:
+## lobbing or before the first step. [param at_step] reads it at that step
+## in place of the step drawn now (677 amended (5): the tap's first step).
+func lob_radius(entity: GridEntity, at_step := DRAWN_NOW) -> float:
 	if not is_instance_valid(entity) or entity.raised != "draw" or not entity.lobbing:
 		return -1.0
-	var step := draw_step(entity)
+	var step := draw_step(entity) if at_step == DRAWN_NOW else at_step
 	var circle: Array = Items.verb_of(drawn_with(entity)).get("lob_circle", [])
 	if step < 0 or circle.is_empty():
 		return -1.0
@@ -7507,20 +7510,22 @@ func lob_radius(entity: GridEntity) -> float:
 ## reach drawn (lob_aim over range_of), so a near lob's circle is as narrow
 ## for its distance as a far one's, at least lob_volley_min; -1 as
 ## lob_radius. The server rolls the falls in it and the aim draws it.
-func lob_circle_at(entity: GridEntity, cell: Vector2i) -> float:
-	var radius := lob_radius(entity)
-	var reach := range_of(entity)
+## [param at_step] as lob_radius's.
+func lob_circle_at(entity: GridEntity, cell: Vector2i, at_step := DRAWN_NOW) -> float:
+	var radius := lob_radius(entity, at_step)
+	var reach := range_of(entity) if at_step == DRAWN_NOW else reach_at(entity, at_step)
 	if radius < 0.0 or reach <= 0:
 		return radius
-	var share := minf(1.0, Vector2(lob_aim(entity, cell)).distance_to(shot_origin(entity)) / float(reach))
+	var share := minf(1.0, Vector2(lob_aim(entity, cell, at_step)).distance_to(shot_origin(entity)) / float(reach))
 	return maxf(float(Items.verb_of(drawn_with(entity)).get("lob_volley_min", 1.0)), radius * share)
 
 
 ## The cell [param entity]'s lob aimed at [param cell] is aimed at (decision
 ## 677): that cell, drawn in along the line to the reach drawn so far
-## (range_of); its own cell before the first step.
-func lob_aim(entity: GridEntity, cell: Vector2i) -> Vector2i:
-	var reach := range_of(entity)
+## (range_of); its own cell before the first step. [param at_step] as
+## lob_radius's: drawn in to that step's reach.
+func lob_aim(entity: GridEntity, cell: Vector2i, at_step := DRAWN_NOW) -> Vector2i:
+	var reach := range_of(entity) if at_step == DRAWN_NOW else reach_at(entity, at_step)
 	var start := shot_origin(entity)  # A free body's centre (688).
 	var way := Vector2(cell) - start
 	if reach <= 0:
@@ -7534,6 +7539,24 @@ func lob_aim(entity: GridEntity, cell: Vector2i) -> Vector2i:
 ## open sky, never a wall's cell, a roof's or indoors.
 func lob_open(cell: Vector2i) -> bool:
 	return is_walkable(cell) and fields.under_sky(cell)
+
+
+## Where the lob [param entity] lets go at [param cell] now, before its first step, will come
+## down (677 amended (5); ui-design: the tap showed nothing till the volley's ring): [the cell, the
+## circle's radius] as try_lob reads them the tick the first step counts (lob_held: step 0, the
+## cell drawn in to its reach); [NO_CELL, -1.0] when the let-go is no such tap (not lobbing, past
+## the first step) or try_lob would let it fall with nothing loosed (let go before hold_from, or
+## onto its own cell or ground it cannot come down on). Main reads it at the let-go, for the ring.
+func lob_first_fall(entity: GridEntity, cell: Vector2i) -> Array:
+	if not is_instance_valid(entity) or entity.raised != "draw" or not entity.lobbing or draw_step(entity) >= 0:
+		return [NO_CELL, -1.0]
+	var verb := Items.verb_of(drawn_with(entity))
+	if verb.is_empty() or tick - entity.raised_tick < int(verb.get("hold_from", 99)):
+		return [NO_CELL, -1.0]
+	var aimed := lob_aim(entity, cell, 0)
+	if aimed == entity.tile or not lob_open(aimed):
+		return [NO_CELL, -1.0]
+	return [aimed, lob_circle_at(entity, cell, 0)]
 
 
 ## Where an arrow lobbed from [param from] to [param to] is [param t] (0 to

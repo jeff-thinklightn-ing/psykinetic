@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_held_through_card()
 	_test_bow_click_walks()
 	await _test_lob_tap_through_main()
+	await _test_lob_tap_ring()
 	_test_friend_click()
 	_test_peaceable_click()
 	_test_bubble_click_goes_through()
@@ -848,6 +849,209 @@ func _test_lob_tap_through_main() -> void:
 	_stop_walk()
 	Net.controls = saved
 
+
+## 677 amended (5) (ui-design; the coordinator's rows): a tap let go before the first step has no
+## arc, so the volley's ring stands on the cell it will come down on from the let-go's frame till
+## the volley's own ring takes over; a draw dropped in the wait takes it away; a let-go that would
+## loose nothing (the sky shut) and an Esc show none; a held lob is as before (its arc, no ring).
+func _test_lob_tap_ring() -> void:
+	print("
+== a tap's lob: the volley's ring on its cell from the let-go till the volley's own (677 amended (5)) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	_kill_monsters()
+	var player := _place_player(Vector2i(11, 3))
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var rig := _rig()
+	rig._sync_puppets()
+	var outdoor_was := World.fields.outdoor
+	World.fields.outdoor = true
+	# Its volleys come down where nothing stands within 3 cells (the room's crates and boulder are
+	# what the rows after these walk round), 4 cells off her.
+	var cell := World.NO_CELL
+	for way: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var spot := player.tile + way * 4
+		var clear := World.lob_open(spot)
+		for entity: GridEntity in World.get_entities():
+			if entity != player and entity.zone == player.zone and World.distance(entity.tile, spot) <= 3:
+				clear = false
+		if clear:
+			cell = spot
+			break
+	_check(cell != World.NO_CELL, "a cell 4 off her open to the sky with nothing within 3 of it (%s)" % cell)
+	var near := cell
+	var right := func(pressed: bool, at: Vector2i) -> void:  # The cell as an argument: a lambda keeps a local's value.
+		_main._pick_grid = Vector2(at) + Vector2(0.1, 0.1)
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_RIGHT
+		click.pressed = pressed
+		_main._unhandled_input(click)
+	var reset_bow := func() -> void:
+		_main._stance = ""
+		World.try_stance(player, "")
+		player.lob_held = World.NO_CELL
+		player.downed_at = -1  # A row's knockdown never meets the last one's grace (343 amended (2)).
+		for i in 12:
+			World.step()  # The last lob down.
+		player.bow_ready_tick = World.tick
+		player.stamina = player.max_stamina
+	var tap_shown := func() -> bool:
+		return is_instance_valid(rig._lob_tap_ring) and rig._lob_tap_ring.visible
+	var tap_on := func() -> Vector2i:
+		return Vector2i(roundi(rig._lob_tap_ring.position.x), roundi(rig._lob_tap_ring.position.z))
+	var arc_shown := func() -> bool:
+		return rig._lob_arc != null and rig._lob_arc.visible
+	var volley_rings := func() -> int:
+		return rig.get_children().filter(func(node: Node) -> bool: return str(node.name).begins_with("VolleyRing") and not node.is_queued_for_deletion()).size()
+
+	# A tap let go at 2 ticks.
+	reset_bow.call()
+	var lobs := World._lobs.size()
+	right.call(true, cell)
+	for i in 2:
+		await get_tree().process_frame
+		World.step()
+	var before_let := [tap_shown.call(), arc_shown.call()]
+	right.call(false, cell)
+	var fall: Array = _main.lob_tap_fall.duplicate()
+	var frames := []  # [shown, on, arc] each frame from the let-go's to the lob's.
+	var at_lob := []
+	for i in 8:
+		await get_tree().process_frame
+		frames.append([tap_shown.call(), tap_on.call() if tap_shown.call() else World.NO_CELL, arc_shown.call()])
+		var rings: int = volley_rings.call()
+		World.step()
+		if World._lobs.size() > lobs:
+			at_lob = [volley_rings.call() - rings, tap_shown.call(), World.last_log]
+			break
+	await get_tree().process_frame
+	var after: bool = tap_shown.call()
+	print("  tap: before the let-go %s; fall %s; frames %s; at the lob %s; a frame on %s" % [before_let, fall, frames, at_lob, after])
+	_check(before_let == [false, false], "drawn at the sky before the first step: no ring of the tap's yet, and no arc (%s)" % [before_let])
+	_check(fall.size() == 2 and fall[0] == cell and not frames.is_empty() and frames.all(func(f: Array) -> bool: return f[0] and f[1] == cell and not f[2]),
+			"let go: from the let-go's frame to the lob's, the volley's ring on the cell let go at and no arc (%s, %s)" % [fall, frames])
+	var said := "" if at_lob.is_empty() else str(at_lob[2])
+	_check(at_lob.size() == 3 and at_lob[0] == 1 and not at_lob[1] and not after,
+			"the lob up: its volley's ring appears and the tap's is gone, and stays gone (%s, a frame on %s)" % [at_lob, after])
+	_check(fall.size() == 2 and said.contains("at (%d, %d)" % [cell.x, cell.y]) and said.contains("in a circle %.1f " % float(fall[1])),
+			"the tap's ring was where it came down and as wide (%s; %s)" % [fall, said])
+
+	# A tap let go beyond the first step's reach: the ring stands where it will come down, drawn in to
+	# that reach (where the volley's ring appears, as the tap above shows), never on the cursor. It is
+	# knocked out of the draw before it flies, so no volley falls among the room's things.
+	reset_bow.call()
+	lobs = World._lobs.size()
+	var reach := World.reach_at(player, 0)
+	var far := World.NO_CELL
+	for way: Vector2i in [Vector2i(-1, 0), Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(1, -1)]:
+		var out := player.tile + way * (reach + 3)
+		var inward := player.tile + way * reach
+		if World.lob_open(inward) and World.lob_open(player.tile + way * (reach - 1)):
+			far = out
+			break
+	cell = far
+	right.call(true, cell)
+	for i in 2:
+		await get_tree().process_frame
+		World.step()
+	right.call(false, cell)
+	var expect: Vector2i = World.lob_aim(player, far, 0)
+	var far_rings := []
+	for i in 2:
+		await get_tree().process_frame
+		far_rings.append(tap_on.call() if tap_shown.call() else World.NO_CELL)
+	World.knock_down(player, player, 1)
+	await get_tree().process_frame
+	var far_gone: bool = not tap_shown.call()
+	for i in 8:
+		World.step()
+	_check(far != World.NO_CELL and far_rings.all(func(c: Vector2i) -> bool: return c == expect) and expect != far
+			and World.distance(player.tile, expect) <= reach and far_gone and World._lobs.size() == lobs,
+			"a tap let go %d cells off (the first step reaches %d): the ring nearer, on the cell the lob comes down on (%s, let go at %s, comes down at %s)" % [World.distance(player.tile, far), reach, far_rings, far, expect])
+	cell = near
+
+	# A tap, then a blow in the wait (a knockdown ends the draw; a let-down alone keeps the lob, 677
+	# amended (4)): the ring goes with it.
+	reset_bow.call()
+	lobs = World._lobs.size()
+	right.call(true, cell)
+	for i in 2:
+		await get_tree().process_frame
+		World.step()
+	right.call(false, cell)
+	await get_tree().process_frame
+	var shown_first: bool = tap_shown.call()
+	World.knock_down(player, player, 1)  # As combat_test _test_lob_tap's blow before tick 5 (a source: Main's listener names it).
+	var dropped := []
+	for i in 6:
+		await get_tree().process_frame
+		dropped.append(tap_shown.call())
+		World.step()
+	_check(shown_first and not dropped.has(true) and World._lobs.size() == lobs,
+			"a tap, then a knockdown in the wait: the ring shown, then gone, and no lob (%s, %s)" % [shown_first, dropped])
+
+	# A tap with the sky shut over the cell: try_lob would loose nothing, so no ring at all.
+	reset_bow.call()
+	World.fields.outdoor = false
+	lobs = World._lobs.size()
+	right.call(true, cell)
+	for i in 2:
+		await get_tree().process_frame
+		World.step()
+	right.call(false, cell)
+	var shut := []
+	for i in 8:
+		await get_tree().process_frame
+		shut.append(tap_shown.call())
+		World.step()
+	World.fields.outdoor = true
+	_check(_main.lob_tap_fall.is_empty() and not shut.has(true) and World._lobs.size() == lobs,
+			"a tap under a roof (no lob comes down there): no ring, no lob (%s)" % [shut])
+
+	# Esc in the draw: the game menu over it, the let-go never reaches Main; no ring.
+	reset_bow.call()
+	lobs = World._lobs.size()
+	right.call(true, cell)
+	await get_tree().process_frame
+	World.step()
+	_main.escape()
+	var escaped := []
+	for i in 8:
+		await get_tree().process_frame
+		escaped.append(tap_shown.call())
+		World.step()
+	if _main.game_menu != null and _main.game_menu.visible:
+		_main.game_menu.open(false)
+	_check(not escaped.has(true) and World._lobs.size() == lobs, "Esc in the draw: no ring, no lob (%s)" % [escaped])
+
+	# A held lob: as before, its arc while held and no ring of the tap's, let go or not.
+	reset_bow.call()
+	lobs = World._lobs.size()
+	right.call(true, cell)
+	var held := []
+	for i in 8:
+		await get_tree().process_frame
+		World.step()
+	await get_tree().process_frame
+	held.append([arc_shown.call(), tap_shown.call()])
+	right.call(false, cell)
+	var held_lobbed := World._lobs.size() > lobs
+	for i in 3:
+		await get_tree().process_frame
+		held.append([arc_shown.call(), tap_shown.call()])
+		World.step()
+	_check(held[0] == [true, false] and held_lobbed and held.slice(1).all(func(h: Array) -> bool: return not h[1]),
+			"a lob held past its first step: its arc as before, loosed at the let-go, no ring of the tap's (%s)" % [held])
+
+	reset_bow.call()
+	World.fields.outdoor = outdoor_was
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	_main.lob_let_at = Main.NONE
+	_free_rig(rig)
+	_stop_walk()
+	Net.controls = saved
 
 func _test_friend_click() -> void:
 	print("
