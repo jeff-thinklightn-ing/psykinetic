@@ -226,15 +226,16 @@ func as_played(clip: String) -> String:
 
 ## The base layer plays [param clip] at [param speed] (of the clip's own):
 ## crossfaded in over [param fade] (the rig's blend if negative), started
-## somewhere along it (seeded) unless [param from_start]. The clip already
-## playing only takes the new speed: no restart, no fade (a gait's pace
-## changes every frame).
-func loop(clip: String, speed := 1.0, fade := -1.0, from_start := false) -> void:
+## somewhere along it (seeded) unless [param from_start], or at [param at]
+## seconds into it when that is 0 or more (a gait's start, its feet as Idle's).
+## The clip already playing only takes the new speed: no restart, no fade (a
+## gait's pace changes every frame).
+func loop(clip: String, speed := 1.0, fade := -1.0, from_start := false, at := -1.0) -> void:
 	clip = _name(clip)
 	if clip == _base_clip[_slot] and not from_start:
 		set_speed(speed)
 		return
-	_to_base(clip, speed, fade, -1.0 if from_start else -2.0)
+	_to_base(clip, speed, fade, at if at >= 0.0 else (-1.0 if from_start else -2.0))
 
 
 ## The base layer's speed (the clip playing goes on, faster or slower).

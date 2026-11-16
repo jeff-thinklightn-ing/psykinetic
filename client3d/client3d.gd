@@ -1806,6 +1806,18 @@ const FOOTFALL_MOVING_MS := 1000
 ## The people's jog (People_Jog_Short, its stance longer: each foot strikes sooner) has its own.
 const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "Jog_Short": [0.027, 0.532], "Sprint_Short": [0.044, 0.587],
 	"People_Jog_Short": [0.966, 0.450]}
+## Where a gait starts from standing, a share of its clip as played (the coordinator's ruling on ui-design's hops,
+## 11-16: a start had begun its gait anywhere along it, at random): the share whose feet stand nearest Idle's, so
+## the blend from Idle moves them least. Idle stands with the left foot forward: the right foot planted, ending its
+## stance, the left leading (its first footfall the start's first sound; leading with the right moves both feet
+## 0.32 m into the jog's first step against 0.19, at the walk 0.49 against 0.19). Measured on both bodies
+## (anim_rig_test _test_gait_phases); a clip not here starts where it did.
+const GAIT_STARTS: Dictionary[String, float] = {CLIP_WALK: 0.895, "People_Jog_Short": 0.715, "Jog_Short": 0.69, "Sprint_Short": 0.72}
+## Each gait's stances, a share of its clip as played: [[the left foot down from, to], [the right's]] (a span may
+## wrap past the clip's end), its sole within 2 cm of the ground throughout on both bodies (anim_rig_test
+## _test_gait_phases). A stop holds with a foot down in one (_hold_gait).
+const GAIT_STANCES: Dictionary[String, Array] = {CLIP_WALK: [[0.96, 0.60], [0.46, 0.10]], "People_Jog_Short": [[0.005, 0.275], [0.55, 0.775]],
+	"Jog_Short": [[0.985, 0.22], [0.475, 0.72]], "Sprint_Short": [[0.935, 0.265], [0.475, 0.78]]}
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
@@ -28476,8 +28488,14 @@ func _animate(puppet: Node3D) -> void:
 		rig.loop(CLIP_WADE, clampf(speed / (ArtKit.feel("client3d.gait." + CLIP_WADE, WADE_PACE) * pace)
 				* ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
-	if speed > WALKING:
+	if speed > WALKING and not puppet.has_meta("still_since"):
 		_gait(puppet, rig, speed, smooth)
+		return
+	if speed > WALKING and _gait_held(puppet, rig):
+		# Stopped (still_since, from the frame it stopped) while the quick read still falls: it eases at 12/s
+		# and stayed over WALKING 0.1 to 0.25 s, the gait cycling on and the hold left what remained of
+		# STOP_HOLD (ui-design's hops3: held late or never). The hold from the frame it stopped.
+		_hold_gait(puppet, rig)
 		return
 	if entity != null and not entity.fishing.is_empty():
 		if _fishing_pose(puppet, rig, entity, now):
@@ -28510,7 +28528,7 @@ func _animate(puppet: Node3D) -> void:
 		rig.loop(CLIP_TALKING, tempo)
 		return
 	if _gait_held(puppet, rig):
-		_gait(puppet, rig, speed, smooth)  # A pause, not yet a stop (869): its gait on, slowing.
+		_hold_gait(puppet, rig)  # A pause, not yet a stop (869): its legs come to rest with a foot down.
 		return
 	var idle := _idle_clip(puppet)
 	var both_hands := puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active  # Ready with a two-hander: no fidgets.
@@ -28542,8 +28560,13 @@ func _gait(puppet: Node3D, rig: AnimRig, speed: float, smooth := -1.0) -> void:
 			at = i
 	var by := speed if smooth < 0.0 else smooth
 	if at < 0:
-		# A start from standing (or from another clip): its gait at once, by the quicker of the two.
+		# A start from standing (or from another clip): its gait at once, by the quickest of the two reads and its
+		# step's own pace (GridEntity.step_pace: the reads ease in over the first frames, and a player's start at
+		# 4 m/s read as a walk and walked half a second, gliding; ui-design's hops2).
 		by = maxf(speed, by)
+		var stepper := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
+		if stepper != null:
+			by = maxf(by, stepper.step_pace)
 		puppet.set_meta("gait_speed", by)
 	var index := gait_for(rig.base_clip(), by / pace, gaits)
 	# A burst goes by the quick read: past the next change up by GAIT_BURST, its gait at once, before the
@@ -28572,7 +28595,48 @@ func _gait(puppet: Node3D, rig: AnimRig, speed: float, smooth := -1.0) -> void:
 	else:
 		puppet.remove_meta("gait_want")
 	var gait: Array = gaits[index]
-	rig.loop(gait[0], clampf(by / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
+	var rate := clampf(by / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0)
+	if at < 0:
+		rig.loop(gait[0], rate, -1.0, false, start_at(rig, gait[0]))  # From standing: GAIT_STARTS, never at random.
+	else:
+		rig.loop(gait[0], rate)
+
+
+## Seconds into [param clip] as [param rig] plays it where a start from standing begins it (GAIT_STARTS), -1
+## for a clip with none (started where it would be).
+static func start_at(rig: AnimRig, clip: String) -> float:
+	var share := float(GAIT_STARTS.get(rig.as_played(clip), GAIT_STARTS.get(clip, -1.0)))
+	return share * rig.length(clip) if share >= 0.0 else -1.0
+
+
+## Whether [param share] of [param clip] as [param rig] plays it has a foot down (GAIT_STANCES); true for a clip
+## with none.
+static func foot_down(rig: AnimRig, clip: String, share: float) -> bool:
+	var spans: Array = GAIT_STANCES.get(rig.as_played(clip), GAIT_STANCES.get(clip, []))
+	if spans.is_empty():
+		return true
+	for span: Array in spans:
+		var from := float(span[0])
+		var to := float(span[1])
+		if (share >= from and share <= to) if from <= to else (share >= from or share <= to):
+			return true
+	return false
+
+
+## 869's hold (a body in a gait reading standing, STOP_HOLD from its stop), its legs come to rest with a foot down
+## (the coordinator's ruling on ui-design's hops, 11-16: they had cycled on, easing, over a body that had stopped,
+## then blended into Idle from wherever they were, the feet sliding a median 0.6 m): with a foot down
+## (foot_down), the clip stops where it is; in the air between two, it plays on at the rate it had to the next
+## foot down (at most a flight's time), then stops. Moving again, _gait takes it on from there; stood out the
+## hold, Idle blends in over that foot. Measured on the clip at a player's 4 m/s, a stop's feet slid a mean 0.42 m
+## as built and 0.26 so (stopped at once, 0.15, but held in the air a third of the time).
+func _hold_gait(puppet: Node3D, rig: AnimRig) -> void:
+	var clip := rig.base_clip()
+	var length := rig.length(clip)
+	if length <= 0.0:
+		return
+	if foot_down(rig, clip, fposmod(rig.base_position(), length) / length):
+		rig.set_speed(0.0)
 
 
 ## Whether [param puppet], in a gait and reading standing, holds it yet (869: still under STOP_HOLD,

@@ -43,6 +43,7 @@ func _ready() -> void:
 	await _test_no_upper()
 	await _test_people_feet()
 	_test_people_jog()
+	await _test_gait_phases()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
 	await _test_hand_relax()
@@ -2897,6 +2898,65 @@ const PEOPLE_JOG_HANG_MOST := 0.175
 const PEOPLE_JOG_STANCE_LEAST := 0.5
 const PEOPLE_JOG_EVEN := 0.12
 const PEOPLE_JOG_TOP := 1.05
+
+
+## The gaits' starts and stances (Client3D.GAIT_STARTS, GAIT_STANCES; the coordinator's ruling on ui-design's
+## hops, 11-16), on the man and the woman: inside each foot's stance span (STANCE_SAMPLES across it, its ends
+## too) that foot's sole (the lower of its toe's and its ankle's height over their rest) within STANCE_SOLE of the
+## ground; at a start's share the right foot down and the left off the ground (it leads), both feet together
+## within START_NEAR m of where Idle has them over the ground and nearer than half a cycle on (the right leading).
+const STANCE_SAMPLES := 8
+const STANCE_SOLE := 0.03
+const START_NEAR := 0.25
+func _test_gait_phases() -> void:
+	print("== the gaits' starts and stances ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var bad: Array[String] = []
+	var starts: Array[String] = []
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var toes := [skeleton.find_bone("LeftToes"), skeleton.find_bone("RightToes")]
+		var feet := [skeleton.find_bone("LeftFoot"), skeleton.find_bone("RightFoot")]
+		var read := func(clip: String, share: float) -> Array:
+			rig.base_at(clip, share * lib.get_animation(clip).length)
+			await _frames(2)
+			var out := []
+			for s in 2:
+				var toe := skeleton.get_bone_global_pose(toes[s]).origin
+				var foot := skeleton.get_bone_global_pose(feet[s]).origin
+				out.append([minf(toe.y - skeleton.get_bone_global_rest(toes[s]).origin.y, foot.y - skeleton.get_bone_global_rest(feet[s]).origin.y), Vector2(foot.x, foot.z)])
+			return out
+		var idle: Array = await read.call("Idle", 0.0)
+		for clip: String in Client3D.GAIT_STANCES:
+			if not lib.has_animation(clip):
+				bad.append("%s: no clip" % clip)
+				continue
+			var spans: Array = Client3D.GAIT_STANCES[clip]
+			for s in 2:
+				var from := float(spans[s][0])
+				var span := fposmod(float(spans[s][1]) - from, 1.0)
+				for k in STANCE_SAMPLES + 1:
+					var share := fposmod(from + span * k / STANCE_SAMPLES, 1.0)
+					var got: Array = await read.call(clip, share)
+					if float(got[s][0]) > STANCE_SOLE:
+						bad.append("%s %s: the %s sole %.3f m up at %.3f" % [build[0], clip, ["left", "right"][s], got[s][0], share])
+		for clip: String in Client3D.GAIT_STARTS:
+			var share := float(Client3D.GAIT_STARTS[clip])
+			var got: Array = await read.call(clip, share)
+			var mirror: Array = await read.call(clip, fposmod(share + 0.5, 1.0))
+			var near := (got[0][1] as Vector2).distance_to(idle[0][1]) + (got[1][1] as Vector2).distance_to(idle[1][1])
+			var other := (mirror[0][1] as Vector2).distance_to(idle[0][1]) + (mirror[1][1] as Vector2).distance_to(idle[1][1])
+			starts.append("%s %s %.3f m (half a cycle on %.3f)" % [build[0], clip, near, other])
+			if float(got[1][0]) > STANCE_SOLE or float(got[0][0]) <= 0.02 or near > START_NEAR or near >= other:
+				bad.append("%s %s's start at %.3f: right sole %.3f, left %.3f, feet %.3f m from Idle's (half a cycle on %.3f)" % [
+					build[0], clip, share, got[1][0], got[0][0], near, other])
+		model.queue_free()
+	print("  starts, both feet from Idle's: %s" % ", ".join(starts))
+	_check(bad.is_empty(), "every stance span's foot down within %.2f m on both bodies, every start the right foot down and the left leading, its feet within %.2f m of Idle's (%s)" % [
+		STANCE_SOLE, START_NEAR, "; ".join(bad.slice(0, 6))])
 
 
 func _test_people_jog() -> void:

@@ -120,6 +120,8 @@ class Own:
 	var pending: Array[Dictionary] = []
 	## The open command: the way held now and for how long so far.
 	var open_intent := Vector2.ZERO
+	## A way at or under this (cells a tick) is not yet a step's: GridEntity's stepping line (going over 0.05).
+	const OPEN_WAY_STEP := 0.05
 	var open_seconds := 0.0
 	## The centre after the server's state and the closed commands.
 	var base := Vector2.INF
@@ -262,6 +264,15 @@ class Own:
 		if open_intent != Vector2.ZERO and open_seconds > 0.0 and not held_by_server(entity):
 			at = World.free_glide(entity, base, open_intent, open_seconds * World.TICK_RATE, held)[0]
 		return at + error
+
+	## The pace its held way would glide at, cells a second, while its way is not yet a step's (a start: way is
+	## still zero till its first command is sent, or under the 0.05 cells a tick GridEntity counts as stepping,
+	## so going() reads all but nothing for up to a tick while the body is drawn moving); 0 otherwise. Display
+	## only (GridEntity.step_pace, a view's gait at a start): World.free_glide touches nothing.
+	func open_pace(entity: GridEntity) -> float:
+		if open_intent == Vector2.ZERO or way.length() > OPEN_WAY_STEP or base == Vector2.INF or held_by_server(entity):
+			return 0.0
+		return (World.free_glide(entity, base, open_intent, 1.0, held)[1] as Vector2).length() / World.TICK_DT
 
 	## The way it is going now, cells a tick.
 	func going() -> Vector2:

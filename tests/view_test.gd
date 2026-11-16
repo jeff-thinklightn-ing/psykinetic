@@ -229,7 +229,7 @@ func _ready() -> void:
 		await _test_wind_flinch()  # 392 amended (11): after blows_seen, with its player still standing (the list's end has none).
 		await _test_tell_killed()  # 780 amended (36): after wind_flinch, its player still standing.
 		await _test_told_hurts()  # 390 amended (4): after wind_flinch, its player still standing.
-		_test_gait_holds()
+		await _test_gait_holds()  # It lets frames run (the hold's rows).
 		await _test_shield_seen()
 		await _test_reel_clock()
 		await _test_barrow_deaths()
@@ -19543,6 +19543,22 @@ func _test_gait_holds() -> void:
 		for i in range(1, seen.size()):
 			n += 1 if seen[i] != seen[i - 1] else 0
 		return n
+	# A start by its step's own pace (the coordinator's ruling on ui-design's hops2: the player's start at 4 m/s read
+	# as a walk for a median half second): the entity drawn along a step at 4 m/s, the jog on the first frame,
+	# begun at its GAIT_STARTS share (never at random).
+	player.step_pace = 4.0 * pace
+	drive.call([[4.0, 1.0 / 60.0]])
+	var paced_first := rig.base_clip()
+	var began := float(rig._base_seek[rig._slot])
+	var meant := Client3D.start_at(rig, gaits[1])
+	player.step_pace = 0.0
+	_check(paced_first == gaits[1] and meant >= 0.0 and absf(began - meant) < 0.001,
+			"a start drawn along a 4 m/s step jogs on its first frame (%s), begun at its start, %.3f s in (%.3f meant)" % [paced_first, began, meant])
+	for key: String in ["speed", "gait_speed", "still_since", "gait_want"]:
+		puppet.remove_meta(key)
+	puppet.set_meta("last_ms", AnimRig._clock_msec)
+	puppet.set_meta("last_at", puppet.position)
+	rig.loop(Client3D.CLIP_IDLE, 1.0)
 	var started: Array = drive.call([[4.0, 0.6]])
 	var first: String = started[0]
 	_check(first in gaits and started[30] == gaits[1], "a start from standing goes at once (%s on its first frame) and jogs within 0.5 s (%s)" % [first, started[30]])
@@ -19567,10 +19583,45 @@ func _test_gait_holds() -> void:
 		hitched.append_array(drive.call([[4.0, 0.4], [0.0, 2.0 / 60.0], [12.0, 1.0 / 60.0]]))
 	_check(hitched.all(func(clip: String) -> bool: return clip == gaits[1]),
 			"a jog that stalls two frames and makes the ground up in one keeps the jog, six times over (%s)" % [hitched.filter(func(clip: String) -> bool: return clip != gaits[1])])
+	# The hold from the frame it stopped (ui-design's hops3: the quick read stayed over WALKING 0.1 to 0.25 s after
+	# a stop, and _gait cycled the jog on, easing it, the hold left what remained of STOP_HOLD): on the first still
+	# frame, the read still over WALKING, the jog is held, stopped with a foot down, else at the rate it had.
+	drive.call([[4.0, 1.0]])
+	var rate_before := rig.speed()
+	drive.call([[0.0, 1.0 / 60.0]])
+	var held_clip := rig.base_clip()
+	var held_share := fposmod(rig.base_position(), rig.length(held_clip)) / maxf(rig.length(held_clip), 0.001)
+	var held_down := Client3D.foot_down(rig, held_clip, held_share)
+	var still_read := float(puppet.get_meta("speed", 0.0))
+	_check(still_read > Client3D.WALKING and held_clip == gaits[1] and (rig.speed() == 0.0 if held_down else is_equal_approx(rig.speed(), rate_before)),
+			"the first still frame after a jog, its read still %.2f m/s (over WALKING), holds the jog (%s at %.3f, a foot down %s): speed %.2f (%.2f before)" % [
+			still_read, held_clip, held_share, held_down, rig.speed(), rate_before])
 	drive.call([[4.0, 1.0]])
 	var stop: Array = drive.call([[0.0, 0.6]])
 	var stood := stop.find(Client3D.CLIP_IDLE)
 	_check(stood >= int(Client3D.STOP_HOLD * 60.0) - 1 and stood <= 24, "a real stop stands after STOP_HOLD, by 0.4 s (frame %d)" % stood)
+	# The hold's legs (_hold_gait; the coordinator's ruling on ui-design's hops2): a jog held inside the right foot's
+	# stance stops where it is; one held in the flight after the left's plays on at its rate (to the next foot down).
+	# The first of its gaits past the walk that this rig plays and that has stances (its list differs by body).
+	var jog := ""
+	for gait: String in gaits.slice(1):
+		if rig.length(gait) > 0.0 and Client3D.GAIT_STANCES.has(rig.as_played(gait)):
+			jog = gait
+			break
+	var jog_length := rig.length(jog)
+	var spans: Array = Client3D.GAIT_STANCES.get(rig.as_played(jog), [])
+	var held := {}
+	if spans.size() == 2:
+		for case: Array in [["down", fposmod(float(spans[1][0]) + 0.05, 1.0)], ["air", fposmod(float(spans[0][1]) + 0.05, 1.0)]]:
+			rig.loop(Client3D.CLIP_IDLE, 1.0)
+			rig.loop(jog, 0.0, 0.0, false, float(case[1]) * jog_length)
+			rig.tree.advance(0.0)  # The seek taken now: a frame would let the view stand the still body in Idle.
+			rig.set_speed(1.2)
+			_rig._hold_gait(puppet, rig)
+			held[case[0]] = [rig.speed(), Client3D.foot_down(rig, jog, float(case[1])), rig.base_clip(), snappedf(rig.base_position() / jog_length, 0.001)]
+	_check(held.size() == 2 and float(held["down"][0]) == 0.0 and bool(held["down"][1]) and is_equal_approx(float(held["air"][0]), 1.2)
+			and not bool(held["air"][1]) and held["down"][2] == jog and held["air"][2] == jog,
+			"held with a foot down the jog stops where it is, held in the air it plays on to the next (%s: [speed, a foot down, clip, share] %s)" % [jog, held])
 	drive.call([[1.0, 1.5]])
 	var walked := rig.base_clip()
 	var burst: Array = drive.call([[4.0, 0.1]])

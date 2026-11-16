@@ -212,6 +212,10 @@ func is_local() -> bool:
 	return owner_peer == Net.local_id  # As Main._local_player.
 
 
+func _start_pace() -> float:
+	return (free_view as FreeNet.Own).open_pace(self) if free_view is FreeNet.Own else 0.0
+
+
 func _free_shown() -> Array:
 	if free_view is FreeNet.Own:
 		var own := free_view as FreeNet.Own

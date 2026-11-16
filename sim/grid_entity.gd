@@ -505,6 +505,10 @@ var push_direction := Vector2i.ZERO
 ## True while the body is drawn taking a step of its own (any slide that is
 ## not its push's).
 var stepping := false
+## The pace it is drawn at along that step, cells a second (0 when not stepping): a slide's own (its length
+## over its time, constant along it) or a free body's. A view's start takes its gait by it from its first
+## frame (Client3D._gait), where a speed read from its frames is still catching up. Display only.
+var step_pace := 0.0
 var _push_from := Vector2i.ZERO
 var _push_to := Vector2i.ZERO
 ## Tick (this peer's clock) of the last push.
@@ -733,6 +737,7 @@ func _process(delta: float) -> void:
 			_to_tile = tile
 			var going: Vector2 = free_at[1]
 			stepping = going.length() > 0.05
+			step_pace = going.length() / World.TICK_DT if stepping else _start_pace()
 			if stepping:
 				wanted = going
 			elif aim != Vector2.ZERO:
@@ -830,6 +835,7 @@ func _process(delta: float) -> void:
 			var sliding := t < 1.0 and to != _from_tile
 			var knocked := sliding and _on_push_line(_from_tile, to)
 			stepping = sliding and not knocked
+			step_pace = _from_pos.distance_to(Vector2(to)) / (_move_duration * World.TICK_DT) if stepping and _move_duration > 0.0 else 0.0
 			_note_push_shown(knocked, to, t)
 			if stepping:
 				wanted = bent[1] if not bent.is_empty() else Vector2(to - _from_tile)
@@ -878,6 +884,12 @@ func _process(delta: float) -> void:
 ## 689): [centre in cells, cells a tick], or [] to draw it by its cell.
 func _free_shown() -> Array:
 	return []
+
+
+## A free body's pace, cells a second, on the frames it is drawn moving before its way is known (its own
+## view's start, FreeNet.Own.open_pace); 0 for any other. Display only (step_pace).
+func _start_pace() -> float:
+	return 0.0
 
 
 ## Whether a slide from [param from] to [param to] goes along the last

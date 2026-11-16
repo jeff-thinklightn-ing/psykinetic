@@ -147,7 +147,26 @@ func _test_own_view() -> void:
 	var from := own.shown(player)
 	own.hold(player, Vector2.RIGHT, FRAME)
 	_check(own.shown(player).x > from.x, "a frame's input shown that frame (%.3f cells)" % (own.shown(player).x - from.x))
+	# A start's pace before its way is known (the view's gait at a start, GridEntity.step_pace; ui-design's hops3:
+	# the player's start read all but nothing and walked a median 0.2 s at 4 m/s): its first frame's open_pace.
+	var way_at_start := own.way
+	var start_pace := own.open_pace(player)
+	var shown_start := player._start_pace()
+	# A way known but shorter than a step's (hops3_after_7f78c899d's low_hop4: its first frame drawn moving, the gait
+	# a walk 219 ms): under GridEntity's stepping line it reads no step, so the held way's pace stands in for it too.
+	own.way = Vector2(0.01, 0.0)
+	var nearly_pace := own.open_pace(player)
+	own.way = Vector2(0.2, 0.0)
+	var stepping_pace := own.open_pace(player)
+	own.way = way_at_start
 	_frames(player, own, Vector2.RIGHT, 60)
+	var going_pace := own.going().length() / World.TICK_DT
+	_check(is_equal_approx(nearly_pace, start_pace) and stepping_pace == 0.0,
+			"a way known but shorter than a step's (0.01 cells a tick): the held way's pace too (%.2f); a step's (0.2): none (%.2f)" % [nearly_pace, stepping_pace])
+	_check(way_at_start == Vector2.ZERO and start_pace > 1.0 and absf(start_pace - going_pace) < 0.05 and is_equal_approx(shown_start, start_pace)
+			and own.open_pace(player) == 0.0,
+			"a start's first frame, nothing glided yet: its pace %.2f cells/s, as it goes once its way is known (%.2f; its view's %.2f), and 0 once it is (%.2f)" % [
+			start_pace, going_pace, shown_start, own.open_pace(player)])
 	_check(own.corrections == 0, "a second's walk east: no corrections (%d)" % own.corrections)
 	var ahead := own.shown(player).x - player.free_pos.x
 	_check(ahead >= 0.0 and ahead < 0.6, "the view ahead of the server by what it has not applied (%.2f)" % ahead)
