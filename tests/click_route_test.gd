@@ -48,6 +48,7 @@ func _ready() -> void:
 	if not _far():
 		_test_doorway()
 		_test_go_in()
+		_test_footprint_click()
 	await _test_click_routes_agree()
 	print("\nRESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -161,6 +162,62 @@ func _test_go_in() -> void:
 		_check(not path.is_empty() and path.back() == Vector2i(178, 208) and path.has(Vector2i(179, 208)),
 			"a click on the front cell (180,208) from the lane: the route goes through the door cell to the link %s (%d cells)" % [path.back() if not path.is_empty() else "none", path.size()])
 		_main._free["path"] = []
+
+
+## 935 amended (6): ui-design's gate run on main 87b2f6017 (the Mughouse's shell solid, 811 amended (8)): 0 of 22 clicks on the footprint off
+## the door went in. The click was taken to the ground beside the building (_snap_to_floor: (174,206) to (174,204)) or to nothing (no floor
+## within SNAP_RANGE of (173,210)) before go_in_goal read it. These are main's own cells, the five targets of the run, on the shell as the
+## level lays it (solid here, asserted): the click's cell is the way in, from the snap's own failure to the route's end at a link.
+func _test_footprint_click() -> void:
+	print("\n== a click on the Mughouse's solid footprint goes in (935 amended (6)) ==")
+	var player := _player()
+	var wilds: Dictionary = _main.level
+	var links: Array[Vector2i] = []
+	for link: Dictionary in wilds.get("links", []):
+		if str(link.get("to_map", "")) == "umbrage_tavern":
+			links.append(link["tile"])
+	# Roof, wall and the shell's inside: the five targets of the run (the roof's picture and wall faces are footprint cells too).
+	var targets: Array[Vector2i] = [Vector2i(174, 206), Vector2i(175, 205), Vector2i(179, 206), Vector2i(179, 211), Vector2i(173, 210),
+			Vector2i(172, 207), Vector2i(173, 208), Vector2i(174, 208)]
+	var solid := 0
+	var snapped_off := 0
+	for cell: Vector2i in targets:
+		if not World.is_walkable(cell):
+			solid += 1
+		var old_way: Vector2i = _main._snap_to_floor(Vector2(cell))
+		if old_way == Main.NONE or not Level.building_rect(_building_at(wilds, cell)).has_point(old_way):
+			snapped_off += 1
+	_check(solid == targets.size(), "the shell is solid at the targets as the level lays it (%d of %d not walkable): the row stands on what the run did" % [solid, targets.size()])
+	_check(snapped_off >= 1, "the snap alone takes %d of the %d targets off the footprint or to nothing: the fault the run found" % [snapped_off, targets.size()])
+	for cell: Vector2i in targets:
+		var goal: Vector2i = _main._click_ground_cell(Vector2(cell))
+		_check(links.has(goal), "a click on %s, solid footprint, means the way in: %s (a link of %s)" % [cell, goal, links])
+		if player != null:
+			World._relocate(player, Vector2i(185, 208))
+			_main._free_taken_over(player)
+			_main._plain_left(player, null, goal, false)
+			var path: Array = _main._free.get("path", [])
+			_check(not path.is_empty() and links.has(path.back()), "and the walk from the lane to it ends on a link: %s (%d cells)" % [path.back() if not path.is_empty() else "none", path.size()])
+			_main._free["path"] = []
+	# Ground outside the footprint is the snap as before; the way in shut is the snap too.
+	_check(_main._click_ground_cell(Vector2(185.2, 208.1)) == Vector2i(185, 208), "a click on the open lane is the cell clicked, as before")
+	var shut_level: Dictionary = wilds.duplicate(true)
+	for link: Dictionary in shut_level["links"]:
+		if str(link.get("to_map", "")) == "umbrage_tavern":
+			link["closed"] = true
+	var kept: Dictionary = _main.level
+	_main.level = shut_level
+	var shut_goal: Vector2i = _main._click_ground_cell(Vector2(174, 206))
+	_main.level = kept
+	_check(shut_goal != Vector2i(174, 206) and not links.has(shut_goal), "the inn's way in shut: a click on its roof is the snap's cell %s, as before" % shut_goal)
+
+
+## The building of [param from_level] whose footprint holds [param cell] (an empty one: none).
+func _building_at(from_level: Dictionary, cell: Vector2i) -> Dictionary:
+	for building: Dictionary in from_level.get("buildings", []):
+		if Level.building_rect(building).has_point(cell):
+			return building
+	return {}
 
 
 ## Every zone the game loads (Level.names(), and each regenerating level's

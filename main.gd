@@ -1718,7 +1718,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
-			_plain_left(player, target, tile if target != null else _snap_to_floor(_mouse_grid()), targetable)
+			_plain_left(player, target, tile if target != null else _click_ground_cell(_mouse_grid()), targetable)
 		MOUSE_BUTTON_RIGHT:
 			# Any entity: go to it and shove. Sent on release, so that
 			# dragging first can aim it.
@@ -1800,7 +1800,7 @@ func _click_with_bow(player: Player) -> void:
 	elif Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, MOUSE_BUTTON_LEFT)
 	else:
-		_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
+		_move_click(player, tile if target != null else _click_ground_cell(_mouse_grid()))
 
 
 ## Whether [param entity] is a friend (decision 454): a town's resident, a
@@ -3869,6 +3869,21 @@ func _update_pick() -> void:
 	else:
 		camera.force_update_scroll()
 		_pick_grid = Iso.local_to_grid(_mouse_point())
+
+
+## The cell a click on bare ground at [param grid] means (935 amended (6)): the way in when the cell under the cursor is one of a
+## building's with an inside (go_in_goal: its door's cells, or anywhere on its footprint), else the walkable cell nearest (_snap_to_floor).
+## The way in is asked of the cell itself, before the snap: with the pocket's shell solid, the snap took a click on the roof's picture or a
+## wall to the ground beside the building (a walk round to (174,204)), or to NONE where no floor lies within SNAP_RANGE (a click that did
+## nothing), and go_in_goal then read a cell outside the footprint.
+func _click_ground_cell(grid: Vector2) -> Vector2i:
+	if is_nan(grid.x) or is_nan(grid.y):
+		return NONE
+	var under := Vector2i(roundi(grid.x), roundi(grid.y))
+	var goal := go_in_goal(level, under)
+	if goal != under:
+		return goal
+	return _snap_to_floor(grid)
 
 
 ## The walkable cell nearest [param grid] (a ground-plane point in grid
