@@ -51183,7 +51183,12 @@ or "player", the two cells, nothing else), for release to count after the deploy
 (they are made at their places, which skip shells), so none is moved; economy finds none of its people placed or
 routed inside I1 and a non-player never steps onto a link. Leaving: travel sets a leaver beside the inn's first link,
 (179, 209), the doorway, and its re-join (_join_player, travelled) puts that through the same rule, so he is set
-outside at (181, 208), unsaid (the line counts what a save held, not who walked out). Measured joined on this take
+outside at (181, 208), unsaid (the line counts what a save held, not who walked out). With terrain's 947 on main,
+its out_of_shell sets the leaver first and this rule leaves that be: through the inn's way out he arrives at its
+spawn from_tavern (181, 208), free and outside the footprint (ui-design's joined gate on 87b2f6017, the Atlas,
+C:/dev/review/ui-design/looks/gate2_87b2f6017/: 20 of 20 leavings at (181, 208) 5 s after); a travel naming no
+spawn gets the door's outer cell (180, 209), facing out (first_room_test reads him outside the footprint, by the
+door, off its links). Measured joined on this take
 alone (ui-design, fcf4527e4, the Lenovo, C:/dev/review/ui-design/looks/pocket_fcf4527e4/): 33 entries, 0 in the shell
 (main 13), 3 stopped on the door cell they clicked; 5 leavings, all set down at (181, 208), W held walking on south,
 away from the door; on the doorway he is a silhouette under the eaves, the roof on. The coordinator then let it be

@@ -159,5 +159,7 @@ func _test_out_of_shell() -> void:
 	var back: bool = _main.travel(peer, "wilds")
 	await get_tree().process_frame
 	bo = _main._players.get(peer)
-	_check(back and bo != null and bo.zone == "wilds" and outside.call(bo.tile) and World.distance(bo.tile, Vector2i(181, 208)) <= 2,
-		"out of the tavern he stands outside its door, at %s, not in its doorway" % [bo.tile if bo else "-"])
+	# 947's out_of_shell sets him on the door's outer cell, facing out (outside the footprint);
+	# the pocket's rule leaves that be. Never the footprint's own door cells or a link.
+	_check(back and bo != null and bo.zone == "wilds" and World.is_walkable(bo.tile) and bo.tile not in foot and bo.tile not in links and World.distance(bo.tile, Vector2i(181, 208)) <= 2,
+		"out of the tavern he stands outside its footprint, by its door, at %s, not in its doorway" % [bo.tile if bo else "-"])
