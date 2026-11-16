@@ -61393,3 +61393,50 @@ are base's ("the temple's under the town", "I've never been to Umbrage"); the gu
 the file is no picture of the game after the stack. A bare order the model leaves untagged, a second-person stage
 direction shown as her line, and a find told before she has looked are on main as before: a row of their own after this.
 Server only; protocol unchanged.
+## 943. A client's first press reads no level again (perf; the coordinator's approval, 2026-11-15)
+
+The first click after arriving hitched by about 400 ms on a laptop, and a second click at the same place
+did not (ui's route watch: 420-680 ms press frames on the first click at each spot, 0.1-110 ms on the
+second). perf's click probes on the Lenovo (C:/dev/review/perf_route_lenovo, C:/dev/review/perf_click2_lenovo,
+the press's mouse path timed step by step) named it: the wilds' whole level parsed again from its files,
+once per cache. A click on Rolf at his stall: 380.3 ms in the press, the mouse path's steps 0.0, the route
+6.1, the rest in _talk_to -> _stand_to_talk -> _counters_of("wilds"), which read Level.load_level(zone) for
+the counter cells. A click on open ground: 409.2 ms, of it "remains_at 408.3": remains_at -> throne_at(map_name)
+-> _zone_level(map_name) -> Level.load_level. _zone_level skips an outdoor zone by World.zone's name, and a
+client's World.zone is an unnamed placeholder, so on a client its own zone was always read. "A spot" was
+nothing spatial: the first click that reached each cache.
+
+- _counters_of(zone) reads Main.level's buildings when zone is map_name with the level loaded, and keeps
+  Level.load_level for any other zone. Main.level is Level.load_level(map_name) (_load_level sets both).
+- _zone_level(zone_name) on a client (not Net.is_authority()) for its own zone (map_name, the level loaded)
+  is {} outdoors (World.outdoor, which mirror_terrain sets), as the server's answer for an outdoor zone,
+  else Main.level, never cached (a terrain message reloads Main.level). The throne's, the altar's and the
+  remains' clicks (throne_at, knights_altar, remains_at) and hall_link_held read it.
+- _rooms_of(zone_name), the same shape (World.zone's name only), takes Main.level's rooms for map_name too.
+- Found beside it: _zone_levels and _rooms_read were never dropped, so a builder's change to an interior
+  (or its rooms) was not seen until the game restarted. Both are now dropped where _counter_cells already
+  was (807 amended (8)): reload_zone on the server and _on_terrain on a client.
+- Level.loads counts Level.load_level's reads by level name (853 amended (21)'s counter, landed beneath this); the test sums them.
+
+The other Level.load_level callers in main.gd and client3d.gd were read for the same shape (the current
+zone parsed again on a press, a hover or a frame): _load_level, _read_neighbour, plane_links and
+Client3D's world map are a crossing's or a join's (terrain's 822); the rest are the server's (_posts_of,
+_fire_where, the companions' and towns' words, _rooms_of's other callers) or a console command. None other
+on a client's press. zone_doors(zone_name) has the same World.zone test (a client's doors for its own zone
+come back empty unless the zone is held); it is not a parse and is left for its own.
+
+The path grid's cold fill (the healer's click: 11,989 cells filled, 673 ms, against 114.8 warm; ~47 us a
+cell on the Lenovo) is 935 amended (3)'s stand-cell bound, not this. The run's grid wipes were 4, all
+_set_terrain on a zone's arrival, so a local wipe has no case yet and is not made.
+
+click_route_test _test_first_click_reads_no_level, as a client (Net.mode CLIENT) in the wilds: the stalls'
+counter cells the same as the level's own buildings give (Rolf's (203, 197) among them), no throne,
+remains or altar on the street, the wilds' _zone_level {}, its rooms the level's, and Level.loads unchanged
+through all of it; in barrow_deep throne_at finds the throne at (49, 75) and _zone_level is the level in
+play, no level read; back in the wilds its own counters, no throne, nothing read; a builder's terrain
+message for the wilds without the stall at (203, 197) (_on_terrain) shows at the next ask, the other stall
+still there; the message's level forgotten and read again, the stall is back. click_route_test,
+companion_test, level_test, raid_groups_test and resident_test PASS.
+
+Client only; protocol unchanged; no new class_name; no bullet until it is seen joined, before and after
+(voice's words then: "the first click after you arrive no longer hitches").

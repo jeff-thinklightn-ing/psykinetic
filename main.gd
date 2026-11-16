@@ -4586,6 +4586,8 @@ func reload_zone(zone_name: String, read := {}, message := {}, config := {}) -> 
 	_counter_cells.erase(zone_name)  # Its buildings may have changed (807 amended (8): read again at the next ask).
 	for kept: Dictionary in [_seat_decor, _camp_bedrolls, _camp_carts]:
 		kept.erase(zone_name)  # Its decor may have changed: kept again from the level laid below (853 amended (21)).
+	_zone_levels.erase(zone_name)  # 943: the same for its cached parse and rooms.
+	_rooms_read.erase(zone_name)
 	Regen.forget()  # An edited level.json may mark it, or no longer.
 	if read.is_empty():
 		_load_level(zone_name)
@@ -5073,6 +5075,8 @@ func _on_terrain(data: Dictionary) -> void:
 	var level_name := str(data.get("name", ""))
 	_terrain_hash[level_name] = terrain_hash(data)  # The left level's test (822 amended (6)).
 	_counter_cells.erase(level_name)  # A level changed live (a builder's accept): its counters are read again (807 amended (8)).
+	_zone_levels.erase(level_name)  # 943: the same for its cached parse and rooms.
+	_rooms_read.erase(level_name)
 	if level_name == map_name:
 		_load_level(level_name)
 		World.mirror_terrain(_terrain)
@@ -16854,7 +16858,14 @@ static func _is_shell(building: Dictionary) -> bool:
 ## loaded: an outdoor level carries no "town", tavern or keeper's room, and
 ## reading the wilds' whole level.json for that stalled a tick ~220 ms on a
 ## player's first arrival in Umbrage (perf, measured on f63bf2b55).
+## A client's own zone is the level it holds (943): its World.zone is
+## unnamed, so the outdoor test above never matched there and a press
+## (remains_at, the throne's and the altar's clicks) read the wilds' whole
+## level again, ~400 ms on a laptop; {} outdoors as on the server, else
+## Main.level, never cached (a terrain message reloads it).
 func _zone_level(zone_name: String) -> Dictionary:
+	if not Net.is_authority() and zone_name == map_name and not level.is_empty():
+		return {} if World.outdoor else level
 	if not _zone_levels.has(zone_name):
 		var held: Zone = World.zones.get(zone_name)
 		var outdoor := (World.zone != null and zone_name == World.zone.name and World.outdoor) or (held != null and held.outdoor)
@@ -18389,7 +18400,8 @@ func _town_ground(zone_name: String, cell: Vector2i) -> String:
 ## Zone [param zone_name]'s level's named rooms (Level.room_at's): the
 ## level open now, an open zone's, else read once and kept.
 func _rooms_of(zone_name: String) -> Dictionary:
-	if World.zone != null and World.zone.name == zone_name and level.get("rooms") is Dictionary:
+	# The level in play (943: a client's World.zone is unnamed, so its own zone was read again from its files).
+	if (zone_name == map_name or World.zone != null and World.zone.name == zone_name) and level.get("rooms") is Dictionary:
 		return level["rooms"]
 	var zone: Zone = World.zones.get(zone_name)
 	if zone != null and zone.main.get("level", {}).get("rooms") is Dictionary:
@@ -28414,7 +28426,9 @@ var _counter_cells := {}
 func _counters_of(zone: String) -> Dictionary:
 	if not _counter_cells.has(zone):
 		var cells := {}
-		var buildings: Array = Level.load_level(zone).get("buildings", []) if Level.exists(zone) else []
+		# The level in play from what is held (943: a click on a stall's keeper read the wilds' whole level again,
+		# ~380 ms on a laptop); any other zone's read once.
+		var buildings: Array = level.get("buildings", []) if zone == map_name and not level.is_empty() 			else Level.load_level(zone).get("buildings", []) if Level.exists(zone) else []
 		for each: Variant in buildings:
 			if each is Dictionary and str(each.get("slot", "")) in COUNTERS:
 				var rect: Variant = Level.building_rect(each)
