@@ -208,6 +208,7 @@ func _ready() -> void:
 		_test_humans()
 		_test_worn()
 		_test_worn_gear()
+		_test_knot_under_headwear()
 		_test_satchel_worn()
 		_test_asleep()
 		_test_person_looks()
@@ -18671,6 +18672,76 @@ func _test_worn_gear() -> void:
 	model.set_meta("worn_gear", "")
 	_rig._process(0.0)
 
+
+## 419 amended (9): bound hair's top-knot (Hair_Bun) its own part, drawn bare-headed and put away under any headwear:
+## the look's own hood, cap or hat (a trade's too), a worn head-slot item, a worn hood, a bard's hat.
+func _test_knot_under_headwear() -> void:
+	print("
+== bound hair's top-knot: its own part, hidden under any headwear (419 amended (9)) ==")
+	var words := {}
+	for headwear: String in ["none", "hood", "hat", "cap"]:
+		var each := PersonLook.make("seed=11 body=female hair=bound headwear=%s" % headwear)
+		words[headwear] = [each.parts.has("Hair_Bound"), each.parts.has(PersonLook.HAIR_KNOT)]
+	var farmer := PersonLook.make("seed=11 body=female hair=bound trade=farmer")
+	_check(words["none"] == [true, true] and words["hood"] == [false, false] and words["hat"] == [true, false]
+			and words["cap"] == [true, false] and farmer.parts.has("Hat_Brimmed") and farmer.parts.has("Hair_Bound")
+			and not farmer.parts.has(PersonLook.HAIR_KNOT),
+			"bare-headed the knot with the hair; under the look's own hood neither, under its hat or cap the hair alone; a farmer's hat the same (%s, farmer %s)" % [words, farmer.parts])
+	var player := _player()
+	if player == null:
+		_check(false, "a player to dress")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var look := puppet.get_meta("look") as PersonLook
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	var knot := model.find_child(PersonLook.HAIR_KNOT, true, false) as MeshInstance3D if model != null else null
+	var bound := model.find_child("Hair_Bound", true, false) as MeshInstance3D if model != null else null
+	_check(knot != null and bound != null, "a person's body has the knot and the bound hair as two parts")
+	if knot == null or bound == null:
+		return
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	var parts_were := look.parts.duplicate()
+	for part: String in PersonLook.HAIR_PARTS.values() + PersonLook.HEADWEAR_PARTS.values():
+		look.parts.erase(part)
+	look.parts.append_array(["Hair_Bound", PersonLook.HAIR_KNOT])
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	slots[Items.HEAD] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	var bare := [bound.visible, knot.visible]
+	slots[Items.HEAD] = "felt_hat"
+	player.slots = slots
+	_rig._process(0.0)
+	var hatted := [bound.visible, knot.visible]
+	slots[Items.HEAD] = "hood"
+	player.slots = slots
+	_rig._process(0.0)
+	var hooded := [bound.visible, knot.visible]
+	_check(bare == [true, true] and hatted == [true, false] and hooded == [false, false],
+			"bare the hair and its knot; a worn felt hat hides the knot, the hair shown; a worn hood hides both (%s, %s, %s)" % [bare, hatted, hooded])
+	slots[Items.HEAD] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	look.words["hat"] = "bard"
+	Client3D._wear_hat(model, puppet)
+	_check(not ArtKit.has("gear.hat") or (not knot.visible and bound.visible),
+			"a bard's hat puts the knot away with the look's own headwear, the hair shown (made: %s)" % ArtKit.has("gear.hat"))
+	look.words.erase("hat")
+	var hat := (puppet.get_meta("sockets", {}) as Dictionary).get("head") as Node3D
+	var worn_hat := hat.get_node_or_null("Hat") if hat != null else null
+	if worn_hat != null:
+		hat.remove_child(worn_hat)
+		worn_hat.free()
+	player.slots = was
+	look.parts.assign(parts_were)
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	_rig._process(0.0)
 
 func _test_satchel_worn() -> void:
 	print("

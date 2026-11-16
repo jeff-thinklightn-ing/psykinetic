@@ -13641,6 +13641,31 @@ three, items 2 and 1 as one take): arms, not pipes, and hands, not paddles, on t
   (sword, axe and bow in hand, the empty hand at rest, a frame of the walk; slim and heavy, man and woman, beside
   Jeff's goblin) and the coordinator's pass. Client only, protocol unchanged, no new class_name.
 
+419 amended (9) (pc-character, 2026-11-16; label by decision_number.sh; the coordinator's hair row, its pass on take 2's
+sheet): bound hair's knot on the crown, where the game's camera sees it, as its own part that any headwear hides.
+- Before: the bun sat low on the back of the head (0.105 m back, 0.150 up from the Head joint). The play camera looks
+  down on a head and sees mostly the crown, so in ui-design's joined sheet (blond, seed 11, nearest and playing zoom,
+  standing and jogging) bound hair was the same smooth dome as the cropped man's; the bun showed only as a lobe in the
+  jog.
+- Now: a top-knot high on the back of the crown, BUN_AT (0.075 back, 0.225 up), rising BUN_UP (1.4 up per unit back),
+  its rings BUN_RINGS (5.2 by 4.7 cm at the widest). It breaks the crown's outline at the nearest and the playing zoom,
+  standing and jogging (take 2's sheet, C:/dev/review/pc-character/hair_sheet2/; the coordinator: "the first thing on
+  the sheet that tells one head from another at the playing zoom").
+- It stands 4.6 cm off the crown, through the look's own soft cap (2.7 cm of room) and brimmed hat (3.9), and would through any helm
+  items make (the head slot holds a hood and a felt hat today). So it is its own part, Hair_Bun (body_gen WEARABLES; Hair_Bound is the cap alone), and every
+  headwear puts it away rather than making room for it:
+  - PersonLook.HAIR_KNOT: drawn with bound hair and no headwear of the look's own; a trade's cap or hat
+    (_wear_headwear) takes it off too.
+  - Client3D.HEADWEAR_MESHES gains it, so _sync_worn_gear hides it under a worn hood or any head-slot item, and
+    _wear_hat under a bard's hat, as the look's own hood, cap and hat. Under a worn hat the hair itself shows as before.
+  - No new variable: what hides the knot is exactly what hides the look's own headwear. A future helm needs no room for it.
+- The knot is the old bun's five rings of eight, moved and widened, now in a mesh of its own: 9,598 triangles a body
+  as before. Both glbs carry the new mesh name, so art and client ship together.
+- Tests: view_test _test_knot_under_headwear (the parts by headwear word and a farmer's hat; on the player bare, a
+  worn felt hat, a worn hood, a bard's hat), anim_rig_test, seamless_test, parts_test, view_world_test. Joined look
+  for the bullet: a woman with bound hair bare-headed, hooded and in a brimmed hat, at the nearest and playing zoom.
+  Client only, protocol unchanged, no new class_name.
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and

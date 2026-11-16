@@ -27753,8 +27753,12 @@ static func bag_tilt(look: PersonLook) -> float:
 ## art slot and variant on the "head" socket, the look's own headwear (hood,
 ## brimmed hat, cap) put away under it. A word not in HATS, or a build
 ## without the piece, wears nothing new (as an old client does).
+## HEADWEAR_MESHES are the look's own parts any headwear puts away: its hood,
+## cap and hat, and bound hair's top-knot (PersonLook.HAIR_KNOT, 419 amended
+## (9)), which no hat or helm makes room for; _sync_worn_gear hides them under
+## a worn hood or head-slot item as here under a bard's hat.
 const HATS := {"bard": ["gear.hat", 1]}
-const HEADWEAR_MESHES: Array[String] = ["Hood", "Hat_Brimmed", "Cap_Soft"]
+const HEADWEAR_MESHES: Array[String] = ["Hood", "Hat_Brimmed", "Cap_Soft", PersonLook.HAIR_KNOT]
 static func _wear_hat(scene: Node3D, puppet: Node3D) -> void:
 	var look := puppet.get_meta("look") as PersonLook if puppet.has_meta("look") else null
 	var head := (puppet.get_meta("sockets", {}) as Dictionary).get("head") as Node3D

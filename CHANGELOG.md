@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bound-up hair sits in a top-knot high on the crown, where you see it from the playing camera, and a hood or hat covers it (419 amended (9)).
 - Names over heads stand clear of one another: one that would cover another steps up above it, your companion's name sits above yours with a gap when they stand beside you or nearer the camera, and someone straight behind you shows no name over your head or body, while one whose head is beside yours keeps theirs (865 amended (7)).
 - Health bars are thin strips just under each name, one size near or far, and bars that would touch step apart; yours shows over your head when you're hurt or fighting, as anyone's does (865 amended (3)).
 - A click on someone behind a shut door, such as the healer in his hut, walks you to the door, opens it and brings up their window as a click in the open would (935 amended (3)).

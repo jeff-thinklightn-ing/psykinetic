@@ -1332,15 +1332,24 @@ def clear_of_head(p: Part, J: dict) -> None:
 
 
 def bun(J: dict) -> Part:
-	"""Hair bound up: a bun high on the back of the head."""
+	"""Hair bound up: a top-knot high on the back of the crown, BUN_AT (back, up) from the head's joint, rising BUN_UP
+	up for each unit back (419 amended (9), the coordinator's hair row): the game's camera looks down on the head and
+	sees mostly the crown, so the knot breaks the crown's outline at the playing zoom, where the bun low on the back
+	(0.105 back, 0.150 up) was the same smooth dome as the cropped man's. Its own part, Hair_Bun, so any headwear hides
+	it (PersonLook.HAIR_KNOT): it stands 4.6 cm off the crown, through the soft cap and the brimmed hat."""
 	p = Part("Bun", "Hair", rigid="Head")
-	c = J["Head"] + Vector((0, 0.105, 0.150))
-	out = Vector((0, 1, 0.35)).normalized()  # Back and a little up.
+	c = J["Head"] + Vector((0, BUN_AT[0], BUN_AT[1]))
+	out = Vector((0, 1, BUN_UP)).normalized()
 	u = X
 	v = out.cross(u).normalized()
-	for t, r in [(-0.02, 0.030), (0.0, 0.040), (0.025, 0.040), (0.045, 0.026), (0.055, 0.010)]:
-		p.add(ring(c + out * t, u, v, r, r * 0.9, 8, 0.2))
+	for t, across, high in BUN_RINGS:
+		p.add(ring(c + out * t, u, v, across, high, 8, 0.2))
 	return p
+## The knot's middle (m back, m up from the Head joint), its rise (up per unit back) and its rings (m along that line,
+## half across, half high).
+BUN_AT = (0.075, 0.225)
+BUN_UP = 1.4
+BUN_RINGS = [(-0.02, 0.040, 0.036), (0.0, 0.052, 0.047), (0.026, 0.052, 0.047), (0.047, 0.037, 0.034), (0.058, 0.012, 0.011)]
 
 
 def belt(J: dict) -> Part:
@@ -2146,7 +2155,8 @@ def strap(J: dict, name: str = "Worn_Strap") -> list:
 ## as the body is, shown or not by the game. Bald is no hair part.
 WEARABLES = {
 	"Hair_Cropped": lambda J: [hair(J, nape=False)],
-	"Hair_Bound": lambda J: [hair(J, nape=True), bun(J)],
+	"Hair_Bound": lambda J: [hair(J, nape=True)],
+	"Hair_Bun": lambda J: [bun(J)],
 	"Hair_Long": lambda J: [hair(J, nape=True), curtain(J)],
 	"Beard_Short": lambda J: beard(J, full=False),
 	"Beard_Full": lambda J: beard(J, full=True),

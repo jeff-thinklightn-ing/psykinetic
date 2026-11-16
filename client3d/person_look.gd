@@ -74,6 +74,10 @@ const CLOTHES := {"forest": [FOREST_TUNICS, FOREST_TROUSERS], "grave": [GRAVE_TU
 ## Hair styles by body, as the seed picks them (bald among a man's, more so old).
 const HAIR_STYLES := {"male": ["cropped", "cropped", "long", "bald"], "female": ["bound", "bound", "long"]}
 const HAIR_PARTS := {"cropped": "Hair_Cropped", "bound": "Hair_Bound", "long": "Hair_Long", "bald": ""}
+## Bound hair's top-knot (419 amended (9)): its own part beside Hair_Bound, drawn only bare-headed. It stands 4.6 cm off
+## the crown, so any headwear hides it rather than make room for it: the look's own hood, cap or hat here (and a cap or
+## hat put on by a trade, _wear_headwear); a worn head-slot item and a bard's hat in Client3D (HEADWEAR_MESHES).
+const HAIR_KNOT := "Hair_Bun"
 const BEARD_PARTS := {"none": "", "short": "Beard_Short", "full": "Beard_Full"}
 const HEADWEAR_PARTS := {"none": "", "hood": "Hood", "hat": "Hat_Brimmed", "cap": "Cap_Soft"}
 ## Garb (decision 480): what is worn over the tunic, by word; rolled is the
@@ -266,6 +270,8 @@ func _resolve(body_by_default: StringName) -> void:
 	# A hood is worn over the hair: the hair is not drawn under it.
 	if HAIR_PARTS[hair] != "" and headwear != "hood":
 		parts.append(HAIR_PARTS[hair])
+	if hair == "bound" and headwear == "none":
+		parts.append(HAIR_KNOT)
 	for part: String in [BEARD_PARTS[beard], HEADWEAR_PARTS[headwear]]:
 		if part != "":
 			parts.append(part)
@@ -308,6 +314,7 @@ func _resolve(body_by_default: StringName) -> void:
 func _wear_headwear(worn: String) -> void:
 	for part: String in HEADWEAR_PARTS.values():
 		parts.erase(part)
+	parts.erase(HAIR_KNOT)
 	if HAIR_PARTS[hair] != "" and not HAIR_PARTS[hair] in parts:
 		parts.insert(0, HAIR_PARTS[hair])
 	parts.append(HEADWEAR_PARTS[worn])
