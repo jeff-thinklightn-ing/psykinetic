@@ -1772,11 +1772,23 @@ func _test_free_pull_keeps_off_a_link() -> void:
 	for entity in World.get_entities():
 		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(6, 3)) <= 8:
 			World.despawn(entity)
+	# The room's pending respawns held off for this row (put back at its end):
+	# a crate broken earlier in the scene came back at (8, 3), on the line,
+	# in the steps _place_player waits (maps' landing, 11-16 10:05).
+	var pending: Dictionary[int, int] = _main._dead_since.duplicate()
+	_main._dead_since.clear()
 	var player := _place_player(Vector2i(4, 3))
+	for entity in World.get_entities():
+		if entity.spawned and entity != player and entity.tile.y in [3, 4] and entity.tile.x >= 4 and entity.tile.x <= 9:
+			World.despawn(entity)
 	var link := Vector2i(6, 3)
 	var from := Vector2(4.4, 3.3)
+	var on_line: Array[String] = []
+	for entity in World.get_entities():
+		if entity.spawned and entity != player and entity.tile.y in [2, 3, 4] and entity.tile.x >= 4 and entity.tile.x <= 9:
+			on_line.append("%s at %s" % [entity.name, entity.tile])
 	_check(Main.body_line_clear(from, Vector2(9.0, 3.0), Vector2i(9, 3), player),
-			"(the open way from %s to (9, 3) clear with no link)" % from)
+			"(the open way from %s to (9, 3) clear with no link; bodies near it: %s)" % [from, on_line])
 	World.fields.link_cells[link] = true
 	_check(not Main.body_line_clear(from, Vector2(9.0, 3.0), Vector2i(9, 3), player),
 			"a link on (6, 3): the straight way across it to (9, 3) is not clear")
@@ -1793,6 +1805,8 @@ func _test_free_pull_keeps_off_a_link() -> void:
 			"the route round it pulled no further than its own way allows: the head %s, the straight way on never over (6, 3) (the route %s)" % [head, path])
 	World.fields.link_cells.erase(link)
 	_stop_walk()
+	for slot: int in pending:
+		_main._dead_since[slot] = pending[slot]
 	Net.controls = saved
 
 
