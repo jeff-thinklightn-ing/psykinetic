@@ -35115,6 +35115,72 @@ half) _test_steady_frames: the step's counts; nothing counted or told while buil
 only, protocol unchanged, no new class_name; no bullet (ui's take carries it, after ui-design's
 joined look of the join on a laptop and voice's words).
 
+660 amended (14) (terrain, 2026-11-15; the coordinator's approval of the shade's design line,
+environment's yes on the fields' side; label from tools/decision_number.sh): a ground seeded under
+the card is not shaded whole again when its fill ends. The stutter a few seconds after stepping out
+(perf's pair: a 367 to 443 ms frame about 400 frames after the lift, barrow to wilds, both laptops)
+was _fill_finished's whole pass. Measured on a local host (scratch probe, never landed): the seed
+took 107.8 ms under the card, from it to the fill's end no cell was touched and the fields' touched-
+all was false, and the pass after the fill looked at all 52,798 cells in 216.1 ms because
+_seed_shades left _ground_shades empty, rewriting every cell, corner and chunk span to the bytes the
+seed had laid. On a client the fields' touched-all is whole then as well: the crossing's own refresh
+comes before the seed and waits untaken, since _shade_floor returns before take_touched while the
+ground fills. Now the room's own view's seed takes the fields' touched cells first (refreshing
+them) and keeps each shade it lays in _ground_shades, and _fill_finished asks a whole pass only
+when no seed ran (a build at once still shades every cell once; a held neighbour and a glimpse,
+which take nothing of the room's, as before). After the fill the floor's shade does the cells the
+light or heat touched since the seed alone: none when nothing changed. A whole refresh after the
+seed (sources arriving) still looks at every cell but writes and uploads only those that changed.
+One pass serves both flags, so no spread is needed and nothing shows part done: every chunk is built
+from the seeded shade (660). A cell whose light changes during the fill waits for its end, as
+before. Carried heat is in no touched set (environment's note): a carrier's moves touch nothing, so
+in play today nothing redraws its warm patch but a whole pass or an unrelated touch, and the pass
+after the fill was the one that redrew it from where the carrier stood then. So with a heat carrier
+in the zone (Fields.any_carried_heat) _fill_finished still asks the whole pass, as before. No body in
+the game carries heat yet (only companion_test sets emit_heat), and carried lanterns are lights the
+view draws, never in the floor's shade (light_at without the carried), so in play the pass is gone.
+A moved heat carrier's patch is corrected by nothing today but a whole pass: whoever first gives a
+body heat in play owes that mend (its moves touching the cells it leaves and reaches), named here
+so a player doesn't find it.
+Daylight never was the pass's work: the floor's shade reads
+light_at without the sky, and the sky's light on the floor is the ground shader's sky_floor, set
+from the clock each step (_update_sky), so dusk falling during a fill needs no cell. The join's
+first build over frames (f1747) takes the same path. Also, host only: World.enter comes a few frames
+before the host's _repaint, and the old room's floor was shaded whole with the new zone's fields
+(241.4 ms leaving the wilds); _shade_floor now does nothing while World has left the room's zone
+(_zone_left: the room's level a zone World is not in; never a neighbour or glimpse), leaving the
+fields' touches for the next room's seed. Client3D.shades_walked and shades_written count the
+cells looked at and written (room_fields VIEW). view_test _test_seeded_fill_shade on the wilds: at
+once every cell once; over frames with nothing changed no cell looked at again and the ground as
+built at once; six cells heated during the fill those six alone, warm; a whole refresh after it
+every cell looked at, the six written; noon to 21:00 during the fill the floor's sky light 21:00's
+and the ground as built at 21:00, no cell looked at; a body carrying heat in the zone at the seed,
+the floor shaded whole after the fill, warm where it stands; World gone from the room's zone no pass and
+the whole refresh untaken, then the barrow over frames with no cell looked at again; each floor as
+a pass from scratch shades it. _test_shade_mid_build now counts writes, not kept shades, as its
+fault's sign (the seed keeps them). Joined, on both laptops (perf's pair, before 8900bc422 and after
+3247b79d2 with its probes, one cold run each: join, barrow, back to the wilds; SCRIPT ERROR 0;
+C:/dev/review/perf_ss_before_lenovo, perf_ss_after_lenovo, perf_ss_before_atlas,
+perf_ss_after_atlas): the fill's first shade pass at the join 331.0 ms (Lenovo) and 337.4 ms (Atlas),
+every cell, to 0.3 and 0.1 ms (8 cells looked at, none written); on the return 379.0 and 375.8 ms to
+no pass looking at a cell; the run's cells looked at 107,127 to 308. The frame it made about 400
+after the lift is gone at both crossings on both (return 437.9 and 440.4 ms, join 389.4 and 388.5
+ms); the ~400 ms frames left after the lifts are draw-only, in both builds alike. The seed's added
+cost under the card, join / barrow / return: Lenovo +15.8 / +2.3 / +3.1 ms, Atlas +10.1 / -0.9 /
++16.2 ms. The card's up-time, after minus before: Lenovo +433 / +117 / +122 ms, Atlas +11 / -33 /
++220 ms, with no steady direction at the join or the barrow; the return's card lifted later on both
+laptops (+122 and +220 ms, one run each, not rerun), read as where the draw stalls fell (the card
+lifts at the third frame in a row under 50 ms, and the change adds only the seed's few ms under it);
+even at face value it trades a fifth of a second longer under the card for a 376 to 440 ms frame
+gone in play. WorldMap take 1's timing of the return reads the card's lift there again. The joined
+night pair (Lenovo, a scratch tour out of Umbrage's tavern at 22:00, stills at 5 and 15 s; C:/dev/
+review/terrain_night14_before, _after, _diff): at most 0.22% of pixels differ, on the bodies, the
+lantern's pool, tufts and the fire's flame, no ground; the after twin looked at no cell after the
+fill. Client only, protocol unchanged, no new class_name; not a package piece. No bullet (voice,
+reading the four logs): after each lift the after-builds still have five or six draw-only frames of
+390 to 620 ms (the laptops' present stalls), so a player still meets pauses there, one fewer; the line
+waits for the take that clears those too.
+
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
 Jeff, after playing: "going inside buildings should go into top down view and

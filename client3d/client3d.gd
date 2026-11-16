@@ -2754,6 +2754,10 @@ var _shadow_key := Vector3i(1 << 30, 0, 0)
 var _shadow_checked := 0.0
 ## A new floor: every cell is shaded, whatever the fields say changed.
 var _shade_all := true
+## The floor's shade's cells looked at and written, all told (660 amended
+## (14)'s rows count them).
+var shades_walked := 0
+var shades_written := 0
 ## The flat stone boxes' material (its see-through copy from
 ## _see_through_of).
 var _stone_opaque: StandardMaterial3D
@@ -8904,7 +8908,11 @@ func _fill_finished() -> void:
 	_fill_ground = {}
 	_fill_cliffs = {}
 	ground_filling = false
-	_shade_all = true
+	# 660 amended (14): a seeded fill's cells are shaded already and their
+	# shades kept (_seed_shades): only what the light touched since is done.
+	# Carried heat is in no touched set, so with a carrier in the zone the
+	# floor is shaded whole, as before (no body in the game carries any yet).
+	_shade_all = not _shades_seeded or _glimpse or _neighbour or World.fields.any_carried_heat(World)
 	_shade_due = false
 	_on_fields_changed()
 	room_filled.emit()
@@ -19784,12 +19792,16 @@ func _shade_floor() -> void:
 	# 660 amended (11): over frames the new fields are laid (_grounds, the
 	# cells' shades) a frame before ground_filling, and their vertex spans are
 	# gathered only once the last chunk is built. Nothing to shade into till
-	# then; _fill_finished shades it all once the spans are in.
+	# then; _fill_finished asks once the spans are in (the cells touched since
+	# the seed, 660 amended (14)).
 	if _cell_vertex_start.size() * 2 != _cell_shades.size() + 2:
 		return
+	if _zone_left():
+		return  # 660 amended (14): the fields are another zone's; its own room's seed takes them.
 	var touched := World.fields.take_touched(World)
 	var cells: Array = _grounds.keys() if touched["all"] or _shade_all else touched["cells"]
 	_shade_all = false
+	shades_walked += cells.size()
 	# Heat as World.is_burning reads it: the map's alone while nobody
 	# carries any (heat_at goes through every entity, for every cell).
 	var carried := World.fields.any_carried_heat(World)
@@ -19803,6 +19815,7 @@ func _shade_floor() -> void:
 		var shade := _floor_shade(cell, carried)
 		if _ground_shades.get(cell) == shade:
 			continue
+		shades_written += 1
 		_ground_shades[cell] = shade
 		_cell_shades[index * 2] = roundi(minf(shade.x, 1.0) * 255.0)
 		_cell_shades[index * 2 + 1] = roundi(shade.y * 255.0)
@@ -19845,6 +19858,17 @@ func _shade_floor() -> void:
 				_ground_bytes.slice(first, last))
 
 
+## Whether World has left this room's zone (660 amended (14)): a host's
+## World.enter comes a few frames before its _repaint, and the old room's
+## floor was shaded whole with the new zone's fields (241 ms leaving the
+## wilds). A held neighbour and a glimpse are another zone's by design.
+func _zone_left() -> bool:
+	if _neighbour or _glimpse or World.zone == null:
+		return false
+	var level := str(_terrain.get("level", ""))
+	return World.zones.has(level) and World.zones[level] != World.zone
+
+
 ## [param cell]'s floor shade: (brightness, warmth), each snapped as the
 ## floor's bytes hold it; [param carried]: whether anyone carries heat.
 func _floor_shade(cell: Vector2i, carried: bool) -> Vector2:
@@ -19856,15 +19880,22 @@ func _floor_shade(cell: Vector2i, carried: bool) -> Vector2:
 
 
 ## Over frames (decision 660): every ground cell's shade bytes worked out
-## before its chunks are built, so each is built shaded. Only the bytes:
-## the floor's own shade, once every chunk is in, works them out again
-## (_ground_shades left empty) and finds nothing to change unless the
-## light moved meanwhile.
+## before its chunks are built, so each is built shaded. 660 amended (14):
+## the room's own view takes the fields' touched cells first (the
+## crossing's own refresh among them) and keeps each shade as drawn, so
+## once every chunk is in, the floor's shade does only the cells the light
+## touched since (it did all of them again: 216 ms on the wilds, none
+## changed). A held neighbour or a glimpse takes nothing (the room's own
+## touches) and is shaded whole after its fill, as before.
 func _seed_shades() -> void:
+	if not _glimpse and not _neighbour:
+		World.fields.take_touched(World)
 	var carried := World.fields.any_carried_heat(World)
 	for cell: Vector2i in _grounds:
 		var index: int = _grounds[cell]
 		var shade := _floor_shade(cell, carried)
+		if not _glimpse:
+			_ground_shades[cell] = shade
 		_cell_shades[index * 2] = roundi(minf(shade.x, 1.0) * 255.0)
 		_cell_shades[index * 2 + 1] = roundi(shade.y * 255.0)
 		if _shade_image != null:  # Indoors, the soft scatter's too.

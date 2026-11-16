@@ -247,6 +247,8 @@ const VIEW: Array[StringName] = [
 	&"reach_ease",
 	&"scatter_reach_low",
 	&"sfx",
+	&"shades_walked",
+	&"shades_written",
 	&"show_all_bars",
 	&"taker_marks",
 	&"telegraph_flash",

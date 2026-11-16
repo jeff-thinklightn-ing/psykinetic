@@ -271,6 +271,7 @@ func _ready() -> void:
 		await _test_indoor_phased_build()
 		_test_steady_frames()
 		await _test_shade_mid_build()
+		await _test_seeded_fill_shade()
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
@@ -17527,10 +17528,10 @@ func _test_steady_frames() -> void:
 ## spans (a SCRIPT ERROR, which fails the scene, but ends only that pass: the
 ## case runs on). Here a pass runs at fields_done and in every frame of the
 ## build. A pass that shades a cell while the spans are not yet the new
-## ground's has recorded its shade (_ground_shades, cleared at the rebuild)
-## and then reads the spans, so a cell recorded while they differ is the fault,
-## counted by the case's own check; and the floor ends shaded as a pass from
-## scratch shades it.
+## ground's has counted its write (shades_written; since 660 amended (14) the
+## seed itself fills _ground_shades, so that is no longer the sign) and then
+## reads the spans, so a write while they differ is the fault, counted by the
+## case's own check; and the floor ends shaded as a pass from scratch shades it.
 func _test_shade_mid_build() -> void:
 	print("\n== a shade pass during a zone change built over frames (barrow to barrow_deep) ==")
 	var barrow := Level.load_level("barrow")
@@ -17540,8 +17541,9 @@ func _test_shade_mid_build() -> void:
 	var passes := [0, 0]  # At the fields; those that shaded a cell before the spans were in.
 	var shade_once := func() -> void:
 		_rig._shade_all = true
+		var written: int = _rig.shades_written
 		_rig._shade_floor()
-		if _rig._cell_vertex_start.size() * 2 != _rig._cell_shades.size() + 2 and not _rig._ground_shades.is_empty():
+		if _rig._cell_vertex_start.size() * 2 != _rig._cell_shades.size() + 2 and _rig.shades_written > written:
 			passes[1] += 1
 	var at_fields := func() -> void:
 		passes[0] += 1
@@ -17567,6 +17569,183 @@ func _test_shade_mid_build() -> void:
 	_check(spans_match and settled.size() > 0 and settled == _rig._ground_bytes,
 			"the floor ends shaded as from scratch (%d bytes, spans %s)" % [settled.size(), spans_match])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## 660 amended (14): a ground built over frames is shaded at its seed (the
+## fields' touched cells taken first, each shade kept), so once its last
+## chunk is in the floor's shade does only the cells the light or heat
+## touched since: none when nothing changed (the whole pass it made was
+## 216 ms on the wilds, every cell the same), a cell given heat during the
+## fill and only it; a whole refresh after the seed looks at every cell and
+## writes only those that changed; a build at once still shades every cell
+## once. Dusk falling during the fill is no touched cell, and needs none: the
+## floor's shade has no sky in it (light_at without the sky) and the sky's
+## light on the floor is the ground shader's sky_floor, set from the clock,
+## so the ground after the fill at the new hour is the ground built at once
+## at that hour. A host's room whose zone World has left is not shaded
+## (241 ms leaving the wilds, with the barrow's fields), and the next room's
+## seed takes the fields' touches. Each case's floor ends as a pass from
+## scratch shades it.
+func _test_seeded_fill_shade() -> void:
+	print("\n== a ground built over frames: shaded at its seed, only what the light touched since done again (660 amended (14)) ==")
+	var wilds := Level.load_level("wilds")
+	var terrain: Dictionary = wilds["terrain"]
+	var centre: Vector2i = wilds["centre"]
+	var hour_was := [DayNight.phase, DayNight.anchor]
+	var weather_was: Dictionary = World.fields.weather.duplicate()
+	World.fields.weather = Weather.KINDS["clear"].duplicate()
+	World.fields.weather["wind_dir"] = Vector2.RIGHT
+	World.fields.weather["snow"] = 0.0
+	# A build at once: every cell once. (Shades are compared by cell: the
+	# bytes' chunk order over frames is not the order built at once.)
+	var walked: int = _rig.shades_walked
+	var written: int = _rig.shades_written
+	DayNight.set_hour(12.0)
+	_rig.rebuild(terrain, centre)
+	await _settled_room()
+	await _frames(2)
+	var cells: int = _rig._grounds.size()
+	_check(cells > 0 and _rig.shades_walked - walked == cells and _rig.shades_written - written == cells,
+			"built at once: every cell shaded once (%d cells, %d looked at, %d written)" % [cells, _rig.shades_walked - walked, _rig.shades_written - written])
+	var at_once := _rig._ground_shades.duplicate()
+	# Over frames, nothing changed: no cell done again.
+	var seeded := await _fill_seeded(terrain, centre, Callable())
+	_check(seeded.size() == 2 and _rig.shades_walked == seeded[0] and _rig.shades_written == seeded[1] and _rig._ground_shades == at_once,
+			"over frames, nothing changed since the seed: no cell looked at again (%d), the ground as built at once" % [
+			_rig.shades_walked - int(seeded[0]) if seeded.size() == 2 else -1])
+	_check(_scratch_same(), "and as a pass from scratch shades it")
+	# Heat given to six cells during the fill (a touched refresh): they alone.
+	var heated: Array[Vector2i] = []
+	var heat_six := func() -> void:
+		for cell: Vector2i in _rig._grounds:
+			if heated.size() == 6:
+				break
+			if World.fields.map_heat_at(World, cell) == 0.0:
+				heated.append(cell)
+		for cell in heated:
+			World.fields._heat[cell] = World.HEAT_BURN
+			World.fields._touched[cell] = true
+	seeded = await _fill_seeded(terrain, centre, heat_six)
+	var warm := snappedf(Client3D.WARM_MOST, 0.05)
+	var warmed := heated.filter(func(cell: Vector2i) -> bool: return is_equal_approx(_rig._ground_shades.get(cell, Vector2.ZERO).y, warm)).size()
+	_check(seeded.size() == 2 and heated.size() == 6 and _rig.shades_walked - int(seeded[0]) == 6 and _rig.shades_written - int(seeded[1]) == 6
+			and warmed == 6 and _rig._ground_shades != at_once,
+			"six cells heated during the fill: those six looked at and written, warm (%d looked at, %d written, %d warm)" % [
+			_rig.shades_walked - int(seeded[0]) if seeded.size() == 2 else -1, _rig.shades_written - int(seeded[1]) if seeded.size() == 2 else -1, warmed])
+	_check(_scratch_same(), "and the floor as a pass from scratch shades it")
+	# A whole refresh after it (their heat gone again): every cell looked at, six written.
+	walked = _rig.shades_walked
+	written = _rig.shades_written
+	World.fields_changed()
+	await _frames(2)
+	_check(_rig.shades_walked - walked == cells and _rig.shades_written - written == 6 and _rig._ground_shades == at_once,
+			"a whole refresh after the seed: every cell looked at (%d), only the six that changed written (%d)" % [
+			_rig.shades_walked - walked, _rig.shades_written - written])
+	# Dusk falling during the fill: the ground after it is the ground built at once at the new hour.
+	var sky_floor := func() -> float:
+		_rig._weather_view.weather = World.fields.weather.duplicate()
+		_rig._sky_step = -1
+		_rig._update_sky(0.0)
+		return float(_rig._ground_shader_material.get_shader_parameter("sky_floor"))
+	DayNight.set_hour(21.0)
+	_rig.rebuild(terrain, centre)
+	await _settled_room()
+	await _frames(2)
+	var night_floor: float = sky_floor.call()
+	var night_shades := _rig._ground_shades.duplicate()
+	DayNight.set_hour(12.0)
+	var noon_floor := [-1.0]
+	var dusk := func() -> void:
+		noon_floor[0] = sky_floor.call()
+		DayNight.set_hour(21.0)
+	seeded = await _fill_seeded(terrain, centre, dusk)
+	var after: float = sky_floor.call()
+	_check(seeded.size() == 2 and noon_floor[0] > night_floor and is_equal_approx(after, night_floor) and _rig._ground_shades == night_shades
+			and _rig.shades_walked == seeded[0],
+			"dusk falling during the fill (noon to 21:00): the floor's sky light at 21:00's (%.2f, noon %.2f, built at 21:00 %.2f), its shade as built at 21:00, no cell looked at again" % [
+			after, noon_floor[0], night_floor])
+	_check(_scratch_same(), "and as a pass from scratch shades it")
+	# A body carrying heat in the zone at the seed (carried heat is in no touched
+	# set): the floor shaded whole after the fill, as before, its patch where it stands then.
+	var carrier: GridEntity = null
+	for cell: Vector2i in _rig._grounds:
+		if World.is_walkable(cell) and World.get_entity_at(cell) == null:
+			carrier = _spawn_imp(cell)
+			break
+	var carrying := [false]
+	var carry := func() -> void:
+		if carrier != null:
+			carrier.emit_heat = 20.0
+			World._carried_heat_key = Vector2i(-1, -1)
+			carrying[0] = World.fields.any_carried_heat(World)
+	seeded = await _fill_seeded(terrain, centre, carry)
+	var patch: Vector2 = _rig._ground_shades.get(carrier.tile, Vector2.ZERO) if carrier != null else Vector2.ZERO
+	_check(carrier != null and seeded.size() == 2 and _rig.shades_walked - int(seeded[0]) == cells and patch.y > 0.0,
+			"a heat carrier in the zone at the seed: the floor shaded whole after the fill (%d looked at, of %d), warm where it stands (%.2f; carrier %s, carrying %s, still %s)" % [
+			_rig.shades_walked - int(seeded[0]) if seeded.size() == 2 else -1, cells, patch.y, carrier.tile if carrier != null else "none",
+			carrying[0], World.fields.any_carried_heat(World)])
+	if carrier != null:
+		carrier.emit_heat = 0.0
+		World.despawn(carrier)
+		World._carried_heat_key = Vector2i(-1, -1)
+	# A host's room whose zone World has left: not shaded, the fields' touches left for the next room.
+	DayNight.set_hour(12.0)
+	_rig.rebuild(terrain, centre)
+	await _settled_room()
+	await _frames(2)
+	var level := str(_rig._terrain.get("level", ""))
+	var had: Variant = World.zones.get(level)
+	# Asked at once and the zone put back in the same frame: Main reads World.zones each frame.
+	World.zones[level] = Zone.new(level)
+	walked = _rig.shades_walked
+	World.fields.mark_dirty()  # The new zone's fields, as World.enter swaps them in.
+	_rig._shade_floor()
+	World.fields.warm(World)
+	var left_alone := _rig.shades_walked == walked and World.fields._touched_all
+	if had == null:
+		World.zones.erase(level)
+	else:
+		World.zones[level] = had
+	_check(level != "" and left_alone, "World gone from the room's zone (%s): no shade pass, the fields' whole refresh left untaken (%d looked at)" % [
+			level, _rig.shades_walked - walked])
+	var barrow := Level.load_level("barrow")
+	seeded = await _fill_seeded(barrow["terrain"], barrow["centre"], Callable())
+	_check(seeded.size() == 2 and _rig.shades_walked == seeded[0], "the barrow built over frames after it: its seed took the refresh, no cell looked at again")
+	_check(_scratch_same(), "and the barrow's floor as a pass from scratch shades it")
+	DayNight.phase = hour_was[0]
+	DayNight.anchor = hour_was[1]
+	DayNight.update()
+	World.fields.weather = weather_was
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## [param terrain] built over frames, [param at_seed] (if valid) called in the
+## first frame the ground fills (its seed laid); settled. The shade's counts
+## at that frame, [] if no frame filled.
+func _fill_seeded(terrain: Dictionary, centre: Vector2i, at_seed: Callable) -> Array:
+	_rig.rebuild(terrain, centre, true)
+	var seeded := []
+	var frames := 0
+	while (_rig.building_room or _rig.ground_filling or not _rig._fill_jobs.is_empty()) and frames < 4000:
+		if seeded.is_empty() and _rig.ground_filling:
+			seeded = [_rig.shades_walked, _rig.shades_written]
+			if at_seed.is_valid():
+				at_seed.call()
+		await get_tree().process_frame
+		frames += 1
+	await _settled_room()
+	await _frames(2)
+	return seeded
+
+
+## Whether the floor's bytes are what a pass from scratch makes of them (and
+## leaves them so).
+func _scratch_same() -> bool:
+	var settled := _rig._ground_bytes.duplicate()
+	_rig._ground_shades.clear()
+	_rig._shade_all = true
+	_rig._shade_floor()
+	return settled.size() > 0 and settled == _rig._ground_bytes
 
 
 ## Decision 822 (P1, step 1): a held neighbour's view and the swap. Every
