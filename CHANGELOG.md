@@ -7,8 +7,6 @@ notes (decision 324).
 
 ## Unreleased
 
-- Towns: the Mughouse's hired rooms upstairs have beds, and at night Margery sleeps in her own bed in the keeper's room (948).
-- Towns: clicking anywhere on the Mughouse, its roof or its walls, walks you to its door and takes you inside (935 amended (5), 935 amended (6)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
@@ -18,6 +16,11 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.223
+
+- Towns: the Mughouse's hired rooms upstairs have beds, and at night Margery sleeps in her own bed in the keeper's room (948).
+- Towns: clicking anywhere on the Mughouse, its roof or its walls, walks you to its door and takes you inside (935 amended (5), 935 amended (6)).
 
 ## v0.1.222
 
