@@ -199,6 +199,19 @@ func _test_footprint_click() -> void:
 			var path: Array = _main._free.get("path", [])
 			_check(not path.is_empty() and links.has(path.back()), "and the walk from the lane to it ends on a link: %s (%d cells)" % [path.back() if not path.is_empty() else "none", path.size()])
 			_main._free["path"] = []
+	# The same click with a bow in hand (never an attack: a move click, as without the bow): _click_with_bow takes the cell as the plain click does.
+	if player != null:
+		var controls_was: String = Net.controls
+		Net.controls = "click"
+		for cell: Vector2i in [Vector2i(174, 206), Vector2i(173, 210), Vector2i(179, 206)]:
+			World._relocate(player, Vector2i(185, 208))
+			_main._free_taken_over(player)
+			_main._pick_grid = Vector2(cell)
+			_main._click_with_bow(player)
+			var bow_path: Array = _main._free.get("path", [])
+			_check(not bow_path.is_empty() and links.has(bow_path.back()), "a left click on %s with a bow in hand walks to a link as without it: %s" % [cell, bow_path.back() if not bow_path.is_empty() else "none"])
+			_main._free["path"] = []
+		Net.controls = controls_was
 	# Ground outside the footprint is the snap as before; the way in shut is the snap too.
 	_check(_main._click_ground_cell(Vector2(185.2, 208.1)) == Vector2i(185, 208), "a click on the open lane is the cell clicked, as before")
 	var shut_level: Dictionary = wilds.duplicate(true)
