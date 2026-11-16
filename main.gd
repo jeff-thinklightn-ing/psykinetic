@@ -3269,7 +3269,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			# 935 amended (1): a plan from this cell to this goal that found nothing is remembered for NO_ROUTE_MEMORY_MSEC, so a button
 			# held over ground nothing reaches searches to the bound once, not at every replan (the cursor moving a cell is a new goal).
 			var none: Dictionary = _free.get("no_route", {})
-			var remembered: bool = none.get("from") == from and none.get("goal") == goal and now - int(none.get("at", 0)) < NO_ROUTE_MEMORY_MSEC
+			var remembered: bool = none.get("goal") == goal and now - int(none.get("at", 0)) < NO_ROUTE_MEMORY_MSEC 					and (none.get("from") == from or bool(none.get("near", false)))
 			if not remembered and (goal != _free.get("goal", NONE) or now - int(_free.get("planned", 0)) > 300):
 				_free["goal"] = goal
 				_free["planned"] = now
@@ -3281,6 +3281,11 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 				_free["path"] = route
 				if route.is_empty():
 					_free["no_route"] = {"from": from, "goal": goal, "at": now}
+				elif Vector2i(route.back()) != goal:
+					# 935 amended (7): a route that only comes near the goal (the nearest cell, 935 amended (1)) is as good as found, and the
+					# search that made it ran to the bound: kept for NO_ROUTE_MEMORY_MSEC, whatever cell the body walks it from, so a button
+					# held over ground nothing reaches searches once per memory and not at every replan.
+					_free["no_route"] = {"from": from, "goal": goal, "at": now, "near": true}
 				else:
 					_free.erase("no_route")
 			if (_free["path"] as Array).is_empty():

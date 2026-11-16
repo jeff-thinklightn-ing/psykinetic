@@ -513,6 +513,28 @@ func _test_no_route() -> void:
 		var again_closed := World.path_closed - c1
 		_check(first_closed > 0 and again_closed == 0,
 			"held over a pocket from the nearest cell: the first replan searches (%d closed), the next within the memory does not (%d closed)" % [first_closed, again_closed])
+		# 935 amended (7): a route that only comes near the goal (the nearest cell, 935 amended (1)) is remembered as a plan with no way is: a button
+		# held over the pocket from a cell with a way to near it searches once, then not again at the next replan within the memory (it
+		# searched every 300 ms, to the bound each time, before this), and the walk is kept.
+		World._relocate(player, free)
+		_main._free_taken_over(player)
+		_main._free["held"] = true
+		_main._free["at"] = Time.get_ticks_msec() - 1000
+		_main._free["click"] = Vector2i(-99999, -99999)
+		_main._test_holding = true
+		_main._pick_grid = Vector2(pocket)
+		var n0 := World.path_closed
+		_main._free_intent(player, own)
+		var near_first := World.path_closed - n0
+		var near_memory: Dictionary = _main._free.get("no_route", {})
+		var near_path: Array = (_main._free.get("path", []) as Array).duplicate()
+		_main._free.erase("goal")
+		_main._free["planned"] = 0
+		var n1 := World.path_closed
+		_main._free_intent(player, own)
+		var near_again := World.path_closed - n1
+		_check(near_first > 0 and bool(near_memory.get("near", false)) and not near_path.is_empty() and near_again == 0 and not (_main._free.get("path", []) as Array).is_empty(),
+			"held over the pocket from a cell with a way to near it: the first replan searches (%d closed) and remembers the near route, the next within the memory does not (%d closed), the walk kept (%d cells)" % [near_first, near_again, near_path.size()])
 		# A button still down over the very cell clicked is still the click (a long frame or search between press and release): in the
 		# open the click's route is kept, never cleared into a straight steer; a cursor moved off the cell is a steer, as ever.
 		World._relocate(player, free)
