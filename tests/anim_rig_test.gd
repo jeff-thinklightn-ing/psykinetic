@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_people_jog()
 	await _test_gait_phases()
 	await _test_run_arms()
+	await _test_posture_arms()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
 	await _test_hand_relax()
@@ -3084,6 +3085,93 @@ func _test_run_arms() -> void:
 	print("  " + "
   ".join(read))
 	_check(bad.is_empty(), "the people's jog and sprint: the hands pump fore and aft, past the hip, not across; the trunk and head steady (%s)" % ["; ".join(bad.slice(0, 6))])
+
+
+## A posture's arms through a gait (953 amended (3); the residue of Jeff's v0.1.226 report: Rhea, slouched, ran with
+## both hands drifting 0.11 m across together). Posture_Slouch and Posture_Stooped turn the clavicles in; AnimRig eases
+## them (POSTURE_ARM_BONES) out through a gait and back in at rest. On the man and the woman, each posture: on Walk,
+## Jog_Short and Sprint_Short each hand's across POSTURE_RUN_SIDE at most and the hands opposite fore and aft (r at
+## most POSTURE_HANDS_R); the share 0 in a gait, eased there over the base's crossfade (no step over a frame's
+## share of it, at 1/60 s); stood again after the run, every arm bone within POSTURE_STAND of a body that never ran.
+const POSTURE_RUN_SIDE := 0.06
+const POSTURE_HANDS_R := -0.9
+const POSTURE_STAND := 0.001
+func _test_posture_arms() -> void:
+	print("== a posture's arms through a gait ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var bad: Array[String] = []
+	var read: Array[String] = []
+	var arm_bones := ["LeftShoulder", "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightShoulder", "RightUpperArm", "RightLowerArm", "RightHand"]
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		for posture: String in ["Posture_Stooped", "Posture_Slouch"]:
+			var bodies := []
+			for k in 2:
+				var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+				add_child(model)
+				var rig := AnimRig.make(model, lib, 0.15, true, null)
+				rig.stood_as = "People_"
+				rig.gaits = PackedStringArray(["Walk", "Jog_Short", "Sprint_Short"])
+				rig.posture(lib.get_animation(posture), 1.0)
+				rig.loop("Idle", 1.0, 0.0, true)
+				rig._process(0.0)
+				bodies.append([model, rig, model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D])
+			var rig: AnimRig = bodies[0][1]
+			var sk: Skeleton3D = bodies[0][2]
+			var rest := func(n: String) -> Vector3: return sk.get_bone_global_rest(sk.find_bone(n)).origin
+			var left: Vector3 = rest.call("LeftUpperLeg") - rest.call("RightUpperLeg")
+			left = Vector3(left.x, 0.0, left.z).normalized()
+			var fwd := Vector3.UP.cross(left).normalized()
+			if (rest.call("LeftToes") - rest.call("LeftFoot")).dot(fwd) < 0.0:
+				fwd = -fwd
+			# The ease: from Idle into the jog at 1/60 s, the share's steps.
+			rig.loop("Jog_Short", 1.0)
+			var step := 0.0
+			var was := rig.posture_arms()
+			var frames := 0
+			while rig.posture_arms() > 0.0 and frames < 60:
+				rig._process(1.0 / 60.0)
+				step = maxf(step, was - rig.posture_arms())
+				was = rig.posture_arms()
+				frames += 1
+			if rig.posture_arms() > 0.0 or step > 1.0 / (rig.blend * 60.0) + 0.001:
+				bad.append("%s %s: the share %.2f after %d frames, its largest step %.3f" % [build[0], posture, rig.posture_arms(), frames, step])
+			for clip: String in ["Walk", "Jog_Short", "Sprint_Short"]:
+				rig.loop(clip, 1.0, 0.0)
+				for k in 20:
+					rig._process(1.0 / 60.0)
+				var length := lib.get_animation(rig.as_played(clip)).length
+				var s := {"Lf": [], "Ls": [], "Rf": [], "Rs": []}
+				for i in 48:
+					rig.base_at(clip, length * i / 48.0)
+					await _frames(2)
+					var hips := sk.get_bone_global_pose(sk.find_bone("Hips")).origin
+					for side in ["L", "R"]:
+						var h := sk.get_bone_global_pose(sk.find_bone(("Left" if side == "L" else "Right") + "Hand")).origin - hips
+						s[side + "f"].append(h.dot(fwd))
+						s[side + "s"].append(h.dot(left))
+				var across: float = maxf(s["Ls"].max() - s["Ls"].min(), s["Rs"].max() - s["Rs"].min())
+				var hands := _pearson(s["Lf"], s["Rf"])
+				read.append("%s %s %s: across %.3f, hands r %+.2f, sides r %+.2f" % [build[0], posture, clip, across, hands, _pearson(s["Ls"], s["Rs"])])
+				if across > POSTURE_RUN_SIDE or hands > POSTURE_HANDS_R:
+					bad.append("%s %s %s: across %.3f m, hands r %+.2f" % [build[0], posture, clip, across, hands])
+			# Stood again: the share back to 1, the arms where a body that never ran holds them.
+			rig.loop("Idle", 1.0, -1.0, true)
+			for k in 30:
+				rig._process(1.0 / 60.0)
+			rig.base_at("Idle", 0.0)
+			(bodies[1][1] as AnimRig).base_at("Idle", 0.0)
+			await _frames(2)
+			var off := 0.0
+			for bone: String in arm_bones:
+				off = maxf(off, sk.get_bone_global_pose(sk.find_bone(bone)).origin.distance_to((bodies[1][2] as Skeleton3D).get_bone_global_pose((bodies[1][2] as Skeleton3D).find_bone(bone)).origin))
+			if not is_equal_approx(rig.posture_arms(), 1.0) or off > POSTURE_STAND:
+				bad.append("%s %s stood again: the share %.2f, an arm bone %.4f m off a body that never ran" % [build[0], posture, rig.posture_arms(), off])
+			read.append("%s %s stood again: arms %.5f m off" % [build[0], posture, off])
+			for body: Array in bodies:
+				(body[0] as Node3D).queue_free()
+	print("  " + "
+  ".join(read))
+	_check(bad.is_empty(), "slouched and stooped, walking, jogging and sprinting: the hands opposite and beside the body; the shoulders' posture eased out and back, standing as it was (%s)" % ["; ".join(bad.slice(0, 6))])
 
 
 static func _pearson(a: Array, b: Array) -> float:

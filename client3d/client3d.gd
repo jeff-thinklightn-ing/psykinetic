@@ -25221,6 +25221,8 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
 	if model.get("people_stance", false):
 		rig.stood_as = PEOPLE_PREFIX
+	# A posture's arms ease out through these (AnimRig.gaits, 953 amended (3)).
+	rig.gaits = PackedStringArray((model.get("gaits", GAITS) as Array).map(func(gait: Array) -> String: return str(gait[0])))
 	rig.loop(_idle_clip(puppet))
 	if model.has("sockets"):
 		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)

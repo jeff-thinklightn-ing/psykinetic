@@ -34,6 +34,14 @@ const UPPER_BONES: Array[String] = ["Spine", "Chest", "UpperChest", "Neck", "Hea
 ## the hips stay the strike's, so its turn and lean read.
 const LEG_BONES: Array[String] = ["LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "LeftToes",
 	"RightUpperLeg", "RightLowerLeg", "RightFoot", "RightToes"]
+## The arm's bones a posture leaves to a gait (posture_arms; 953 amended (3)). Posture_Slouch and Posture_Stooped
+## turn the shoulders (the clavicles) in, about 13 degrees about the upright for the slouch: on a body standing it
+## reads as rounded shoulders; on an arm swinging fore and aft it turns the swing across, the two hands drifting to
+## the same side together (a slouched runner 0.11 m a hand, stooped 0.04, the run's own path 0.005; Rhea in
+## ui-design's arms5). Filtered one group at a time on the slouched jog, the shoulders alone carry it (0.118 m;
+## the spine 0.015, the neck and head, hips, legs none). The arm below them is here too, for a posture that turns it.
+const POSTURE_ARM_BONES: Array[String] = ["LeftShoulder", "LeftUpperArm", "LeftLowerArm", "LeftHand",
+	"RightShoulder", "RightUpperArm", "RightLowerArm", "RightHand"]
 ## A strike's speed is kept within these (a blow can be hurried or held back
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
@@ -56,6 +64,10 @@ var blend := 0.15
 ## as its copy so named where the library has one (People_Idle for Idle), and named plain by
 ## playing(), base_clip() and upper_clip(), so callers and their tables keep the plain names.
 var stood_as := ""
+## The base clips (named plain) a posture's arms ease out of (Client3D: the body's gaits). Playing one, the
+## posture's arm share goes to 0 over the base's crossfade; playing anything else, back to 1. The spine, neck and
+## head keep the posture throughout.
+var gaits := PackedStringArray()
 ## The tree is posed every this many frames (its level of detail: the caller
 ## sets it by how near and how seen the body is), with the time since.
 var every := 1
@@ -73,6 +85,8 @@ var _upper_speed := 1.0
 var _sky_clip := ""
 var _sky_amount := 0.0
 var _posture: Animation
+var _posture_weight := 0.0
+var _posture_arms := 1.0  # The posture's arm share now (posture_arms).
 var _action_clip := ""
 var _action_speed := 1.0
 ## A strike's speed after its contact, and the msec it changes to it.
@@ -153,10 +167,22 @@ func _build(upper: bool) -> void:
 		_root.connect_node("upper", 0, under)
 		_root.connect_node("upper", 1, "sky")
 		under = "upper"
+	# The posture in two: its arms (POSTURE_ARM_BONES, at the gait's share) and the rest of it, each a filter of the
+	# other's bones (set by posture()); a node's output feeds one input, so each has its own copy of the pose.
 	_root.add_node("pose", AnimationNodeAnimation.new())
-	_root.add_node("posture", AnimationNodeAdd2.new())
+	_root.add_node("pose_arms", AnimationNodeAnimation.new())
+	var body_add := AnimationNodeAdd2.new()
+	body_add.filter_enabled = true
+	_root.add_node("posture", body_add)
 	_root.connect_node("posture", 0, under)
 	_root.connect_node("posture", 1, "pose")
+	var arms_add := AnimationNodeAdd2.new()
+	arms_add.filter_enabled = true
+	for bone in POSTURE_ARM_BONES:
+		arms_add.set_filter_path(NodePath("%GeneralSkeleton:" + bone), true)
+	_root.add_node("posture_arms", arms_add)
+	_root.connect_node("posture_arms", 0, "posture")
+	_root.connect_node("posture_arms", 1, "pose_arms")
 	var action := AnimationNodeOneShot.new()
 	action.fadein_time = blend
 	action.fadeout_time = blend
@@ -166,7 +192,7 @@ func _build(upper: bool) -> void:
 	_root.connect_node("action_seek", 0, "action_clip")
 	_root.connect_node("action_speed", 0, "action_seek")
 	_root.add_node("action", action)
-	_root.connect_node("action", 0, "posture")
+	_root.connect_node("action", 0, "posture_arms")
 	var struck := "action_speed"
 	if upper:
 		# The legs under a strike (legs_walk): the base's gait (a copy of it, legs_clip: a node's
@@ -200,6 +226,7 @@ func _build(upper: bool) -> void:
 		tree.set("parameters/upper/blend_amount", 0.0)
 		tree.set("parameters/sky/blend_amount", 0.0)
 	tree.set("parameters/posture/add_amount", 0.0)
+	tree.set("parameters/posture_arms/add_amount", 0.0)
 	if upper:
 		tree.set("parameters/legs/blend_amount", 0.0)
 	tree.active = true
@@ -479,7 +506,9 @@ func upper_off() -> void:
 func posture(pose: Animation, weight: float) -> void:
 	if pose == null or weight <= 0.0:
 		_posture = null
+		_posture_weight = 0.0
 		tree.set("parameters/posture/add_amount", 0.0)
+		tree.set("parameters/posture_arms/add_amount", 0.0)
 		return
 	if pose != _posture:
 		var library := player.get_animation_library("")
@@ -487,8 +516,32 @@ func posture(pose: Animation, weight: float) -> void:
 		if not library.has_animation(key):
 			library.add_animation(key, pose)
 		(_root.get_node("pose") as AnimationNodeAnimation).animation = key
+		(_root.get_node("pose_arms") as AnimationNodeAnimation).animation = key
+		# The body's share: every bone the pose turns but the arms'.
+		var body_add := _root.get_node("posture") as AnimationNodeAdd2
+		for track in pose.get_track_count():
+			var path := pose.track_get_path(track)
+			var bone := path.get_concatenated_subnames()
+			body_add.set_filter_path(NodePath(str(path.get_concatenated_names()) + ":" + bone), not bone in POSTURE_ARM_BONES)
 		_posture = pose
+	_posture_weight = weight
 	tree.set("parameters/posture/add_amount", weight)
+	tree.set("parameters/posture_arms/add_amount", weight * _posture_arms)
+
+
+## The posture's arm share now: 1 at rest, 0 through a gait (gaits), eased between over the base's crossfade.
+func posture_arms() -> float:
+	return _posture_arms
+
+
+## Eases the posture's arm share toward its mark by [param delta] seconds (_process; a test steps it).
+func _ease_posture_arms(delta: float) -> void:
+	var mark := 0.0 if base_clip() in gaits else 1.0
+	if is_equal_approx(_posture_arms, mark):
+		return
+	_posture_arms = move_toward(_posture_arms, mark, delta / maxf(blend, 0.01))
+	if _posture != null:
+		tree.set("parameters/posture_arms/add_amount", _posture_weight * _posture_arms)
 
 
 ## How much of a strike's legs give way to the base's (0 its own footwork,
@@ -607,6 +660,7 @@ func _process(delta: float) -> void:
 		_contact_seek = -1.0
 	_since += delta
 	_frames += 1
+	_ease_posture_arms(delta)
 	if every <= 1 or _frames % every == 0:
 		tree.advance(_since)
 		_since = 0.0
