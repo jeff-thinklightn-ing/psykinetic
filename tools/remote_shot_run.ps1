@@ -42,14 +42,22 @@
 #                 with nvidia-smi into out\gpu-<pass>.csv while each pass's game runs.
 #   -Mode parse   a tour's scripts (-Dir: its name) checked in the clone, parse errors only
 #   -Mode cache   the cache's warm and keep steps alone on a scratch run folder (the test's)
+#   -Mode manifest  the run folder -Dir's files as remote_shot.sh pulls them back, one a line,
+#                 "out/<path>|<bytes>" and "godot.log|<bytes>": relative paths and sizes
+#                 under that run's own folder, nothing else read (828 amended (15))
+#   -Mode keep    a run folder whose pull-back came back short kept as <Runs>\kept-<name>
+#                 (an older one of the name replaced); prints its path
+#   -Mode sweep   the kept-* folders in <Runs> two days old removed, then the oldest past
+#                 2 GB in all (-KeptMB); prints "dropped: ..." for each
 param(
-	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args", "cache", "load")][string]$Mode,
+	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args", "cache", "load", "manifest", "keep", "sweep")][string]$Mode,
 	[string]$Dir = "",
 	[string]$Root = "D:\psykinetic",
 	[string]$Runs = "D:\psykinetic-runs",
 	[int]$TimeoutMin = 10,
 	[int]$StaleMin = 30,
 	[int]$Repeat = 1,
+	[int]$KeptMB = 2048,
 	[string]$Godot = "",
 	[switch]$Joined
 )
@@ -289,6 +297,20 @@ function Keep-Cache([hashtable]$opts, [string]$caches, [string]$name, [string]$a
 	return $lines
 }
 
+# 828 amended (15): [path] as a folder directly under $Runs (a run's or a kept- one), else $null;
+# the lock and caches folders are never one.
+function Run-Folder([string]$path) {
+	if ($path -eq "" -or -not (Test-Path $path -PathType Container) -or -not (Test-Path $Runs)) { return $null }
+	$item = Get-Item $path
+	if ($item.Parent -eq $null -or $item.Parent.FullName.TrimEnd("\") -ne (Get-Item $Runs).FullName.TrimEnd("\")) { return $null }
+	if ($item.Name -in @("lock", "caches")) { return $null }
+	return $item.FullName
+}
+## 828 amended (15), the coordinator's terms: kept copies go after two days, and the oldest first
+## once together they pass 2 GB (a laptop's disk is smaller than the PC's).
+$KeptDays = 2
+$KeptBytes = [int64]$KeptMB * 1MB  # -KeptMB: the test's smaller cap; 2048 (2 GB) on a laptop.
+
 switch ($Mode) {
 	# The pipeline cache's two steps alone, for tests/remote_shot_sockets_test.sh (828 amended
 	# (12)): -Dir a run folder holding opts.txt (and appdata\Godot\app_userdata\<project>\vulkan
@@ -328,6 +350,58 @@ switch ($Mode) {
 		if ($Dir -match '^\d+$') { $STARVED_AVAIL_MB = [int]$Dir }
 		$state = Load-State -Cpu
 		Write-Output "LOAD $($state.line) | starved [$($state.starved)]"
+		exit 0
+	}
+	# 828 amended (15), the coordinator's terms (2026-11-16): a pull-back that came back short
+	# (root3_12b, 61 of 112 stills and no godot.log, the laptop's copy then removed) leaves the
+	# laptop's copy, and only inside the runner's own Runs folder. Each mode takes only a folder
+	# directly under $Runs: a run's, or a kept- one.
+	"manifest" {
+		$run = Run-Folder $Dir
+		if ($run -eq $null) { Write-Output "manifest: not a run folder under $Runs"; exit 1 }
+		$out = Join-Path $run "out"
+		if (Test-Path $out) {
+			$base = (Get-Item $out).FullName.TrimEnd("\") + "\"
+			Get-ChildItem -Recurse -File -Force $out | ForEach-Object {
+				Write-Output ("out/" + $_.FullName.Substring($base.Length).Replace("\", "/") + "|" + $_.Length)
+			}
+		}
+		$log = Join-Path $run "godot.log"
+		if (Test-Path $log -PathType Leaf) { Write-Output ("godot.log|" + (Get-Item $log).Length) }
+		exit 0
+	}
+	"keep" {
+		$run = Run-Folder $Dir
+		if ($run -eq $null) { Write-Output "keep: not a run folder under $Runs"; exit 1 }
+		$kept = Join-Path $Runs ("kept-" + (Split-Path -Leaf $run))
+		if (Test-Path $kept) { Remove-Item -Recurse -Force $kept }
+		Move-Item $run $kept
+		Write-Output $kept
+		exit 0
+	}
+	"sweep" {
+		if (-not (Test-Path $Runs)) { exit 0 }
+		$kept = @(Get-ChildItem -Directory -Force $Runs -Filter "kept-*" | Sort-Object LastWriteTime)
+		$left = @()
+		foreach ($each in $kept) {
+			$bytes = (Get-ChildItem -Recurse -File -Force $each.FullName | Measure-Object -Sum Length).Sum
+			if ($bytes -eq $null) { $bytes = 0 }
+			$age = (Get-Date) - $each.LastWriteTime
+			if ($age.TotalDays -ge $KeptDays) {
+				Remove-Item -Recurse -Force $each.FullName
+				Write-Output ("dropped: {0} ({1:N0} MB, {2:N1} days old, past {3} days)" -f $each.Name, ($bytes / 1MB), $age.TotalDays, $KeptDays)
+			} else {
+				$left += [pscustomobject]@{ item = $each; bytes = $bytes; age = $age }
+			}
+		}
+		$total = ($left | Measure-Object -Sum bytes).Sum
+		if ($total -eq $null) { $total = 0 }
+		foreach ($each in $left) {
+			if ($total -le $KeptBytes) { break }
+			Remove-Item -Recurse -Force $each.item.FullName
+			$total -= $each.bytes
+			Write-Output ("dropped: {0} ({1:N0} MB, {2:N1} days old, the oldest while kept copies passed {3:N0} MB)" -f $each.item.Name, ($each.bytes / 1MB), $each.age.TotalDays, ($KeptBytes / 1MB))
+		}
 		exit 0
 	}
 	"lock" {

@@ -369,6 +369,9 @@ trap 'release; rm -rf "$TMP"' EXIT
 # A crashed run's runner copy is swept by the next run holding the lock: r-*.ps1 last written
 # before yesterday (forfiles' whole days; a run lasts under an hour, so none is in use).
 rsh "forfiles /p $RUNS /m r-*.ps1 /d -1 /c \"cmd /c del /q @path\"" >/dev/null 2>&1
+# The copies kept from short pull-backs (828 amended (15)): two days, and the oldest first once
+# together past 2 GB; only <Runs>\kept-* folders, each one dropped said here.
+rps -Mode sweep 2>/dev/null | tr -d '\r' | sed -n 's/^dropped: /remote_shot: a kept copy dropped on the laptop: /p'
 # The runner this run copied, by its hash: runner.log names the copy that ran, and the two match.
 RUNNER_SHA="$(sha256sum tools/remote_shot_run.ps1 | cut -c1-16)"
 echo "runner: $(fwd "$helper"), sha256 $RUNNER_SHA"
@@ -432,7 +435,8 @@ rsh "(if exist $DIR rmdir /s /q $DIR) & mkdir $DIR" >/dev/null || { echo "no run
 # The run folder (its out and its APPDATA) and its task go however this ends (828; the task
 # since 828 amended (2): a stopped run left psyk_shot_<name> on the laptop).
 task="psyk_shot_$NAME"
-trap 'rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1; rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
+# A copy kept because its pull-back came back short (KEEP_RUN, 828 amended (15)) is left.
+trap 'rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1; [ "${KEEP_RUN:-0}" = 1 ] || rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
 "${SCP[@]}" "$TMP/args.txt" "$HOST:$(fwd "$DIR")/args.txt" || exit 1
 "${SCP[@]}" "$TMP/opts.txt" "$HOST:$(fwd "$DIR")/opts.txt" || exit 1
 joined_flag=""
@@ -453,12 +457,44 @@ done
 rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1
 echo "run: ${done:-no answer (no interactive session?)}"
 
-# 3. The frames back, the laptop's copy gone.
+# 3. The frames back; the laptop's copy gone only once the copy here is proved whole (828 amended
+# (15), the coordinator's terms, 2026-11-16): pc-character's root3_12b on the Atlas came back with
+# 61 of 112 stills and no godot.log, scp's errors thrown away, and its copy was then removed and the
+# joined check called a client that had joined "never connected". The runner lists the run's
+# files and sizes first (-Mode manifest, that run's own folder only); both pulls keep their exits
+# and errors; tools/remote_shot_pull.sh checks each listed file came at its size. Short, or the list
+# unread: the copy is kept as <Runs>\kept-<name> and the run ends here, before any verdict.
 mkdir -p "$REVIEW"
-"${SCP[@]}" -r "$HOST:$(fwd "$DIR")/out/." "$REVIEW/" 2>/dev/null
-"${SCP[@]}" "$HOST:$(fwd "$DIR")/godot.log" "$REVIEW/godot.log" 2>/dev/null
-rsh "rmdir /s /q $DIR" >/dev/null 2>&1
-rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
+. tools/remote_shot_pull.sh
+manifest="$(rps -Mode manifest -Dir $DIR 2>/dev/null)"; listed=$?
+manifest="$(printf '%s\n' "$manifest" | tr -d '\r' | grep '|')"
+PULL="$TMP/pull"
+mkdir -p "$PULL"
+"${SCP[@]}" -r "$HOST:$(fwd "$DIR")/out/." "$PULL/" 2>"$TMP/pull.err"; out_rc=$?
+log_rc=0
+if printf '%s\n' "$manifest" | grep -q '^godot\.log|'; then
+	"${SCP[@]}" "$HOST:$(fwd "$DIR")/godot.log" "$PULL/godot.log" 2>>"$TMP/pull.err"; log_rc=$?
+fi
+cp -rf "$PULL/." "$REVIEW/"
+if [ $listed -eq 0 ] && pulled="$(printf '%s\n' "$manifest" | pull_short "$PULL")" && [ $out_rc -eq 0 ] && [ $log_rc -eq 0 ]; then
+	echo "pull-back: $pulled, whole"
+	rsh "rmdir /s /q $DIR" >/dev/null 2>&1
+	rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
+else
+	[ $listed -eq 0 ] || pulled="the laptop's list of the run's files unread"
+	KEEP_RUN=1
+	kept="$(rps -Mode keep -Dir $DIR 2>/dev/null | tr -d '\r' | tail -1)"
+	echo "remote_shot: the pull-back came back short: ${pulled:-unchecked}; scp exits $out_rc (out) and $log_rc (godot.log)$([ -s "$TMP/pull.err" ] && printf '; scp said: %s' "$(head -c 300 "$TMP/pull.err" | tr '\n' ' ')")"
+	case "$kept" in
+		*kept-*)
+			echo "remote_shot: the laptop's copy is kept at $kept (dropped after two days, or sooner once kept copies pass 2 GB); the session that owns this look pulls it again, under its own laptop OK, with:"
+			echo "  scp -q -r -o BatchMode=yes $HOST:$(fwd "$kept")/out/. $REVIEW/"
+			echo "  scp -q -o BatchMode=yes $HOST:$(fwd "$kept")/godot.log $REVIEW/godot.log" ;;
+		*) echo "remote_shot: the laptop's copy could not be kept as kept-$NAME (${kept:-no answer}); left at $DIR" ;;
+	esac
+	echo "remote_shot: no verdict read off a short copy: this run's stills and numbers are unchecked, not void"
+	exit 1
+fi
 printf 'SHOT vsync: %s\n' "$VSYNC" >>"$REVIEW/runner.log"
 # 828 amended (12): no figure read without its pipeline cache's state (the runner's "cache:" line).
 # (The BOM too: PowerShell's Add-Content opens runner.log with one, before its first line, "cache: ...".)

@@ -54474,6 +54474,30 @@ Godot takes the Atlas from about 4.2 GB to 2.2 GB; a joined run's two to about 1
 which is why joined timings and stall reads go to the Lenovo (the coordinator's ruling, 11-16). Tools and
 tests only; protocol unchanged; no class_name; no bullet.
 
+828 amended (15) (perf; ui-design's report and the coordinator's go and terms, 2026-11-16; label from
+tools/decision_number.sh): a pull-back that comes back short keeps the laptop's copy. pc-character's root take 3, half
+12b (root3_12b_69ca53c76, the Atlas, about 20:32 to 20:51 with C: nearly full) finished on the laptop ("run: exit 0"),
+but section 3's two scp calls threw their errors away and their exits were never read: 61 of 112 stills and no godot.log
+came back, the laptop's run folder was then removed regardless (and the EXIT trap removes it however the script ends),
+and the joined check, reading a godot.log that never came, called a client that had joined "never connected". Now the
+runner first lists the run's files (-Mode manifest: "out/<path>|<bytes>" and "godot.log|<bytes>", relative paths and
+sizes under that run's own folder alone); both pulls go to a scratch folder with their exits kept and their errors in a
+file, then into the review folder; tools/remote_shot_pull.sh (pull_short) checks every listed file arrived at its size.
+Whole: the laptop's copy goes as before. Short, a pull's exit not 0, or the list unread: the copy is kept inside the
+runner's Runs folder as kept-<name> (-Mode keep; only a folder directly under Runs, never lock or caches), the EXIT trap
+leaves it (KEEP_RUN), and the run ends with exit 1 before any joined, host or tour verdict, saying "the pull-back came back
+short: N of M files; missing ...", the scp exits and what scp said, where the copy is, the two scp lines for the session
+that owns the look to pull it again under its own laptop OK, and "no verdict read off a short copy: unchecked, not void".
+Each run holding the lock sweeps kept-* (-Mode sweep): two days old dropped, then the oldest first once together past
+2 GB (-KeptMB, the test's smaller cap), each one said ("a kept copy dropped on the laptop"). No other listing of the
+laptop. tests/remote_shot_sockets_test.sh, new rows, the runner run here on a scratch Runs folder: the manifest (nested
+paths, sizes, godot.log, nothing else); none for a folder outside Runs or the lock; pull_short whole, a still and
+godot.log missing, a still cut short, no list, root3_12b's shape (61 of 112, the first missing named); keep; the sweep by
+age and by the cap, the lock and caches untouched however old; remote_shot.sh's pull keeps its errors, the rmdir after the
+check, the short exit before the joined verdict, the trap and the sweep. RESULT: PASS. No laptop run: a short pull is
+proved on a deliberately partial local folder (the coordinator's allowance). Stacked on 828 amended (14). Tools and
+tests only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

@@ -314,6 +314,72 @@ if grep -qF 'grep -h "^STARVED" "$REVIEW/runner.log"' tools/remote_shot.sh && gr
 else
 	echo "  FAIL  runner.log's load lines or remote_shot.sh's STARVED relay missing"; failed=$((failed + 1))
 fi
+# A short pull-back keeps the laptop's copy (828 amended (15), the coordinator's terms, 11-16):
+# pc-character's root3_12b came back with 61 of 112 stills and no godot.log, the copy was then
+# removed and the joined check said "never connected". The runner's manifest, keep and sweep modes
+# on a scratch Runs folder, and remote_shot_pull.sh's check, here; the laptop never reached.
+. tools/remote_shot_pull.sh
+prow() { if [ "$1" = 0 ]; then echo "  PASS  $2"; else echo "  FAIL  $2${3:+: $3}"; failed=$((failed + 1)); fi; }
+pruns="$tmp/pullruns"
+mkdir -p "$pruns/run1/out/sub" "$pruns/lock" "$pruns/caches/c1"
+head -c 100 /dev/zero > "$pruns/run1/out/a.png"
+head -c 50 /dev/zero > "$pruns/run1/out/sub/b.png"
+printf 'runner: x\n' > "$pruns/run1/out/runner.log"
+head -c 30 /dev/zero > "$pruns/run1/godot.log"
+head -c 10 /dev/zero > "$pruns/run1/appdata.txt"
+win() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
+mode() { powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$runner" -Runs "$(win "$pruns")" "$@" 2>&1 | tr -d '\r'; }
+listed="$(mode -Mode manifest -Dir "$(win "$pruns/run1")" | sort)"
+wanted="$(printf '%s\n' 'godot.log|30' 'out/a.png|100' 'out/runner.log|10' 'out/sub/b.png|50' | sort)"
+[ "$listed" = "$wanted" ]; prow $? "the manifest: out's files by relative path and size, and godot.log; nothing else of the folder" "[$listed]"
+got="$(mode -Mode manifest -Dir "$(win "$tmp")")"; code=$?
+printf '%s' "$got" | grep -q "not a run folder"; prow $? "a folder not directly under Runs: no listing" "[$got]"
+got="$(mode -Mode manifest -Dir "$(win "$pruns/lock")")"
+printf '%s' "$got" | grep -q "not a run folder"; prow $? "the lock folder: no listing" "[$got]"
+here="$tmp/pulled"
+mkdir -p "$here/sub"
+cp "$pruns/run1/out/a.png" "$pruns/run1/out/runner.log" "$here/"; cp "$pruns/run1/out/sub/b.png" "$here/sub/"; cp "$pruns/run1/godot.log" "$here/"
+said="$(printf '%s\n' "$listed" | pull_short "$here")"; code=$?
+[ $code -eq 0 ] && [ "$said" = "4 of 4 files" ]; prow $? "a whole copy: whole (4 of 4 files)" "[$said]"
+rm "$here/sub/b.png" "$here/godot.log"
+said="$(printf '%s\n' "$listed" | pull_short "$here")"; code=$?
+[ $code -eq 1 ] && printf '%s' "$said" | grep -qF "2 of 4 files; missing 2:" && printf '%s' "$said" | grep -qF "out/sub/b.png" && printf '%s' "$said" | grep -qF "godot.log"
+prow $? "a still and godot.log missing: short, both named" "[$said]"
+cp "$pruns/run1/out/sub/b.png" "$here/sub/"; cp "$pruns/run1/godot.log" "$here/"; head -c 40 /dev/zero > "$here/a.png"
+said="$(printf '%s\n' "$listed" | pull_short "$here")"; code=$?
+[ $code -eq 1 ] && printf '%s' "$said" | grep -qF "a wrong size 1: out/a.png (40 of 100 bytes)"; prow $? "a still cut short: short, its size named" "[$said]"
+said="$(printf '' | pull_short "$here")"; code=$?
+[ $code -eq 1 ] && printf '%s' "$said" | grep -qF "no file listed"; prow $? "no list from the laptop: never whole" "[$said]"
+many="$tmp/many"; mkdir -p "$many/got"
+for i in $(seq 1 112); do printf 'out/look_%03d.png|5\n' "$i"; done > "$many/list.txt"
+for i in $(seq 1 61); do printf 'xxxxx' > "$many/got/look_$(printf %03d "$i").png"; done
+said="$(pull_short "$many/got" < "$many/list.txt")"; code=$?
+[ $code -eq 1 ] && printf '%s' "$said" | grep -qF "61 of 112 files; missing 51: out/look_062.png" && printf '%s' "$said" | grep -qF ", ..."
+prow $? "root3_12b's shape: 61 of 112, the first missing named, the rest counted" "[$said]"
+got="$(mode -Mode keep -Dir "$(win "$pruns/run1")")"
+[ -d "$pruns/kept-run1/out/sub" ] && [ ! -d "$pruns/run1" ] && printf '%s' "$got" | grep -q 'kept-run1$'; prow $? "keep: the run folder renamed kept-run1 inside Runs, its path said" "[$got]"
+mkdir -p "$pruns/kept-old/out" "$pruns/kept-a/out" "$pruns/kept-b/out"
+head -c 10 /dev/zero > "$pruns/kept-old/out/x.png"
+head -c 700000 /dev/zero > "$pruns/kept-a/out/x.png"
+head -c 700000 /dev/zero > "$pruns/kept-b/out/x.png"
+powershell -NoProfile -NonInteractive -Command "(Get-Item '$(win "$pruns/kept-old")').LastWriteTime = (Get-Date).AddDays(-3); (Get-Item '$(win "$pruns/kept-a")').LastWriteTime = (Get-Date).AddHours(-5); (Get-Item '$(win "$pruns/kept-b")').LastWriteTime = (Get-Date).AddHours(-2); (Get-Item '$(win "$pruns/kept-run1")').LastWriteTime = (Get-Date).AddHours(-1); (Get-Item '$(win "$pruns/caches")').LastWriteTime = (Get-Date).AddDays(-9); (Get-Item '$(win "$pruns/lock")').LastWriteTime = (Get-Date).AddDays(-9)" >/dev/null 2>&1
+got="$(mode -Mode sweep -KeptMB 1)"
+printf '%s' "$got" | grep -q "^dropped: kept-old .*past 2 days" && [ ! -d "$pruns/kept-old" ]; prow $? "sweep: a kept copy three days old dropped, and said" "[$got]"
+printf '%s' "$got" | grep -q "^dropped: kept-a .*the oldest while kept copies passed 1 MB" && [ ! -d "$pruns/kept-a" ] && [ -d "$pruns/kept-b" ] && [ -d "$pruns/kept-run1" ]
+prow $? "past the cap (1 MB here, 2 GB on a laptop): the oldest dropped first, the rest kept" "[$got]"
+[ -d "$pruns/lock" ] && [ -d "$pruns/caches/c1" ]; prow $? "the lock and the caches folder never swept, however old"
+# remote_shot.sh: the pull-back keeps its errors and exits, the laptop's copy goes only after the
+# check, and a short copy ends the run before any joined, host or tour verdict.
+rs=tools/remote_shot.sh
+! grep -nE 'SCP\[@\]\}" .*(out/\.|godot\.log).* 2>/dev/null' "$rs" >/dev/null; prow $? "no pull-back scp throws its errors away"
+check_line="$(grep -n 'pull_short "\$PULL"' "$rs" | head -1 | cut -d: -f1)"
+rmdir_line="$(grep -n 'rsh "rmdir /s /q \$DIR"' "$rs" | head -1 | cut -d: -f1)"
+short_exit="$(grep -n 'no verdict read off a short copy' "$rs" | head -1 | cut -d: -f1)"
+joined_line="$(grep -n 'connected as peer' "$rs" | head -1 | cut -d: -f1)"
+[ -n "$check_line" ] && [ -n "$rmdir_line" ] && [ "$check_line" -lt "$rmdir_line" ]; prow $? "the laptop's copy removed only after the check ($check_line, $rmdir_line)"
+[ -n "$short_exit" ] && [ -n "$joined_line" ] && [ "$short_exit" -lt "$joined_line" ]; prow $? "a short copy's exit comes before the joined verdict ($short_exit, $joined_line)"
+grep -qF '[ "${KEEP_RUN:-0}" = 1 ] || rsh "if exist $DIR rmdir' "$rs"; prow $? "the exit trap leaves a kept copy"
+grep -qF 'rps -Mode sweep' "$rs"; prow $? "each run holding the lock sweeps the kept copies"
 
 # The whole runner parses (its run mode needs a laptop's session; its proof is a laptop run).
 parsed="$(powershell -NoProfile -NonInteractive -Command "\$e = \$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$runner', [ref]\$null, [ref]\$e); \$e.Count" 2>&1 | tr -d '\r')"
