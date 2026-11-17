@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3139)
+## Lines in the code (3150)
 
 ### companions (Pip, Wren, Nix) (720)
 
@@ -1416,7 +1416,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (648)
+### other (sim) (650)
 
 | | Line | Where |
 |---|---|---|
@@ -1880,6 +1880,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is beaten down and carried off by %s (%s) | `sim/towns.gd` resident_taken() |
 |  | %s the hunter found no game | `sim/towns.gd` _on_hunted() |
 |  | %s the hunter brought home a %s | `sim/towns.gd` _on_hunted() |
+|  | brought wood to mend the healer's hut | `sim/towns.gd` REGARD_HUT |
+|  | wood laid at the healer's hut | `sim/towns.gd` rack_lay() |
 |  | I've none of that left. | `sim/towns.gd` visitor_sell() |
 |  | %s the %s goes on from %s | `sim/towns.gd` _visitors_turn() |
 |  | %s the %s from %s comes to %s%s | `sim/towns.gd` _visitor_comes() |
@@ -2227,7 +2229,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (835)
+### server and windows (844)
 
 | | Line | Where |
 |---|---|---|
@@ -2329,6 +2331,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | meat brought home off his hill | `main.gd` _balance_settle() |
 |  | meat left lying on his hill | `main.gd` _balance_settle() |
 |  | kept the wolves off his flock | `main.gd` _balance_thank() |
+|  | laid in the healer's hut's rack | `main.gd` hut_give() |
+|  | %d of %d | `main.gd` hut_give() |
+|  | gone (its mend ordered) | `main.gd` hut_give() |
 |  | someone was hurt | `main.gd` _tell_bandage_broke() |
 |  | a monster came near | `main.gd` _tell_bandage_broke() |
 |  | Your bandaging broke off: %s. | `main.gd` _tell_bandage_broke() |
@@ -3007,6 +3012,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s: the town owes %s %d | `main.gd` owe_command() |
 |  | owe: %d is past %s's ceiling of %d | `main.gd` owe_command() |
 |  | %s: the town owes %s %d (was %d) | `main.gd` owe_command() |
+|  | usage: hut <place id> [standing\|disrepair\|ruin] (test-only) | `main.gd` hut_command() |
+|  | hut: no healer's hut %s | `main.gd` hut_command() |
+|  | hut: %s is not standing, disrepair or ruin | `main.gd` hut_command() |
+|  | %s: %s (level %d), rack %s%s | `main.gd` hut_command() |
+|  | %d of %d | `main.gd` hut_command() |
+|  | at %d,%d | `main.gd` hut_command() |
 |  | usage: give <player> <item> [count] | `main.gd` _give_command() |
 |  | no player %s in the game | `main.gd` _give_command() |
 |  | give: no item %s%s | `main.gd` _give_command() |
@@ -3278,7 +3289,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (1114)
+## Lines in the data (1119)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3589,7 +3600,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (40)
+### levels/economy.json (45)
 
 | | Line | Key |
 |---|---|---|
@@ -3599,6 +3610,11 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | %s the carpenter comes to raise the town's sheds and workshops | `gatherers.carpenter` |
 |  | %s, from the old chests | `kept.caption` |
 |  | This was in the old chests by the stall. I kept it for you. | `kept.says` |
+|  | That's good wood. It'll go into the walls. | `healers.rack.said.laid[0]` |
+|  | Every log helps. Fill that rack and I can set this place right. | `healers.rack.said.laid[1]` |
+|  | Thank you. I'll put it to use. | `healers.rack.said.laid[2]` |
+|  | No charge. You brought the wood. | `healers.rack.said.free[0]` |
+|  | This one's on me, for the wood. | `healers.rack.said.free[1]` |
 |  | Yours, for %d. | `camp_traders.say.sold` |
 |  | That's %d gold, friend. | `camp_traders.say.short` |
 |  | I've none of that. | `camp_traders.say.none` |
