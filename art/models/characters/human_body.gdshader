@@ -28,16 +28,21 @@ const float ROOT_DARK = 0.5;
 const float ROOT_FULL_TO = 0.55;
 const float ROOT_NONE_FROM = 0.85;
 
+// SCRATCH (never lands): the look word hairroot's settings (band, dark at the line); 0 keeps the constant.
+instance uniform vec2 hair_root_try = vec2(0.0);
+
 float light_of(vec3 c) {
 	return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
 
 void fragment() {
 	vec4 part = COLOR;
-	float root = UV2.y * (1.0 - smoothstep(0.0, ROOT_BAND, UV2.x));
+	float band = hair_root_try.x > 0.0 ? hair_root_try.x : ROOT_BAND;
+	float dark = hair_root_try.y > 0.0 ? hair_root_try.y : ROOT_DARK;
+	float root = UV2.y * (1.0 - smoothstep(0.0, band, UV2.x));
 	float near_face = light_of(hair.rgb) / max(light_of(skin.rgb), 0.01);
 	float spared = smoothstep(ROOT_FULL_TO, ROOT_NONE_FROM, near_face);
-	vec3 hair_seen = hair.rgb * mix(1.0, ROOT_DARK, root * (1.0 - spared));
+	vec3 hair_seen = hair.rgb * mix(1.0, dark, root * (1.0 - spared));
 	vec3 own = skin.rgb * part.r + hair_seen * part.g + tunic.rgb * part.b + trousers.rgb * part.a;
 	float tinted = clamp(part.r + part.g + part.b + part.a, 0.0, 1.0);
 	ALBEDO = mix(mix(texture(palette, UV).rgb, own, tinted), dye.rgb, dye.a);
