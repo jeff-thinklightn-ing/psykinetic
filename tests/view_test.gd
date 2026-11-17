@@ -2423,6 +2423,21 @@ func _test_dig_beat() -> void:
 			if Sfx.hearing(SoundKit.DIG, at, ear).heard != World.heard(reach, at, ear, World.has_hearing_line(at, ear)):
 				apart.append(str(ear))
 	_check(apart.is_empty(), "Sfx.hearing heard the pick as World.heard has it with the client's line, at all %d cells round it (%s)" % [cells, apart])
+	# Its told stab heard coming: the red and its effort in the one call, once (as the old grey's snarl, 955).
+	if not SoundKit.files("sfx.goblin_stab_tell").is_empty():
+		var lead := int(Monster.fight_for("digger").get("lead_ticks", Monster.LEAD_TICKS))
+		var hear_tell: bool = _rig.sfx.hear_everything
+		_rig.sfx.hear_everything = true
+		var before := _rig.sfx.played.size()
+		_main._on_telegraph_started(9520, {"id": 9520, "source": str(digger.get_path()), "kind": "stab",
+				"cells": [[at.x - 1, at.y]], "from_tick": World.tick, "lands_tick": World.tick + lead})
+		var drawn := _rig._telegraphs.has("9520")
+		var cries := _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]) == "sfx.goblin_stab_tell").size()
+		_rig.creature_tell_over(9520, false)
+		_rig.telegraph_drop("9520")
+		_rig._told_lands.erase(digger.get_instance_id())
+		_rig.sfx.hear_everything = hear_tell
+		_check(drawn and cries == 1, "its told stab: the red drawn and its effort played in the same call, once (%s, %d)" % [drawn, cries])
 	World.despawn(digger)
 
 

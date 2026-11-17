@@ -2608,6 +2608,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.goblin_stab_tell": [
+			{
+				"file": "sfx.goblin_stab_tell.ogg",
+				"from": "freesound",
+				"original": "freesound 868445: Various groans & moans for goblin or imp enemies attacking or taking damage in CRPG game (from 0.05 s for 0.55 s)",
+				"sha256": "e5ed2f5c2523a099518a48d26499b2e2c5bceaf232f480f9f0bf4cd163c21244",
+				"by": "randbsoundbites",
+				"url": "https://freesound.org/people/randbsoundbites/sounds/868445/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_stab_tell.2.ogg",
+				"from": "freesound",
+				"original": "freesound 868445: Various groans & moans for goblin or imp enemies attacking or taking damage in CRPG game (from 1.15 s for 0.62 s)",
+				"sha256": "6f3d07ab15ac456275be86b51bb1d4ea534b88757ad329c451864a9d7031647b",
+				"by": "randbsoundbites",
+				"url": "https://freesound.org/people/randbsoundbites/sounds/868445/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_stab_tell.3.ogg",
+				"from": "freesound",
+				"original": "freesound 868445: Various groans & moans for goblin or imp enemies attacking or taking damage in CRPG game (from 2.38 s for 0.62 s)",
+				"sha256": "d70e402eedd32e149b82627090ca2d5b936e6360229aaf72e4e83ab409bee4cc",
+				"by": "randbsoundbites",
+				"url": "https://freesound.org/people/randbsoundbites/sounds/868445/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.goblin_whistle": [
 			{
 				"file": "sfx.goblin_whistle.ogg",

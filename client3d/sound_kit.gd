@@ -476,8 +476,9 @@ const BITE := "sfx.wolf_bite"
 ## A told move's own cry as its red is laid (955; Client3D.creature_tell), by slot name, then
 ## the telegraph's kind: only for a tell the server cries nothing at. The lunge, the howl and
 ## the pant are cried by the server (Monster.cried: sfx.wolf_lunge, sfx.wolf_howl,
-## sfx.wolf_pant), so they have no row here and never sound as the bite does.
-const TELL_CRIES := {"wolf": {"bite": "sfx.wolf_snarl"}}
+## sfx.wolf_pant), so they have no row here and never sound as the bite does. A goblin's told
+## stab (the digger's, the only kind that tells one) gives a short effort, as the bite its snarl.
+const TELL_CRIES := {"wolf": {"bite": "sfx.wolf_snarl"}, "goblin": {"stab": "sfx.goblin_stab_tell"}}
 
 
 ## The slot [param creature]'s (a monster's kind) jaws shut with as it bites (955), "" for a

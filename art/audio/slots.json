@@ -1058,6 +1058,15 @@
 			"volume_db": -4.0,
 			"uses": "a goblin hurt; Client3D._pain, one blow in two"
 		},
+		"sfx.goblin_stab_tell": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -6.0,
+			"uses": "a goblin's told stab heard coming: a short effort as its red is laid, over before the stab lands, as the old grey's snarl tells his bite (the digger's, package \"a first fight\"; SoundKit.tell_cry, Client3D.creature_tell, at the sneak's pitch; no fallback, silent without takes)"
+		},
 		"sfx.goblin_death": {
 			"category": "creatures",
 			"type": "oneshot",

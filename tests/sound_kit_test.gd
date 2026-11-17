@@ -802,6 +802,20 @@ func _test_digger() -> void:
 			and SoundKit.idle("digger") == SoundKit.idle("sneak") and SoundKit.steady_slot("digger") == SoundKit.steady_slot("sneak")
 			and SoundKit.steady_slot("sneak") == "sfx.chief_steady",
 			"its death, cries, idle and steadying the sneak's")
+	# Its told stab heard coming, as the old grey's bite (the coordinator, 11-16): a goblin's effort as the red is laid.
+	_check(SoundKit.has("sfx.goblin_stab_tell") and not SoundKit.spec("sfx.goblin_stab_tell").has("fallback") and SoundKit.reach("sfx.goblin_stab_tell") == SoundKit.reach("sfx.wolf_snarl")
+			and SoundKit.tell_cry("digger", "bite") == "" and SoundKit.tell_cry("old_wolf", "stab") == "",
+			"the stab's tell slot: no fallback, heard as far as the snarl (%d); no stab cry for a wolf, no bite cry for the digger" % SoundKit.reach("sfx.goblin_stab_tell"))
+	if SoundKit.files("sfx.goblin_stab_tell").is_empty():
+		_check(SoundKit.tell_cry("digger", "stab") == "", "its takes not synced here: the told stab silent, never a placeholder")
+	else:
+		var red := int(Monster.fight_for("digger").get("lead_ticks", Monster.LEAD_TICKS)) * World.TICK_DT
+		var slowest := SoundKit.pitch("digger") * (1.0 - Sfx.PITCH_JITTER)
+		var longest := 0.0
+		for path: String in SoundKit.files("sfx.goblin_stab_tell"):
+			longest = maxf(longest, (load(path) as AudioStream).get_length() / slowest)
+		_check(SoundKit.tell_cry("digger", "stab") == "sfx.goblin_stab_tell" and longest > 0.0 and longest <= red - 0.05,
+				"the told stab cries, each take heard ending by %.2f s, inside its %.1f s red" % [longest, red])
 
 
 func _test_idle_people() -> void:
