@@ -20,12 +20,13 @@ instance uniform vec4 dye : source_color = vec4(0.0);
 // write_hairline): x the distance in metres from the cap's hairline, y 1 on a hair cap and 0 on everything
 // else (a beard, a brow, the bun, the fall, the body), so only the cap darkens. At the line the hair is
 // ROOT_DARK of its colour, back to its own by ROOT_BAND (the cap's lower half, short of its crown, about 14.5 cm
-// from the line; at 3 cm it did not show, the cap's quads coarser than the band); hair lighter than the face
-// darkens less (by its light over the face's, to ROOT_PALE of it at PALE_SPAN over), so a pale crown keeps its distance.
+// from the line; at 3 cm it did not show, the cap's quads coarser than the band). Only hair near the face's own
+// light needs it: the full root while the hair's light is at most ROOT_FULL_TO of the skin's, none from ROOT_NONE_FROM
+// (blond and grey on the pale skins, drawn close to the face's light by heads by day, keep their crown as it was).
 const float ROOT_BAND = 0.09;
 const float ROOT_DARK = 0.5;
-const float ROOT_PALE = 0.3;
-const float PALE_SPAN = 1.0;
+const float ROOT_FULL_TO = 0.55;
+const float ROOT_NONE_FROM = 0.85;
 
 float light_of(vec3 c) {
 	return dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -34,9 +35,9 @@ float light_of(vec3 c) {
 void fragment() {
 	vec4 part = COLOR;
 	float root = UV2.y * (1.0 - smoothstep(0.0, ROOT_BAND, UV2.x));
-	float over = light_of(hair.rgb) / max(light_of(skin.rgb), 0.01) - 1.0;
-	float pale = mix(1.0, ROOT_PALE, clamp(over / PALE_SPAN, 0.0, 1.0));
-	vec3 hair_seen = hair.rgb * mix(1.0, ROOT_DARK, root * pale);
+	float near_face = light_of(hair.rgb) / max(light_of(skin.rgb), 0.01);
+	float spared = smoothstep(ROOT_FULL_TO, ROOT_NONE_FROM, near_face);
+	vec3 hair_seen = hair.rgb * mix(1.0, ROOT_DARK, root * (1.0 - spared));
 	vec3 own = skin.rgb * part.r + hair_seen * part.g + tunic.rgb * part.b + trousers.rgb * part.a;
 	float tinted = clamp(part.r + part.g + part.b + part.a, 0.0, 1.0);
 	ALBEDO = mix(mix(texture(palette, UV).rgb, own, tinted), dye.rgb, dye.a);
