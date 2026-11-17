@@ -4627,6 +4627,7 @@ func _test_kinds() -> void:
 	_test_tavern_inside()
 	_test_room_beds()
 	_test_smithy_inside()
+	_test_daylight_indoors()
 
 
 ## Umbrage's tavern, re-laid (774; the coordinator: "a player who walks into
@@ -4637,6 +4638,138 @@ func _test_kinds() -> void:
 ## Umbrage's smithy inside (811 amended (2), off): its forge burning, its
 ## "fire" part shown and the forge's light at its hearth, as the cold forge's
 ## once woken; its pieces drawn; the smith's tools gone from the west wall.
+## Daylight indoors (946, Jeff's report of 11-15: "the inside reminds me of
+## a dungeon, no natural light, black outside"): a building's inside gets
+## windows on its outer walls (maps' marked cells, else the spacing rule
+## clear of its hearth, counter, pieces and ways out), panes painted by the
+## clock, the sun's and the sky's patches on its floor and the way out's,
+## its ambient and what lies past its walls following the day; an outdoor
+## level none of it.
+func _test_daylight_indoors() -> void:
+	print("\n== daylight indoors (946): windows, panes, patches, ambient and surround by the clock ==")
+	var warnings: Array[String] = []
+	var floor_of := {Vector2i(1, 0): true, Vector2i(2, 0): true}
+	var marked := Level.windows_from({"windows": [{"cells": [[1, 0], [2, 0]], "side": "north"}, {"cells": [[1, 0]], "side": "up"}, {"cells": [[5, 5]], "side": "west"}]}, floor_of, warnings)
+	_check(marked == [Terrain.edge_key(Vector2i(1, 0), Vector2i(0, -1)), Terrain.edge_key(Vector2i(2, 0), Vector2i(0, -1))] and warnings.size() == 2,
+			"maps' windows read as the wall edges on their side, a bad side and a cell off the floor said and left out (%s; %s)" % [marked, warnings])
+	# The rule on a room of 8 by 3: along its 8-edge north and south runs the
+	# 2nd and 5th edges, none at a run's end, none beside a kept cell.
+	var room: Dictionary[Vector2i, bool] = {}
+	var edges := {}
+	for x in 8:
+		for y in 3:
+			room[Vector2i(x, y)] = true
+	for x in 8:
+		edges[Terrain.edge_key(Vector2i(x, 0), Vector2i(0, -1))] = Terrain.Edge.WALL
+		edges[Terrain.edge_key(Vector2i(x, 2), Vector2i(0, 1))] = Terrain.Edge.WALL
+	for y in 3:
+		edges[Terrain.edge_key(Vector2i(0, y), Vector2i(-1, 0))] = Terrain.Edge.WALL
+		edges[Terrain.edge_key(Vector2i(7, y), Vector2i(1, 0))] = Terrain.Edge.WALL
+	var none_kept: Dictionary[Vector2i, bool] = {}
+	var ruled := Client3D.inside_windows_by_rule(room, edges, none_kept)
+	var north := ruled.filter(func(key: Vector3i) -> bool: return key.y == -1).map(func(key: Vector3i) -> int: return key.x)
+	var kept: Dictionary[Vector2i, bool] = {Vector2i(1, 0): true}
+	var kept_ruled := Client3D.inside_windows_by_rule(room, edges, kept)
+	_check(north == [1, 4] and ruled.filter(func(key: Vector3i) -> bool: return key.y == 2).size() == 2
+			and ruled.filter(func(key: Vector3i) -> bool: return key.z == Terrain.EAST).size() == 2
+			and not Terrain.edge_key(Vector2i(1, 0), Vector2i(0, -1)) in kept_ruled,
+			"the rule's windows every %d edges from a run's second, none at its ends, none by a kept cell (north at %s, %d in all)" % [Client3D.INSIDE_WINDOW_EVERY, north, ruled.size()])
+	# The Mughouse's ground floor (maps' four marked, 946 amended (1)): its
+	# windows maps', none by its hearth, its way out or its stair, each a pane
+	# painted by the clock; its way out a patch's row.
+	var ground := Level.load_level("umbrage_tavern")
+	_rig.rebuild(ground["terrain"], ground["spawn_points"]["from_wilds"])
+	var kept_cells := Client3D.inside_kept_cells(ground["terrain"])
+	var floor: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in ground["terrain"]["floor"]:
+		floor[cell] = true
+	# Marked windows answer to the coordinator's terms (never on a door, a
+	# link or the hearth, nor on a piece); the rule's own keep a cell clear
+	# round each (inside_kept_cells).
+	var by_maps := bool(ground["terrain"].get("windows_marked", false))
+	var on_piece := func(cell: Vector2i) -> bool:
+		if cell in ground["terrain"].get("links_at", []):
+			return true
+		for building: Variant in ground["terrain"].get("buildings", []):
+			if building is Dictionary and (building as Dictionary).get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(cell):
+				return true
+		return false
+	var bad: Array = []
+	for key: Vector3i in _rig._inside_windows:
+		var sides := Terrain.edge_cells(key)
+		var inner := sides[0] if floor.has(sides[0]) else sides[1]
+		var window_kept: bool = on_piece.call(inner) if by_maps else kept_cells.has(inner)
+		if window_kept or _rig._wall_states.get(key) != "window" or inner.distance_to(Vector2i(0, 6)) < 2.0:
+			bad.append(key)
+	var doors := _rig._inside_rows.filter(func(row: Array) -> bool: return row[0] == "door")
+	var ground_marked: Array = ground["terrain"].get("windows", [])
+	var as_marked := not bool(ground["terrain"].get("windows_marked", false)) \
+			or (ground_marked.size() == _rig._inside_windows.size() and ground_marked.all(func(key: Vector3i) -> bool: return _rig._inside_windows.has(key)))
+	_check(_rig._inside_lit() and _rig._inside_windows.size() >= 4 and bad.is_empty() and as_marked and _rig._inside_panes.size() == _rig._inside_windows.size()
+			and doors.size() == 2 and _rig._inside_patches != null and _rig._inside_apron != null,
+			"the Mughouse's ground floor: %d windows (maps' marked: %s), none by its hearth, way out or stair (bad %s), each a pane; its way out two patches' rows; the apron laid" % [_rig._inside_windows.size(), ground["terrain"].get("windows_marked", false), bad])
+	# By the clock: noon brighter than 21:30, its panes the sky's and the
+	# background the day's haze; at night deep blue panes, never black, and
+	# the room's look the hearth's as before.
+	var phase_was := DayNight.phase
+	var anchor_was := DayNight.anchor
+	var read := func(hour: float) -> Array:
+		DayNight.set_hour(hour)
+		_rig._inside_step = -1
+		_rig._update_inside()
+		return [_rig._environment.ambient_light_energy, _rig._inside_pane_material.emission, _rig._environment.background_color,
+			_rig._inside_patches.multimesh.visible_instance_count]
+	var noon: Array = read.call(12.0)
+	var night: Array = read.call(21.5)
+	DayNight.phase = phase_was
+	DayNight.anchor = anchor_was
+	DayNight.update()
+	_check(is_equal_approx(float(noon[0]), float(night[0]) * Client3D.INSIDE_DAY_LIFT) and is_equal_approx(float(night[0]), float(_rig._inside_night[1]))
+			and (noon[1] as Color).v > 0.7 and (night[1] as Color).b > 0.2 and (night[1] as Color).v < 0.4
+			and (noon[2] as Color).v > (night[2] as Color).v and (night[2] as Color).v > 0.0 and int(noon[3]) > int(night[3]) and int(night[3]) == doors.size(),
+			"noon's ambient %.2f over 21:30's %.2f (the night's as before), its panes %s by day, %s by night, the background %s over %s, %d patches by day and the way out's %d pools at night"
+			% [noon[0], night[0], noon[1], night[1], noon[2], night[2], noon[3], night[3]])
+	# Past the walls: the way out's dirt and cobbles laid outward from its
+	# threshold, as wide as its doorway; by day the ground under the floor's
+	# light, by night the wilds' grass under the moon, never black.
+	var way: Array = Client3D.inside_way(_rig._inside_rows)
+	var noon_look: Dictionary = Client3D.inside_look(Client3D.sky_look(60.0), 1.0, _rig._inside_night[0], _rig._inside_night[1])
+	var night_look: Dictionary = Client3D.inside_look(Client3D.sky_look(-30.0), 0.0, _rig._inside_night[0], _rig._inside_night[1])
+	_check(is_equal_approx((way[1] as Vector2).length(), 1.0) and float(way[2]) >= 1.0
+			and (noon_look["apron"] as Color).get_luminance() < 0.25 and (night_look["apron"] as Color).get_luminance() > 0.08
+			and (night_look["haze"] as Color).get_luminance() > 0.07 and (night_look["dirt"] as Color).r > (night_look["apron"] as Color).r,
+			"the way out laid from %s toward %s, %.1f m wide; the ground %s by day, %s and the far %s by night" % [way[0], way[1], float(way[2]) * 2.0, noon_look["apron"], night_look["apron"], night_look["haze"]])
+	# A pane in a wall the camera cuts away: the near fade's see-through copy
+	# of the panes kept to the clock and faded as its wall, at once.
+	var pane_copy := _rig._see_through_of(_rig._inside_pane_material) as BaseMaterial3D
+	_rig._update_inside()
+	_check(pane_copy != null and pane_copy.emission == _rig._inside_pane_material.emission
+			and is_equal_approx(pane_copy.emission_energy_multiplier, _rig._inside_pane_material.emission_energy_multiplier * Client3D.INSIDE_PANE_FADED)
+			and is_equal_approx(pane_copy.albedo_color.a, Client3D.INSIDE_PANE_FADED),
+			"a pane in a cut-away wall faded with it and kept to the clock (glow %.2f of the pane's %.2f)" % [pane_copy.emission_energy_multiplier if pane_copy != null else -1.0, _rig._inside_pane_material.emission_energy_multiplier])
+	# The patches: a window with the sun on its side throws the sky's pool and
+	# the sun's patch, its length the glass's fall at that height; with the
+	# sun behind its wall the pool alone; none at night; the way out's warm
+	# pool then.
+	var foot := Transform3D(Basis(Vector3.RIGHT, Vector3.UP, Vector3.BACK), Vector3(0.0, 0.0, 0.0))
+	var window_row := ["window", foot, 6.0]
+	var door_row := ["door", foot, 6.0]
+	var sun_in := Vector3(0.0, sin(deg_to_rad(40.0)), -cos(deg_to_rad(40.0)))  # Toward the sun: north, out past the wall.
+	var lit: Array = Client3D.inside_patches(window_row, sun_in, 40.0, 1.0)
+	var behind: Array = Client3D.inside_patches(window_row, Vector3(0.0, sin(deg_to_rad(40.0)), cos(deg_to_rad(40.0))), 40.0, 1.0)
+	var dark: Array = Client3D.inside_patches(window_row, sun_in, -20.0, 0.0)
+	var door_dark: Array = Client3D.inside_patches(door_row, sun_in, -20.0, 0.0)
+	var want := (Client3D.INSIDE_PANE_HIGH - Client3D.INSIDE_PANE_LOW) / tan(deg_to_rad(40.0))
+	_check(lit.size() == 2 and (lit[1][1] as Color).a < 0.0 and is_equal_approx(-(lit[1][1] as Color).a, want) and behind.size() == 1 and dark.is_empty()
+			and door_dark.size() == 1 and (door_dark[0][1] as Color).r > (door_dark[0][1] as Color).b and (door_dark[0][0] as Transform3D).origin.z < 0.0,
+			"a window with the sun on its side its sky's pool and the sun's patch %.2f m long; the sun behind its wall the pool alone; none at night; the way out's warm pool then, outside its threshold" % [-(lit[1][1] as Color).a if lit.size() == 2 else 0.0])
+	# An outdoor level none of it.
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	_check(not _rig._inside_lit() and _rig._inside_windows.is_empty() and _rig._inside_patches == null and _rig._inside_apron == null,
+			"an outdoor level no inside's windows, patches or apron")
+
+
 func _test_smithy_inside() -> void:
 	print("
 == Umbrage's smithy inside (811 amended (2)): the forge burning, its pieces drawn ==")
