@@ -848,7 +848,7 @@ func _draw_content(c: Control) -> void:
 			if you_rect.size != Vector2.ZERO:
 				covered_area += you_rect.intersection(candidate).get_area()
 			for taken: Rect2 in keep_off:
-				covered_area += taken.intersection(candidate).get_area()
+				covered_area += taken.grow(4.0).intersection(candidate).get_area()  # Chips a few pixels apart, never edge to edge.
 			for ring: Rect2 in place_rings:
 				covered_area += ring.intersection(candidate).get_area()
 			if covered_area < least:
@@ -1014,7 +1014,8 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 		return _fold_name(ids, at, rect, cell_px)
 	var measure := func(words: String) -> Vector2:
 		return sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + pad * 2.0
-	var groups := WorldMapModel.fold(labels, keep_off, _k(&"ring") + pad.x, name_of, measure, rect)
+	# A label stays inside the box and off the frame's own line (KnownWorld own_edge wide, half of it inside).
+	var groups := WorldMapModel.fold(labels, keep_off, _k(&"ring") + pad.x, name_of, measure, _inner(rect, _k(&"own_edge")))
 	_name_towns_once(groups, rect, cell_px)
 	for group: Dictionary in groups:
 		var ids: Array = group["ids"]
