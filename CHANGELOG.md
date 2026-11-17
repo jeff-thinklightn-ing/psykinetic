@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The world map draws only the world's own places, one line between any two that join, and an unclaimed place by its name alone (445 amended (3)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
