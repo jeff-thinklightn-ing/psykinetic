@@ -996,6 +996,7 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 	var pad := Vector2(_k(&"label_pad_x"), _k(&"label_pad_y"))
 	var labels: Array[Dictionary] = []
 	var looks := {}
+	var ring_of := {}  # Place id -> the rect of its ring (what a renamed label keeps clear of).
 	var places: Dictionary = world.areas[own_area].get("places", {})
 	for id: String in known_place_ids(own_area):
 		var place: Dictionary = places[id.get_slice("/", 1)]
@@ -1007,6 +1008,7 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 			continue
 		var at := rect.position + (cell + Vector2(0.5, 0.5)) * cell_px
 		_draw_ring(c, at, knows_way(id))
+		ring_of[id] = Rect2(at - Vector2.ONE * _k(&"ring"), Vector2.ONE * _k(&"ring") * 2.0)
 		var look := place_look(id, UiTheme.color("text"))
 		looks[id] = look
 		labels.append({"id": id, "at": at, "size": sans.get_string_size(str(look["words"]), HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + pad * 2.0})
@@ -1020,7 +1022,7 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 		apart.append(off.grow(4.0))
 	var inside := _inner(rect, _k(&"own_edge"))
 	var groups := WorldMapModel.fold(labels, apart, _k(&"ring") + pad.x, name_of, measure, inside)
-	_name_towns_once(groups, rect, cell_px, apart, _k(&"ring") + pad.x, measure, inside)
+	_name_towns_once(groups, rect, cell_px, apart, _k(&"ring") + pad.x, measure, inside, ring_of)
 	for group: Dictionary in groups:
 		var ids: Array = group["ids"]
 		var folded := bool(group["folded"])
@@ -1033,7 +1035,7 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 
 ## A town's name is said once in the window: of the folded labels that read the same town name, the first keeps it
 ## and each later one reads its nearest place's name alone (ui-design's look of cec148ba5: "Umbrage" twice).
-func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2, keep_off: Array[Rect2], gap: float, measure: Callable, inside: Rect2) -> void:
+func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2, keep_off: Array[Rect2], gap: float, measure: Callable, inside: Rect2, rings: Dictionary = {}) -> void:
 	var said := {}
 	for i in groups.size():
 		var group := groups[i]
@@ -1041,8 +1043,16 @@ func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2, 
 			continue
 		var words := str(group["name"])
 		if said.has(words):
-			# Its new words laid again: they may be longer than the town's name was.
-			groups[i] = WorldMapModel.reword(group, _nearest_place_name(group["ids"], group["at"], rect, cell_px), keep_off, gap, measure, inside)
+			# Its new words laid again: they may be longer than the town's name was, so clear of the other labels (four
+			# pixels apart) and of every ring but its own.
+			var keep: Array[Rect2] = keep_off.duplicate()
+			for j in groups.size():
+				if j != i:
+					keep.append((groups[j]["rect"] as Rect2).grow(4.0))
+			for id: Variant in rings:
+				if not (group["ids"] as Array).has(id):
+					keep.append(rings[id])
+			groups[i] = WorldMapModel.reword(group, _nearest_place_name(group["ids"], group["at"], rect, cell_px), keep, gap, measure, inside)
 		else:
 			said[words] = true
 
