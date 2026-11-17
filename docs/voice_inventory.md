@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3073)
+## Lines in the code (3085)
 
 ### companions (Pip, Wren, Nix) (671)
 
@@ -1362,7 +1362,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (642)
+### other (sim) (648)
 
 | | Line | Where |
 |---|---|---|
@@ -1854,6 +1854,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Telegraphs and boss moves | `sim/tuning.gd` fields() |
 |  | Knockback and mass | `sim/tuning.gd` fields() |
 |  | its zone sleeps | `sim/wanderers.gd` step() |
+|  | no pieces timed | `sim/world.gd` _residents_said() |
+|  | ; %d path searches, %.1f ms | `sim/world.gd` _residents_said() |
+|  | , the longest %.1f ms to (%d, %d) | `sim/world.gd` _residents_said() |
+|  | ; the costliest body: a %s at (%d, %d)%s, %s %.1f ms, %d path searches | `sim/world.gd` _residents_said() |
+|  | with a player | `sim/world.gd` _residents_said() |
+|  | , the longest %.1f ms to (%d, %d) | `sim/world.gd` _residents_said() |
 |  | %d tick%s over %d ms, the worst %.1f ms (tick %d): %s | `sim/world.gd` _note_slow() |
 |  | (companion turns: %s) | `sim/world.gd` _note_slow() |
 |  | %s %d frame%s over %d ms outside the sim, the worst %.1f ms | `sim/world.gd` _note_slow() |
@@ -2167,7 +2173,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (829)
+### server and windows (835)
 
 | | Line | Where |
 |---|---|---|
@@ -2445,6 +2451,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | U | Raiders beat %s down and carried them off. | `main.gd` _resident_taken() |
 |  | %s was beaten down and carried off by raiders in %s. | `main.gd` _companion_taken_in_town() |
 |  | Raiders carried %s off from %s. | `main.gd` _companion_taken_in_town() |
+|  | wanted: town near | `main.gd` _sync_residents() |
+|  | wanted: inn goers | `main.gd` _sync_residents() |
+|  | wanted: huts, folds | `main.gd` _sync_residents() |
+|  | wanted: camp traders | `main.gd` _sync_residents() |
+|  | beds, shelter, doors | `main.gd` _sync_residents() |
 |  | %s said: "%s" | `main.gd` _all_clear() |
 |  | %s will not open up now. | `main.gd` _threat_told() |
 |  | %s will not open up now. | `main.gd` _threat_told() |
@@ -2494,6 +2505,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | who travels with %s | `main.gd` _send_claims() |
 |  | said as fixed | `main.gd` _resident_answered() |
 |  | %s said: "%s"%s | `main.gd` _resident_answered() |
+|  | places: fire seats | `main.gd` _resident_places() |
 |  | companion let go by the raiders | `main.gd` companion_let_go() |
 |  | a raid group's captive | `main.gd` companion_let_go() |
 |  | a camp's captive | `main.gd` companion_let_go() |
