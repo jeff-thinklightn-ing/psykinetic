@@ -59,6 +59,10 @@ ground_wet={
 "type": "float",
 "value": 0.0
 }
+hair_root_day={
+"type": "float",
+"value": 1.0
+}
 look_day={
 "type": "float",
 "value": 1.0

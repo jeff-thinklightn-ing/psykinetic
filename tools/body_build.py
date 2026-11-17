@@ -427,7 +427,7 @@ def dress(obj, region: list, refs: dict) -> None:
 	if not mesh.uv_layers:
 		mesh.uv_layers.new(name="UVMap")
 	# The swatch in the first layer (TEXCOORD_0, the game's UV), whichever is active: a human's second is
-	# body_gen's "hairline" (UV2, ROOTLABEL), kept as written. The first is the one the exporter writes first.
+	# body_gen's "hairline" (UV2, 419 amended (12)), kept as written. The first is the one the exporter writes first.
 	uv = mesh.uv_layers[0].data
 	mesh.uv_layers.active_index = 0
 	mesh.uv_layers[0].active_render = True

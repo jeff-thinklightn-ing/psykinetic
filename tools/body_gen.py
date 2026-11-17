@@ -449,7 +449,7 @@ class Part:
 
 def write_hairline(mesh, rings: list, hairline) -> None:
 	"""A human part's two UV layers, in this order: "UVMap" (tools/body_build.py's palette swatch, written there)
-	and "hairline" (the shading row's darker root, ROOTLABEL): on a hair cap ([hairline], seen_hairline's) each
+	and "hairline" (the shading row's darker root, 419 amended (12)): on a hair cap ([hairline], seen_hairline's) each
 	corner's distance in metres from the nearest of its segments, u (0 under the skin), and v 1; on every other part (0, 0), no
 	root (a beard, a brow, the bun, the fall, the tail, a hood, the body). The game reads it as UV2
 	(human_body.gdshader); it keeps the import's light baking off UV2. glTF turns v over (1 - v), so (u, 1 - v)

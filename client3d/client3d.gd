@@ -4039,6 +4039,8 @@ func _apply_sky() -> void:
 	_outdoor = bool(_terrain.get("outdoor", false))
 	_body_fill.visible = false
 	_sky_step = -1
+	if not _outdoor:
+		set_hair_root_day(0.0)  # In a room or underground: no daylight, no darker root (419 amended (12)).
 	_environment.fog_enabled = false
 	_set_sky_floor(0.0)
 	_weather_view.set_outdoor(_outdoor)
@@ -4187,6 +4189,18 @@ static func _set_scatter_sky(share: float) -> void:
 		_scatter_sway.set_shader_parameter("sky_light", share)
 
 
+## The hair's darker root by day (419 amended (12); human_body.gdshader): the shader global hair_root_day,
+## the open sky's daylight (look_day) on an outdoor level, 0 in a room or underground. Its own global,
+## not look_day: _update_sky stops on a room level, where look_day keeps the last outdoor value.
+static func set_hair_root_day(share: float) -> void:
+	hair_root_day = share
+	RenderingServer.global_shader_parameter_set("hair_root_day", share)
+
+
+## The last hair_root_day written (for tests: a headless renderer keeps no globals to read back).
+static var hair_root_day := 1.0
+
+
 ## Outdoors: the sky, its light and the sun or moon as the world clock
 ## stands (DayNight), moved on a game minute at a time (SKY_STEPS), under
 ## the weather (decision 309: eased every frame, drawn when it changes).
@@ -4216,6 +4230,7 @@ func _update_sky(delta: float) -> void:
 		_look = sky_look(elevation).duplicate()
 		_look_elevation = elevation
 		_look_daylight = smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
+		set_hair_root_day(_look_daylight)
 		# Chimney smoke's colour falls with it (710 amended (1)).
 		RenderingServer.global_shader_parameter_set("look_day", _look_daylight)
 		# The moon by night, opposite the sun; either casts from its

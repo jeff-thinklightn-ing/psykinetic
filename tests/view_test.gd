@@ -289,6 +289,7 @@ func _ready() -> void:
 		await _test_preview_tunic()
 		_test_hair_covers_head()
 		_test_hair_root()
+		_test_hair_root_by_day()
 		_test_hair_value()
 		_test_look_pins()
 		_test_hair_pick_kept()
@@ -839,15 +840,67 @@ func _test_bandaging() -> void:
 	bandaging.free()
 
 
-## The hair's darker root (ROOTLABEL): the human bodies carry body_gen's "hairline" layer as UV2, which human_body.gdshader
+## The hair's darker root (419 amended (12)): the human bodies carry body_gen's "hairline" layer as UV2, which human_body.gdshader
 ## darkens the hair by. On each hair cap (Hair_Cropped, Hair_Bound, the cap of Hair_Long) y is 1 and x its distance from the
 ## hairline, from 0 at the line to over 10 cm at the crown; the cap's forehead line (in front of the head, over the brow) is
 ## at the line. Every other part, a beard, the bun, the tail, long hair's fall, a hood, a hat and the body with its brows,
 ## is (0, 0): no root. And the import keeps light baking off UV2 (meshes/light_baking 1): at 2 Godot unwraps into UV2
 ## over the hairline without a word (art-kit's watch point).
+## The darker root by day (419 amended (12); the coordinator's ruling (iv) on root3_69ca53c76): full under an open
+## midday sky, none by dusk (the sun 1 degree up, take 3's 19:00) and at night, a ramp between, from the
+## shader global hair_root_day that Client3D writes beside look_day; 0 in a room or underground; the
+## character window's body held full (hair_root_full) whatever the hour.
+func _test_hair_root_by_day() -> void:
+	print("
+== the hair's darker root follows the daylight; the character window's held full (419 amended (12)) ==")
+	var code := (load("res://art/models/characters/human_body.gdshader") as Shader).code
+	var none := _shader_const(code, "ROOT_DAY_NONE")
+	var full := _shader_const(code, "ROOT_DAY_FULL")
+	var dusk := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, 1.0)  # The sun 1 degree up (take 3's 19:00 stills).
+	var noon := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, 50.0)
+	_check(smoothstep(none, full, dusk) == 0.0 and smoothstep(none, full, noon) == 1.0 and smoothstep(none, full, 0.0) == 0.0
+		and smoothstep(none, full, (none + full) * 0.5) > 0.0 and smoothstep(none, full, (none + full) * 0.5) < 1.0,
+		"the root's share: none with the sun 1 degree up (daylight %.3f), at night, full at noon (%.3f), a ramp between (%.2f..%.2f)" % [dusk, noon, none, full])
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	var had_hour := DayNight.hour(DayNight.now())
+	DayNight.set_hour(12.0)
+	_rig._sky_step = -1
+	_rig._update_sky(0.0)
+	_check(_rig._outdoor and _rig._look_daylight > 0.98 and is_equal_approx(Client3D.hair_root_day, _rig._look_daylight),
+		"out of doors at noon (Umbrage): hair_root_day the look's daylight (%.3f, %.3f)" % [Client3D.hair_root_day, _rig._look_daylight])
+	var room := Level.load_level("umbrage_tavern_up")
+	_rig.rebuild(room["terrain"], room["spawn_points"].values()[0])
+	_check(not _rig._outdoor and Client3D.hair_root_day == 0.0, "in a room: none (%.3f)" % Client3D.hair_root_day)
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	DayNight.set_hour(0.0)
+	_rig._update_sky(0.0)
+	_check(_rig._outdoor and Client3D.hair_root_day < 0.01 and is_equal_approx(Client3D.hair_root_day, _rig._look_daylight),
+		"out of doors at midnight: the daylight's again, none (%.3f)" % Client3D.hair_root_day)
+	DayNight.set_hour(had_hour)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_rig._sky_step = -1
+	_rig._update_sky(0.0)
+	var preview := CharacterPreview.new()
+	add_child(preview)
+	preview.show_look(PersonLook.make("seed=4 body=male hair=cropped"))
+	var held: Array = []
+	for mesh: MeshInstance3D in preview._model.find_children("*", "MeshInstance3D", true, false):
+		held.append(mesh.get_instance_shader_parameter("hair_root_full"))
+	_check(not held.is_empty() and held.all(func(v: Variant) -> bool: return v != null and float(v) == 1.0),
+		"the character window's body: every part's root held full (%d parts)" % held.size())
+	preview.free()
+
+
+## The float [param name] is set to in shader [param code] ("const float NAME = x;"), NAN if none.
+func _shader_const(code: String, name: String) -> float:
+	var found := RegEx.create_from_string("const float " + name + " = ([0-9.]+);").search(code)
+	return float(found.get_string(1)) if found != null else NAN
+
+
 func _test_hair_root() -> void:
 	print("
-== the hair's darker root: the hairline in UV2 on the hair caps alone (ROOTLABEL) ==")
+== the hair's darker root: the hairline in UV2 on the hair caps alone (419 amended (12)) ==")
 	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
 		var import_text := FileAccess.get_file_as_string(String(build[1]) + ".import")
 		_check(import_text.contains("meshes/light_baking=1"), "%s: the import keeps light baking off UV2" % build[0])

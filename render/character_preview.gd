@@ -69,6 +69,9 @@ func show_look(look: PersonLook, tunic := Color.WHITE) -> void:
 		animator.play(Client3D.CLIP_IDLE)
 	Client3D._dress(_model, tunic)
 	look.apply(_model, tunic)
+	# The hair's darker root held full (419 amended (12)): a colour is picked here to read as it will by day.
+	for mesh: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
+		mesh.set_instance_shader_parameter("hair_root_full", 1.0)
 	Client3D._size_head(_model, look)
 	_model.scale = Vector3.ONE * look.scale
 

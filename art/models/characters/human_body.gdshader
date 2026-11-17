@@ -15,18 +15,27 @@ instance uniform vec4 trousers : source_color = vec4(0.32, 0.24, 0.18, 1.0);
 // the cape's, PersonLook.dye_hood); alpha 0, the default, leaves the picture as it was.
 instance uniform vec4 dye : source_color = vec4(0.0);
 
-// The hair's darker root (ROOTLABEL, the shading row): hair is darker along the hairline, so a cap
+// The hair's darker root (419 amended (12), the shading row): hair is darker along the hairline, so a cap
 // reads as hair against a face of its own hue. UV2 is the mesh's "hairline" layer (tools/body_gen.py's
 // write_hairline): x the distance in metres from the cap's hairline, y 1 on a hair cap and 0 on everything
 // else (a beard, a brow, the bun, the fall, the body), so only the cap darkens. At the line the hair is
-// ROOT_DARK of its colour, back to its own by ROOT_BAND (the cap's lower half, short of its crown, about 14.5 cm
-// from the line; at 3 cm it did not show, the cap's quads coarser than the band). Only hair near the face's own
-// light needs it: the full root while the hair's light is at most ROOT_FULL_TO of the skin's, none from ROOT_NONE_FROM
-// (blond and grey on the pale skins, drawn close to the face's light by heads by day, keep their crown as it was).
-const float ROOT_BAND = 0.09;
-const float ROOT_DARK = 0.5;
+// ROOT_DARK of its colour, back to its own by ROOT_BAND (7 cm up the cap, short of its crown; at 3 cm it did not
+// show, the cap's quads coarser than the band; "deep", the coordinator's pick on root3_69ca53c76 over 9 cm at 0.5).
+// Only hair near the face's own light needs it: the full root while the hair's light is at most ROOT_FULL_TO of the
+// skin's, none from ROOT_NONE_FROM (blond and grey on the pale skins, drawn close to the face's light by heads by day,
+// keep their crown as it was). And only by day: by dusk the low sun lights the crown and leaves the face in shade, so
+// a darker hairline moved the crown toward the face (take 3 at 19:00); the root is full from ROOT_DAY_FULL of the
+// open sky's daylight (hair_root_day, Client3D's look_day on an outdoor level, 0 in a room or underground), none at or
+// under ROOT_DAY_NONE (the sun 1 degree up), between them a ramp. hair_root_full 1 holds it full whatever the hour
+// (the character window's body, where a hair colour is picked to read as it will by day).
+const float ROOT_BAND = 0.07;
+const float ROOT_DARK = 0.55;
 const float ROOT_FULL_TO = 0.55;
 const float ROOT_NONE_FROM = 0.85;
+const float ROOT_DAY_NONE = 0.64;
+const float ROOT_DAY_FULL = 0.98;
+global uniform float hair_root_day;
+instance uniform float hair_root_full = 0.0;
 
 float light_of(vec3 c) {
 	return dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -37,7 +46,8 @@ void fragment() {
 	float root = UV2.y * (1.0 - smoothstep(0.0, ROOT_BAND, UV2.x));
 	float near_face = light_of(hair.rgb) / max(light_of(skin.rgb), 0.01);
 	float spared = smoothstep(ROOT_FULL_TO, ROOT_NONE_FROM, near_face);
-	vec3 hair_seen = hair.rgb * mix(1.0, ROOT_DARK, root * (1.0 - spared));
+	float by_day = smoothstep(ROOT_DAY_NONE, ROOT_DAY_FULL, max(hair_root_day, hair_root_full));
+	vec3 hair_seen = hair.rgb * mix(1.0, ROOT_DARK, root * (1.0 - spared) * by_day);
 	vec3 own = skin.rgb * part.r + hair_seen * part.g + tunic.rgb * part.b + trousers.rgb * part.a;
 	float tinted = clamp(part.r + part.g + part.b + part.a, 0.0, 1.0);
 	ALBEDO = mix(mix(texture(palette, UV).rgb, own, tinted), dye.rgb, dye.a);
