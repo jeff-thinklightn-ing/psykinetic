@@ -171,7 +171,7 @@ const PLAYER_CHOICES := {
 	"hair_colour": ["black", "dark", "brown", "chestnut", "fair", "blond", "red", "grey"],
 	"beard": ["none", "short", "full", "long"],
 	"skin": ["1", "2", "3", "4", "5", "6", "7", "8"],
-	"hairroot": ["0", "2", "3"],  # SCRATCH (the root row): 0 off, 2 deeper, 3 darker; human_body.gdshader's hair_root_try.
+	"hairroot": ["0", "2", "3"],  # SCRATCH (the root row): 0 off, 2 narrower (7 cm, 0.55), 3 wider and darker (11 cm, 0.45); human_body.gdshader's hair_root_try.
 }
 
 var seed := 0
@@ -412,7 +412,7 @@ func apply(scene: Node3D, tunic := Color.WHITE) -> void:
 			mesh.set_instance_shader_parameter("hair", beard_colour)
 		if tunic != Color.WHITE:
 			mesh.set_instance_shader_parameter("tunic", tunic)
-		var root_try: Variant = {"0": Vector3(0.03, 1.0, 0.3), "2": Vector3(0.045, 0.45, 0.3), "3": Vector3(0.03, 0.45, 0.3)}.get(str(words.get("hairroot", "")))
+		var root_try: Variant = {"0": Vector3(0.09, 1.0, 0.3), "2": Vector3(0.07, 0.55, 0.3), "3": Vector3(0.11, 0.45, 0.3)}.get(str(words.get("hairroot", "")))
 		if root_try != null:  # SCRATCH (the root row)
 			mesh.set_instance_shader_parameter("hair_root_try", root_try)
 	dye_hood(scene)
