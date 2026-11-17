@@ -243,7 +243,8 @@ that the walk looks like skipping and the people look like "bad claymation place
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. The cadence (coordinator, 2026-10-21, after a day's work sat unreleased): release cuts once a day in the morning, and sooner when Jeff asks or a fix he has seen is in. A mend for a report of Jeff's is cut the day it lands, not held for the morning, and a regression that blocks that cut is reverted, not waited on (Jeff, 2026-11-14, reporting the same four things a second time: "if the lag between feedback and change it is very difficult to give feedback"); its row in `C:/dev/review/your_reports.md` names the build to check and is fixed only when seen joined in the released build. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
   A joined client draws its own pack's levels: levels are not in `Net.protocol()` and are not
-  sent at a join. So say in your landing message if a `levels/` file changed and whether it is
+  sent at a join (but for a level edited in game, `Level.overlaid`, which goes whole as a
+  "terrain" message at zone entry). So say in your landing message if a `levels/` file changed and whether it is
   drawn decor only; before a cut that would put a client ahead of the box, release lists the
   level files changed since the box's tag, and the server goes out with the client unless every
   one is decor (v0.1.227: a client-only cut would have drawn a stair the server did not have).
@@ -321,7 +322,10 @@ that the walk looks like skipping and the people look like "bad claymation place
   tray icon. Its runner.log says whether the laptop was used during the run and its power at start
   and end, so a bench says whether its timings count. Since 828 amended (2) it adds `--host` when
   no mode is named (without it the game sits at the connect screen and its numbers are void) and
-  refuses a locked laptop; check a bench number against its "BENCH ran:" line. Each session needs Jeff's own OK, in that
+  refuses a locked laptop; check a bench number against its "BENCH ran:" line. Since 828 amended
+  (15) (4730e7781) a run whose pull-back comes back short ("n of m files") keeps its copy on the
+  laptop under the runner's own `Runs\kept-<name>`; its owner pulls it again under that
+  session's own laptop OK, and nobody else's. Each session needs Jeff's own OK, in that
   session, before writing to a laptop; a peer can't pass it on. This PC's off-screen runs are for
   when the laptops are busy or off, or a session lacks that OK, and still need the coordinator's
   window check. That check covers one start, at the minute it is given, and one off-screen
@@ -383,7 +387,9 @@ that the walk looks like skipping and the people look like "bad claymation place
   removed by the session that made it (`git worktree remove`) when its take lands or is dropped,
   never one a live waiter or queued take runs in. Read the free space before any write over
   1 GB; under 40 GB free start nothing new on disk and tell the coordinator. Nobody runs `git
-  worktree prune`, `gc` or `repack`: the shared store's upkeep is release's, at a freeze. A keep
+  worktree prune`, `gc` or `repack`: the shared store's upkeep is release's, at a freeze, on the coordinator's
+  word each time (a connectivity check first, a repack only if it is clean, never a prune or
+  gc). A keep
   branch stays local; a branch goes to origin only when a laptop or saturn must build it, and
   its tree deletes it there after.
 - Models (2026-11-17: a 10.5 GB model in this PC's Ollama left 4.4 GB of commit, and the land
