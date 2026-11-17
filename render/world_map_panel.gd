@@ -275,6 +275,54 @@ func ways_drawn() -> Array[Dictionary]:
 	return out
 
 
+## Levels made for testing, which the known world draws no box for (a dev level, 673; the default
+## map, test_room, the editor's sample): the map's boxes are the game's places. Where the player stands
+## in one it is drawn all the same.
+const TEST_LEVELS: Array[String] = [Level.DEFAULT_MAP, "sample"]
+
+
+## Whether [param area_name]'s box is drawn: every area but a test level, and that where the player is.
+func area_shown(area_name: String) -> bool:
+	return area_name == own_area or (area_name not in Level.DEV_LEVELS and area_name not in TEST_LEVELS)
+
+
+## [param ways] as the lines the map draws, one for each pair of areas whatever the ways between them
+## (two doors, a way and its way back): [{a, b, edge (any edge way), sealed (all of them sealed), marks:
+## {area: mark}}], the pair in the order its first way names it. A link's mark (end_mark) stands at its
+## far end; where two ways end at one area the one that says most stays (a mouth over a ring over a dot
+## over a sealed dim one), so a pair draws one line and at most a mark at each end.
+static func one_line_ways(ways: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var at := {}
+	for way: Dictionary in ways:
+		var from := str(way.get("from", ""))
+		var to := str(way.get("to", ""))
+		var pair := [from, to]
+		pair.sort()
+		var key := "|".join(pair)
+		if not at.has(key):
+			at[key] = out.size()
+			out.append({"a": from, "b": to, "edge": false, "sealed": true, "marks": {}})
+		var line: Dictionary = out[at[key]]
+		var mark := end_mark(way)
+		line["edge"] = bool(line["edge"]) or mark.is_empty()
+		line["sealed"] = bool(line["sealed"]) and mark == "sealed"
+		var marked: String = line["marks"].get(to, "")
+		if not mark.is_empty() and (marked.is_empty() or MARK_RANK.find(mark) < MARK_RANK.find(marked)):
+			line["marks"][to] = mark
+	return out
+
+
+## Whether a place's holding ([faction, strength]) names a holder to draw: none for an unclaimed
+## place ("nobody"), which has no faction row to name or colour it.
+static func holder_named(held: Variant) -> bool:
+	return held is Array and (held as Array).size() >= 1 and str(held[0]) != Factions.NOBODY
+
+
+## The marks, most telling first.
+const MARK_RANK: Array[String] = ["mouth", "ring", "dot", "sealed"]
+
+
 ## The editor's positions, where it has them (never written here).
 func _read_layout() -> void:
 	if not FileAccess.file_exists(LAYOUT_PATH):
@@ -599,7 +647,7 @@ func _area_words(area_name: String) -> String:
 func _area_at(at: Vector2) -> String:
 	var scale := ZOOMS[zoom_step]
 	for area_name: String in positions:
-		if Rect2(positions[area_name] * scale + pan, sizes[area_name] * scale).has_point(at):
+		if area_shown(area_name) and Rect2(positions[area_name] * scale + pan, sizes[area_name] * scale).has_point(at):
 			return area_name
 	return ""
 
@@ -613,24 +661,26 @@ func _draw() -> void:
 	var sans := UiTheme.font("sans")
 	var heading := UiTheme.size("heading")
 	var caption := UiTheme.size("caption")
-	# The ways first, under the boxes.
-	for way: Dictionary in ways_drawn():
-		var from := str(way.get("from", ""))
-		var to := str(way.get("to", ""))
-		if not positions.has(from) or not positions.has(to):
+	# The ways first, under the boxes: one line for each pair of areas.
+	for line: Dictionary in one_line_ways(ways_drawn()):
+		var from := str(line["a"])
+		var to := str(line["b"])
+		if not positions.has(from) or not positions.has(to) or not area_shown(from) or not area_shown(to):
 			continue
 		var a := (positions[from] + sizes[from] * 0.5) * scale + pan
 		var b := (positions[to] + sizes[to] * 0.5) * scale + pan
-		var edge := str(way.get("kind", "")) == "edge"
-		var mark := end_mark(way)
-		var line_colour := Color(UiTheme.color("text_dim"), 0.5) if mark == "sealed" else Color(UiTheme.color("edge"), 0.9 if edge else 0.6)
+		var edge := bool(line["edge"])
+		var line_colour := Color(UiTheme.color("text_dim"), 0.5) if bool(line["sealed"]) else Color(UiTheme.color("edge"), 0.9 if edge else 0.6)
 		draw_line(a, b, line_colour, LINE_WIDTH * scale, true)
-		if not edge:
-			_draw_end_mark(b, mark, 6.0 * scale)
+		for end: String in line["marks"]:
+			if positions.has(end):
+				_draw_end_mark((positions[end] + sizes[end] * 0.5) * scale + pan, str(line["marks"][end]), 6.0 * scale)
 	_draw_trade(scale)
 	_rows.clear()
 	_party_rows.clear()
 	for area_name: String in positions:
+		if not area_shown(area_name):
+			continue
 		var rect := Rect2(positions[area_name] * scale + pan, sizes[area_name] * scale)
 		var area: Dictionary = world.areas[area_name]
 		var is_known := known_areas.is_empty() or known_areas.has(area_name)
@@ -659,7 +709,7 @@ func _draw() -> void:
 			var held: Variant = holdings.get(id)
 			var colour := UiTheme.color("text_dim")
 			var words := str(place.get("name", key))
-			if held is Array and (held as Array).size() >= 1:
+			if holder_named(held):
 				var look := faction_look(str(held[0]))
 				colour = look["colour"]
 				words += ", %s" % look["name"]
