@@ -20448,6 +20448,8 @@ func _test_shield_seen() -> void:
 ## Steadied (843, animation's side): a boss out of a stagger, cried "steady", plants and shakes it
 ## off, then stands braced; a blow on it rocks it with no hit clip; "steady_over" (or its cap) lets
 ## it up. A creature (the boar king, CreatureView) and a person (a robber for the chiefs, Client3D).
+## The steadied rows' step through a shake's tween (s): its peaks read at every step, whatever the frame rate.
+const STEADY_STEP := 1.0 / 120.0
 func _test_steadied() -> void:
 	print("
 == steadied (843): out of a stagger it plants and shakes it off, a blow rocks it without a hit, braced till steady_over ==")
@@ -20473,6 +20475,18 @@ func _test_steadied() -> void:
 	# watched, then on till braced, 3 s at most.
 	var braced := func() -> bool:
 		return pose.position.y < -0.005 and absf(pose.rotation.z) < 0.01 and absf(pose.rotation.y - view._rest_yaw) < 0.01
+	# The shake's peaks read from its tween stepped by hand at STEADY_STEP, not once a drawn frame: a loaded
+	# machine's slow frames stepped past them (pc-character's solo scene, 11-16, the person's rolled 0.13 of 0.35).
+	var shake := view._steady
+	if shake != null and shake.is_valid():
+		shake.pause()
+		for k in int(3.0 / STEADY_STEP):
+			var running := shake.custom_step(STEADY_STEP)
+			lowest = minf(lowest, pose.position.y)
+			rolled = maxf(rolled, absf(pose.rotation.z))
+			twisted = maxf(twisted, absf(pose.rotation.y - view._rest_yaw))
+			if not running:
+				break
 	var started := Time.get_ticks_msec()
 	while Time.get_ticks_msec() - started < 600 or (not braced.call() and Time.get_ticks_msec() - started < 3000):
 		await get_tree().process_frame
@@ -20518,6 +20532,19 @@ func _test_steadied() -> void:
 	var held := func() -> bool:
 		var turned_back := absf(angle_difference(faces, model.rotation.y)) < 0.01
 		return model.position.y < rest_y - 0.02 and absf(body.rotation.x) < 0.01 and absf(body.rotation.z) < 0.01 and turned_back
+	# Its tween stepped by hand as the boar king's (its twist read where the tween writes it, "steady_twist";
+	# _lay turns Model by it each drawn frame).
+	var set_beat := person.get_meta("steady_tween", null) as Tween
+	if set_beat != null and set_beat.is_valid():
+		set_beat.pause()
+		for k in int(3.0 / STEADY_STEP):
+			var running := set_beat.custom_step(STEADY_STEP)
+			dipped = minf(dipped, model.position.y)
+			rolled_by = maxf(rolled_by, absf(body.rotation.x))
+			twisted_by = maxf(twisted_by, absf(float(person.get_meta("steady_twist", 0.0))))
+			lifted = maxf(lifted, body.rotation.z)
+			if not running:
+				break
 	started = Time.get_ticks_msec()
 	while Time.get_ticks_msec() - started < 600 or (not held.call() and Time.get_ticks_msec() - started < 3000):
 		await get_tree().process_frame
