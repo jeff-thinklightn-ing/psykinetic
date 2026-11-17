@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: in the Mughouse the windows are sky blue by day and deep blue at night, daylight falls pale across the floor by the door and fades through the evening to hearth and candlelight, the lane's cobbles and green ground lie outside its walls, with the door lantern's glow on the step at night, and a candle burns on a table upstairs (946).
 - The temple and the healers' huts are indoors: step inside one and the camera takes its inside view and the rain stays off you, while a ruin with no roof lets the rain in (751 amended (10), 775 amended (2)).
 - The world map draws only the world's own places, one line between any two that join, and an unclaimed place by its name alone (445 amended (3)).
 - Ask your companion the way and they stay by you as they answer (960).
