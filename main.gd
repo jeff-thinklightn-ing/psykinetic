@@ -1595,6 +1595,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	var click := event as InputEventMouseButton
 	if click == null:
 		return
+	if click.pressed and click.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT] and _client3d != null and DisplayServer.get_name() != "headless":
+		# 935 amended (9): a press picks through the event's own position (viewport coordinates, the space the camera projects and the pointer is read in),
+		# so a parsed press is a whole one and a real one is where it was made; _update_pick clears it next frame. Headless and the 2D view keep the
+		# cell the test or the frame's pointer gave.
+		_client3d.press_at = click.position
+		_pick_grid = _client3d.mouse_grid()
 	if click.button_index == MOUSE_BUTTON_LEFT and click.pressed and tuning_panel != null and not tuning_panel.picking.is_empty():
 		var cell := _mouse_tile()
 		if cell != NONE:
@@ -1656,8 +1662,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
 	if click.button_index == MOUSE_BUTTON_LEFT and Net.test_click_log:
 		# 935 amended (8): what the click picked and where the pointer was (the cursor's own, which a test's pick of a cell does not move): a
-		# click that did nothing says why (a person under the pointer is a talk, the ground a walk).
-		print("[click] pointer %s, cell %s, %s" % [Vector2i(get_viewport().get_mouse_position()), tile, ("on a %s (%s)" % [target.get_script().get_global_name(), "under the pointer" if on_sprite else "on the cell"]) if target != null else "ground"])
+		# click that did nothing says why (a person under the press is a talk, the ground a walk).
+		print("[click] press %s, pointer %s, cell %s, %s" % [Vector2i(click.position), Vector2i(get_viewport().get_mouse_position()), tile, ("on a %s (%s)" % [target.get_script().get_global_name(), "under the press" if on_sprite else "on the cell"]) if target != null else "ground"])
 	# Fishing (805 amended (11), "fishing that works"): the float down, a left
 	# click strikes; a left click on water with a rod on you casts there.
 	if click.button_index == MOUSE_BUTTON_LEFT and _fish_click(player, tile, on_sprite):
@@ -3996,6 +4002,7 @@ func _mouse_grid() -> Vector2:
 ## has moved: the 3D view's floor-plane ray, or the 2D projection inverted.
 func _update_pick() -> void:
 	if _client3d != null:
+		_client3d.press_at = Vector2(INF, INF)  # A press's own point ends with its frame (935 amended (9)).
 		_pick_grid = _client3d.mouse_grid()
 	else:
 		camera.force_update_scroll()

@@ -240,6 +240,7 @@ const VIEW: Array[StringName] = [
 	&"pitch",
 	&"pitch_ease_seconds",
 	&"plate_focus",
+	&"press_at",
 	&"rack_view",
 	&"reach_ease",
 	&"scatter_reach_low",

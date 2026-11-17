@@ -10301,6 +10301,28 @@ func _test_box_turn() -> void:
 		var rip := _lane_walk(hand_r, true, NAN, [], true)
 		print("  lane walk, hand yaw %d, the walk rippling: %.2f s in a box, %d turns, %.0f degrees" % [int(hand_r), rip["boxed"], rip["turns"], rip["degrees"]])
 		_check(float(rip["boxed"]) < 0.3 and int(rip["turns"]) <= 2, "the lane walk at yaw %d with the walk rippling: %.2f s in a box (a graze), %d turns" % [int(hand_r), rip["boxed"], rip["turns"]])
+	# The point a tour sends for a cell (Client3D.screen_point_of) picks the cell back on raised ground too, on both cameras, on the wilds' own terrain (935 amended (9)).
+	var high_cell := Vector2i(181, 208)
+	var high_lift := 0.0
+	for hx in range(150, 215, 2):
+		for hy in range(190, 240, 2):
+			var lift_here: float = _rig._height_in(Vector2i(hx, hy), Vector2(hx, hy)) - _rig._height_in(Vector2i(181, 208), Vector2(181, 208))
+			if lift_here > high_lift:
+				high_lift = lift_here
+				high_cell = Vector2i(hx, hy)
+	print("  raised ground for the press-point row: cell %s, %.2f m above (181, 208)" % [high_cell, high_lift])
+	for high in [false, true]:
+		Net.set_camera_low(not high, false)
+		_rig._camera_target = Vector3(high_cell.x - 2, _rig._ground_height(Vector2(high_cell.x - 2, high_cell.y)), high_cell.y)
+		_rig._set_yaw(45.0)
+		_rig._place_camera()
+		_rig._box_pull = 1.0
+		var sent_high: Vector2 = _rig.screen_point_of(high_cell)
+		_rig.press_at = sent_high
+		var back_high := Vector2i(_rig.mouse_grid().round())
+		_rig.press_at = Vector2(INF, INF)
+		_check(high_lift < 0.2 or (not is_nan(sent_high.x) and back_high == high_cell), "the point sent for the raised cell %s (%.2f m up, %s camera) picks %s back" % [high_cell, high_lift, "high" if high else "low", back_high])
+	Net.set_camera_low(true, false)
 	Net.set_camera_low(low_was, false)
 	_rig._set_yaw(yaw_was)
 	_rig._place_camera()
@@ -20758,6 +20780,59 @@ func _test_stone_names() -> void:
 	_check(off_strip.is_empty(), "a ground click picks her only along the strip behind her on the line from the camera, never off it (%s)" % [off_strip.slice(0, 4)])
 	_rig._set_yaw(yaw_pick_was)
 	Net.set_camera_low(low_pick_was, false)
+	# 935 amended (9): a press picks through its own point (Client3D.press_at), the pointer where it is: the resident's body at a press on its chest, the
+	# ground at a press on a cell off the line behind it, whatever the viewport's pointer reads; and with no press the pointer's ray as ever.
+	var press_near: Vector2i = _main._nearest_free(player.tile + Vector2i(1, 1))
+	World._relocate(knight, press_near)
+	var press_low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	_rig._camera_target = Vector3(player.tile.x, _rig._ground_height(Vector2(player.tile)), player.tile.y)
+	var press_yaw_was: float = _rig.yaw
+	_rig._set_yaw(0.0)
+	_rig._place_camera()
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_rig._sync_puppets()
+	await get_tree().physics_frame
+	var chest := Vector3(press_near.x, _rig._ground_height(Vector2(press_near)) + 0.9, press_near.y)
+	var off_cell: Vector2i = player.tile + Vector2i(-4, -2)
+	var off_point := Vector3(off_cell.x, _rig._ground_height(Vector2(off_cell)), off_cell.y)
+	var pointer_ray: Array[Vector3] = _rig._mouse_ray()
+	_rig.press_at = _rig._camera.unproject_position(chest)
+	_check(_rig.entity_under_mouse() == knight, "a press on the resident's chest picks her, the pointer elsewhere (%s)" % [_rig.get_viewport().get_mouse_position()])
+	_rig.press_at = _rig._camera.unproject_position(off_point)
+	var press_grid: Vector2 = _rig.mouse_grid()
+	_check(_rig.entity_under_mouse() != knight and press_grid.distance_to(Vector2(off_cell)) < 0.6, "a press on a ground cell off the line behind her picks the ground there (%s)" % [press_grid])
+	# The point a tour sends for a cell (Client3D.screen_point_of, bot.click's) picks the cell back, on both cameras, flat ground and raised: a bot one cell
+	# off on the high camera would void tours quietly (ui-design's check of 935 amended (9) aimed at its puppet's height, which is a cell off in ortho at 50 degrees).
+	var flat_cell: Vector2i = player.tile + Vector2i(-3, -1)
+	var raised_cell := flat_cell
+	var raised_by := 0.0
+	for rdx in range(-7, 8):
+		for rdy in range(-5, 6):
+			var try_cell: Vector2i = player.tile + Vector2i(rdx, rdy)
+			var lift: float = _rig._height_in(try_cell, Vector2(try_cell)) - _rig._height_in(flat_cell, Vector2(flat_cell))
+			if lift > raised_by:
+				raised_by = lift
+				raised_cell = try_cell
+	for high in [false, true]:
+		Net.set_camera_low(not high, false)
+		_rig._camera_target = Vector3(player.tile.x, _rig._ground_height(Vector2(player.tile)), player.tile.y)
+		_rig._set_yaw(0.0)
+		_rig._place_camera()
+		for aimed: Vector2i in [flat_cell, raised_cell]:
+			var sent: Vector2 = _rig.screen_point_of(aimed)
+			_rig.press_at = sent
+			var back := Vector2i(_rig.mouse_grid().round())
+			_check(not is_nan(sent.x) and back == aimed, "the point sent for cell %s (%s camera, ground %.2f m above the flat cell's) picks %s back" % [aimed, "high" if high else "low", _rig._height_in(aimed, Vector2(aimed)) - _rig._height_in(flat_cell, Vector2(flat_cell)), back])
+	Net.set_camera_low(true, false)
+	_rig._set_yaw(0.0)
+	_rig._place_camera()
+	_rig.press_at = Vector2(INF, INF)
+	var after_ray: Array[Vector3] = _rig._mouse_ray()
+	_check(after_ray[0].is_equal_approx(pointer_ray[0]) and after_ray[1].is_equal_approx(pointer_ray[1]), "with no press the ray is the pointer's, as ever")
+	_rig._set_yaw(press_yaw_was)
+	Net.set_camera_low(press_low_was, false)
 	var box := Chest.new()
 	box.name = "ViewBox"
 	add_child(box)

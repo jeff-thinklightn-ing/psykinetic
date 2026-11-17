@@ -3037,6 +3037,10 @@ const PLATE_LOOK_SOON := 100
 const PLATE_LOOK_QUICK := 2000
 ## Main: Alt is held, so every HP bar shows.
 var show_all_bars := false
+## The point of the press Main is handling now, in viewport coordinates (a mouse button event's own position): every pick of the world (_mouse_ray) is
+## through it while it stands, so a press picks where it was made, a parsed one included, and the pointer's place does not matter. INF when none;
+## Main sets it for a press and clears it first thing next frame (935 amended (9)). Hover, the name plates and a held button's walk read the pointer.
+var press_at := Vector2(INF, INF)
 ## The count over a healer's rack (wood at the hut's door): {text: "L of M", cell} while Main says the local player stands within reach of a rack the
 ## server tells, {} otherwise; name_plates lists it as a row of its own (UiNamePlates's, as a name's), at the rack's top.
 var rack_view := {}
@@ -5734,7 +5738,7 @@ func _set_yaw(degrees: float) -> void:
 # --- Picking --------------------------------------------------------------------
 
 func _mouse_ray() -> Array[Vector3]:
-	var mouse := get_viewport().get_mouse_position()
+	var mouse := press_at if not is_inf(press_at.x) else get_viewport().get_mouse_position()
 	return [_camera.project_ray_origin(mouse), _camera.project_ray_normal(mouse)]
 
 
@@ -6118,6 +6122,20 @@ func _pick() -> Dictionary:
 ## of the cursor's ray is the one (the nearest, if more).
 func entity_under_mouse() -> GridEntity:
 	return entity_on_ray(_mouse_ray())
+
+
+## Where cell [param cell]'s ground point is on the screen, in viewport coordinates (the space a press's position and the pointer are read in); NaN when it
+## is behind the lens or off the visible rect. A press there picks the cell back (tests/tour/bot.gd's click sends it).
+func screen_point_of(cell: Vector2i) -> Vector2:
+	if _camera == null:
+		return Vector2(NAN, NAN)
+	var ground := to_global(_tile_position(cell))
+	if _camera.is_position_behind(ground):
+		return Vector2(NAN, NAN)
+	var point := _camera.unproject_position(ground)
+	if not get_viewport().get_visible_rect().has_point(point):
+		return Vector2(NAN, NAN)
+	return point
 
 
 ## The entity a ray [param ray] ([origin, direction], as _mouse_ray gives) picks: the cursor's, or a test's from the camera through a ground cell.

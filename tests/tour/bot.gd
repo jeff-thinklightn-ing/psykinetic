@@ -306,14 +306,31 @@ func _collect_buttons(node: Node, out: Array[Dictionary]) -> void:
 ## click handler, with the cell under the cursor set to [param at].
 func click(at: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
 	_clicked_frame = Engine.get_process_frames()
+	var point := Vector2(NAN, NAN)
+	if DisplayServer.get_name() != "headless" and main._client3d != null:
+		# A press picks through its own position (935 amended (9); ui, in playtest's place on the coordinator's ruling, 11-16): the cell's ground
+		# point on the screen, never a clamped one: a cell off the screen or behind the lens fails here, in the tour's log.
+		point = screen_point(at)
+		if is_nan(point.x):
+			expect(false, "a click at %s has a point on the screen" % at, "off the screen or behind the lens: not pressed")
+			return
 	for pressed: bool in [true, false]:
 		main._pick_grid = Vector2(at)
 		var event := InputEventMouseButton.new()
 		event.button_index = button
 		event.pressed = pressed
+		if not is_nan(point.x):
+			event.position = point
+			event.global_position = point
 		main._unhandled_input(event)
 		if pressed:
 			await frames(1)
+
+
+## Where cell [param at]'s ground point is on the screen, in viewport coordinates (Camera3D.unproject_position); NaN when it is behind the lens or off
+## the visible rect.
+func screen_point(at: Vector2i) -> Vector2:
+	return main._client3d.screen_point_of(at)
 
 
 ## A tap of [param keycode] with the cursor over [param at] (if given):
