@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3062)
+## Lines in the code (3069)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1361,7 +1361,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (640)
+### other (sim) (641)
 
 | | Line | Where |
 |---|---|---|
@@ -1423,6 +1423,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | given by %s | `sim/economy.gd` give_gold() |
 |  | the town has no use for that | `sim/economy.gd` refuses() |
 |  | gold is given, not sold: put it in the depot | `sim/economy.gd` refuses() |
+|  | the town has no use for that | `sim/economy.gd` refuses() |
 |  | the town has enough of that | `sim/economy.gd` refuses() |
 |  | not by day | `sim/economy.gd` fence_refuses() |
 |  | won't buy that | `sim/economy.gd` fence_refuses() |
@@ -2164,7 +2165,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (821)
+### server and windows (827)
 
 | | Line | Where |
 |---|---|---|
@@ -2930,6 +2931,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | damage: the %s is damaged already | `main.gd` damage_command() |
 |  | damage: the %s is %s, not standing | `main.gd` damage_command() |
 |  | %s: the %s damaged (level %d); its repair is ordered at the town's next turn | `main.gd` damage_command() |
+|  | usage: owe <town store> <resident name> [gold] (test-only) | `main.gd` owe_command() |
+|  | owe: no town store %s | `main.gd` owe_command() |
+|  | owe: no resident %s at %s | `main.gd` owe_command() |
+|  | %s: the town owes %s %d | `main.gd` owe_command() |
+|  | owe: %d is past %s's ceiling of %d | `main.gd` owe_command() |
+|  | %s: the town owes %s %d (was %d) | `main.gd` owe_command() |
 |  | usage: give <player> <item> [count] | `main.gd` _give_command() |
 |  | no player %s in the game | `main.gd` _give_command() |
 |  | give: no item %s%s | `main.gd` _give_command() |
