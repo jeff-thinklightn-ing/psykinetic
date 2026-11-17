@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3069)
+## Lines in the code (3070)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1361,7 +1361,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (641)
+### other (sim) (642)
 
 | | Line | Where |
 |---|---|---|
@@ -1979,6 +1979,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | the rim (teetering) | `sim/world.gd` _free_slide() |
 |  | a fall of %d | `sim/world.gd` _free_slide() |
 |  | (by %s, %s) | `sim/world.gd` lay_downed() |
+|  | (?<![\\w])(%s)(?![\\w]) | `sim/world.gd` mask_pattern() |
 |  | world_map.json: the start zone %s is not a level | `sim/world_map.gd` problems() |
 |  | no player start | `sim/world_map.gd` problems() |
 |  | %s: it is the start zone (world_map.json) but has no starts | `sim/world_map.gd` problems() |
