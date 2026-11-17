@@ -18993,6 +18993,7 @@ func _build_talk() -> void:
 	world_map_panel.guide_asked.connect(_ask_guide)  # The map's "ask her to lead you there" (551).
 	world_map_panel.visibility_changed.connect(_world_map_hud)  # 968: the HUD's labels give way to it.
 	world_map_panel.where_name = func(cell: Vector2i) -> String: return Level.where_name(level, cell)  # A folded label's town.
+	world_map_panel.room_of = func(cell: Vector2i) -> String: return Level.room_at(level, cell)  # The room a fold's places share.
 	$HUD.add_child(world_map_panel)
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_world_map)
@@ -26623,7 +26624,7 @@ func _refresh_world_map() -> void:
 ## map are hidden (the coordinator's ruling, 11-17, decision 968); back when it closes.
 func _world_map_hud() -> void:
 	var open := world_map_panel != null and world_map_panel.visible
-	for item: CanvasItem in [compass, minimap, name_plates]:
+	for item: CanvasItem in [compass, minimap, name_plates, _context_hint]:  # The hover hint too: it named what lies under the pointer behind the map.
 		if item != null:
 			item.modulate.a = 0.0 if open else 1.0
 

@@ -2141,6 +2141,9 @@ func _test_world_map_model() -> void:
 	var shut := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(-500, -500, 2000, 2000)] as Array[Rect2], 10.0, name_of, measure)
 	_check(beside.size() == 1 and beside[0]["rect"] == Rect2(10, 90, 80, 20) and shut.is_empty(),
 		"a label keeps off a chip or the you mark: the other side of its ring, or none at all")
+	var crowded := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(85, 85, 30, 30)] as Array[Rect2], 10.0, name_of, measure)
+	_check(crowded.size() == 1 and crowded[0]["rect"] == Rect2(120, 90, 80, 20),
+		"a ring crowded by the you mark keeps its label, stepped out to twice the gap (a newcomer's two places keep their names)")
 
 
 ## The window itself, on a panel of its own (Main's is refreshed each tick): the picture form of the
@@ -2212,12 +2215,50 @@ func _test_world_map_window() -> void:
 	_check(panel.ask_pending() == "", "a click on one she does not: none")
 	_check(panel._party_rows.has("wilds") and (panel._party_rows["wilds"]["rect"] as Rect2).end.y <= panel._screen_rect(WorldMapModel.box_of(panel.layout, "wilds")).end.y + 1.0,
 		"the party's line at the foot of the box")
+	# The wheel: the zooms are 1, 1.5, 2.25, 3.375, 4 times the fit; a wheel up at the map steps in, never past the last or below the fit.
+	var zooms: Array[float] = panel._zooms()
+	_check(zooms.size() == 5 and is_equal_approx(zooms[1], 1.5) and is_equal_approx(zooms[2], 2.25) and is_equal_approx(zooms[3], 3.375) and is_equal_approx(zooms[4], 4.0),
+		"the wheel's zooms from the fit: %s" % [zooms])
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	wheel.pressed = true
+	wheel.position = canvas.size * 0.5
+	panel.zoom_step = 0
+	for i in 6:
+		panel._map_input(wheel)
+	var most: int = panel.zoom_step
+	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+	for i in 6:
+		panel._map_input(wheel)
+	_check(most == 4 and panel.zoom_step == 0, "the wheel up steps in to the last zoom and the wheel down back to the fit, no further either way (%d, %d)" % [most, panel.zoom_step])
+	# A folded label reads the town's name only where all its places lie in the one room, else the nearest place's name alone.
+	panel.own_area = "wilds"
+	panel.where_name = func(_cell: Vector2i) -> String: return "Umbrage"
+	panel.room_of = func(_cell: Vector2i) -> String: return "town"
+	var rect := Rect2(Vector2.ZERO, Vector2(cells) * 4.0)
+	var first_two: Array = [ids[0], ids[1]]
+	var middle := Vector2(cells) * 2.0
+	_check(panel._fold_name(first_two, middle, rect, Vector2(4.0, 4.0)) == "Umbrage", "places all in the one room: the folded label reads the town's name")
+	var apart_room := ["town", "yard"]
+	var which := [0]
+	panel.room_of = func(cell: Vector2i) -> String:
+		which[0] += 1
+		return apart_room[0] if which[0] % 2 == 1 or cell == Vector2i(cells.x / 2, cells.y / 2) else apart_room[1]
+	var one_name := str(panel._fold_name(first_two, middle, rect, Vector2(4.0, 4.0)))
+	var names: Array[String] = []
+	for id: String in first_two:
+		names.append(str(panel.world.areas["wilds"]["places"][id.get_slice("/", 1)]["name"]))
+	_check(one_name != "Umbrage" and one_name in names, "places not all in the room: the nearest place's name alone (%s of %s)" % [one_name, names])
+	panel.where_name = Callable()
+	panel.room_of = Callable()
 	# The HUD's labels give way to the map while Main's is open.
 	_main.open_world_map()
-	_check(is_zero_approx(_main.compass.modulate.a) and is_zero_approx(_main.minimap.modulate.a) and (_main.name_plates == null or is_zero_approx(_main.name_plates.modulate.a)),
-		"while the world map is open the compass, the corner map and the name plates are hidden")
+	_check(is_zero_approx(_main.compass.modulate.a) and is_zero_approx(_main.minimap.modulate.a) and (_main.name_plates == null or is_zero_approx(_main.name_plates.modulate.a))
+			and (_main._context_hint == null or is_zero_approx(_main._context_hint.modulate.a)),
+		"while the world map is open the compass, the corner map, the name plates and the hover hint are hidden")
 	_main.world_map_panel.close()
-	_check(is_equal_approx(_main.compass.modulate.a, 1.0) and is_equal_approx(_main.minimap.modulate.a, 1.0) and (_main.name_plates == null or is_equal_approx(_main.name_plates.modulate.a, 1.0)),
+	_check(is_equal_approx(_main.compass.modulate.a, 1.0) and is_equal_approx(_main.minimap.modulate.a, 1.0) and (_main.name_plates == null or is_equal_approx(_main.name_plates.modulate.a, 1.0))
+			and (_main._context_hint == null or is_equal_approx(_main._context_hint.modulate.a, 1.0)),
 		"and back when it closes")
 	panel.queue_free()
 

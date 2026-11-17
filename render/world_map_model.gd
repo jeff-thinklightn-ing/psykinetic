@@ -240,10 +240,14 @@ static func _join(a: Dictionary, b: Dictionary, keep_off: Array[Rect2], gap: flo
 
 
 ## The rect a label of [param size] takes beside a ring at [param at]: right, left, above, below,
-## the first that covers none of [param keep_off]; an empty rect for none.
+## the first that covers none of [param keep_off], at [param gap] from the ring and, none clear
+## there, stepped out to twice and then three times the gap (a newcomer's two places keep their
+## names beside the "you" mark); an empty rect for none.
 static func _placed(at: Vector2, size: Vector2, keep_off: Array[Rect2], gap: float) -> Rect2:
-	for rect: Rect2 in [Rect2(at + Vector2(gap, -size.y * 0.5), size), Rect2(at + Vector2(-gap - size.x, -size.y * 0.5), size),
-			Rect2(at + Vector2(-size.x * 0.5, -gap - size.y), size), Rect2(at + Vector2(-size.x * 0.5, gap), size)]:
-		if not keep_off.any(func(off: Rect2) -> bool: return off.intersects(rect)):
-			return rect
+	for step in [1.0, 2.0, 3.0]:
+		var away: float = gap * step
+		for rect: Rect2 in [Rect2(at + Vector2(away, -size.y * 0.5), size), Rect2(at + Vector2(-away - size.x, -size.y * 0.5), size),
+				Rect2(at + Vector2(-size.x * 0.5, -away - size.y), size), Rect2(at + Vector2(-size.x * 0.5, away), size)]:
+			if not keep_off.any(func(off: Rect2) -> bool: return off.intersects(rect)):
+				return rect
 	return Rect2()
