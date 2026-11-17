@@ -7,15 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
-- In the crypt, a wall niche answers a click the moment you stop in front of it, so the one the fallen knight told you of opens to your first click however quickly you make it (608 amended (9)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
-- Up close by day, hair near a face's own colour is a shade darker at its hairline, so it reads as hair (419 amended (12)).
-- Anyone who slouches, a companion or a townsperson, runs with arms beside the body too (953 amended (3)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
-- In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
-- Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).
-- In the crypt, clicking a wall niche walks you to it and presses it, even from right in front of it, so once the fallen knight has told you of the way down, the niche that hides it opens to a click, and the stair behind it takes you down at the first click (608 amended (8)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps their idle talk until a while after (917).
@@ -24,6 +18,15 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.228
+
+- In the crypt, a wall niche answers a click the moment you stop in front of it, so the one the fallen knight told you of opens to your first click however quickly you make it (608 amended (9)).
+- Up close by day, hair near a face's own colour is a shade darker at its hairline, so it reads as hair (419 amended (12)).
+- Anyone who slouches, a companion or a townsperson, runs with arms beside the body too (953 amended (3)).
+- In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
+- In builder mode, accepting or taking back a change leaves play running while it's saved, and the change appears a moment later; a second change to that level, asked while the first is saving, is turned away with word to try again in a moment (956).
+- In the crypt, clicking a wall niche walks you to it and presses it, even from right in front of it, so once the fallen knight has told you of the way down, the niche that hides it opens to a click, and the stair behind it takes you down at the first click (608 amended (8)).
 
 ## v0.1.227
 
