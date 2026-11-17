@@ -302,6 +302,13 @@ if git diff --name-only origin/main...HEAD -- tests/land.sh tests/land_retry.sh 
 else
 	echo "land_retry_test: not run (the take changes none of tests/land.sh, land_retry.sh or its test)"
 fi
+# The shared rebase's own test (394 amended (65)), about 50 s: only when the take changes the rebase,
+# the resolvers it calls or the test.
+if git diff --name-only origin/main...HEAD -- tools/land_rebase.sh tools/changelog_resolve.py tools/list_lines.py tests/land_rebase_test.sh 2>/dev/null | grep -q .; then
+	tool_part land_rebase_test bash tests/land_rebase_test.sh
+else
+	echo "land_rebase_test: not run (the take changes none of tools/land_rebase.sh, changelog_resolve.py, list_lines.py or its test)"
+fi
 tool_part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
 tool_part land_tested_test bash tests/land_tested_test.sh
 tool_part fonts_imported_test bash tests/fonts_imported_test.sh

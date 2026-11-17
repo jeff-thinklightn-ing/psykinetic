@@ -11721,6 +11721,54 @@ first (a gate entry at 47 with a record at 48 not named, the reverse named), els
 revision; status with one waiter on this code reads "0 of 1", with a record older code wrote names it by its entry.
 RESULT: PASS. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (65) (perf, 2026-11-16; release's shape, the coordinator's design and terms; label from
+tools/decision_number.sh): a landing's fetch and rebase in one place, tools/land_rebase.sh. That night three landings
+took the lock and gave it back with no push: perf's slowline on a docs/voice_inventory.md conflict its own script
+refused (748 amended (8) now regenerates the page in a commit of its own at each landing with a voice line, so most
+takes behind meet it), and dungeon's nichefix on a real conflict in main.gd that had sat unseen ninety minutes in the
+queue. Each tree's land script ran its own `git rebase origin/main`, and nothing between the lock's take and land.sh
+ran the resolver. `bash tools/land_rebase.sh <tree>` fetches and rebases; at each stop where every conflicted file is
+one the resolvers own (CHANGELOG.md, the three generated pages, THIRD_PARTY.md, the lists' room_fields.gd and net.gd)
+it runs list_lines.py --fix for the lists and changelog_resolve.py for the rest, and continues. changelog_resolve.py
+still decides what it takes: THIRD_PARTY.md changed outside its spans is refused there. A commit the resolvers leave
+empty is dropped with `git rebase --skip`, and only when nothing is staged. Any other file, or a resolver's refusal,
+aborts the rebase and puts HEAD back on the take's own commit: exit 1, the files named. A rebase already stopped here,
+or tracked changes not committed, is exit 2 with nothing done. In this git (2.56) REBASE_HEAD stays after a finished
+rebase, so "stopped here" is read from the rebase-merge and rebase-apply folders. `--would [--no-fetch] <tree>` touches no working tree and no index:
+it replays the commits a rebase would pick (`git rev-list --cherry-pick`), each with `git merge-tree --write-tree
+--merge-base`, and prints "clean", "resolvable: <files>" (exit 0) or "CONFLICT: <files>" (exit 1), in 1 to 2 s on
+this repository. It leaves nothing in the store (the coordinator's term: nobody may gc or prune it, and C: filled that
+afternoon; twenty-five waiters replaying on every move of main would leave hundreds of megabytes a day). The replay's
+trees, blobs and commits go to a temp folder of its own (GIT_OBJECT_DIRECTORY, the common store read through
+GIT_ALTERNATE_OBJECT_DIRECTORIES), removed by its exact path on every way out. A real run's exit 1 also covers a failed
+fetch ("land_rebase: the fetch failed"), so a land script reads the line as well as the code. A first build merged the tip alone; on the live checkouts it called perf's
+place a conflict, a stack on lockroom's commit from before it landed as 4b86b0b2f, which the rebase drops. A waiter
+runs it as it queues and each time origin/main's tip moves (the ref is shared by every checkout, and a landing's push
+moves it). The tool takes no lock. Each run writes one line to the lock's log (--would only when its answer for that
+tip changes) and its last answer to <lock>.would/<tree> for heavy_job status to show. No merge driver and no
+attributes are set: every checkout reads the shared config. A land script from before it keeps its own rebase until
+its tree calls this instead. GATE_REVISION is unchanged. tests/land_rebase_test.sh (new tool part, about 50 s, run when
+a take changes the tool, the two resolvers or the test), a scratch remote and clone, 36 rows:
+- clean;
+- the voice page alone, main's side taken and the rest of the commit kept;
+- two pages in one stop;
+- a page beside a real conflict, which aborts with the checkout clean at its own commit and logs once;
+- a refusing resolver;
+- a page-only commit left empty and dropped;
+- two commits each stopping on the page;
+- CHANGELOG.md through the real changelog_resolve.py, both bullets and none doubled;
+- uncommitted changes, a stopped rebase and no tree named, each exit 2;
+- --would clean, resolvable, and CONFLICT naming main.gd apart from the page, with HEAD, index and files untouched,
+  told once per tip of main, its mark written;
+- a stack on a base landed as another sha reads clean where a merge of the tip alone conflicts, and its rebase drops
+  the landed copy; a middle commit's conflict that the tip undoes reads CONFLICT;
+- the store's loose objects and packs the same after a --would replaying a conflicting stack (CHANGELOG.md merged in
+  it) and after a clean one, its own object folder gone (on the tool before this term, both rows fail: two loose
+  objects left);
+- no merge config and no attributes written;
+- an older script's own rebase meets the same stop as before and its own abort leaves it clean.
+RESULT: PASS. Stacked on 394 amended (64). Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
