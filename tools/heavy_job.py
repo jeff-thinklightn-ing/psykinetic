@@ -226,7 +226,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 48  # 63: a lock waiter charged its own reservation only, never another waiter's.
+GATE_REVISION = 49  # 61: a landing given back to a freeze keeps its queue place; nothing is held.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -865,6 +865,135 @@ def frozen_passable(row, owner):
     """Whether queued [row] is a landing's suite that cannot land while the freeze of [owner]
     lasts (394 amended (59)): passed by the light kinds. The owner's own rows never are."""
     return bool(owner) and row.get("kind") in FROZEN_PASSED_KINDS and row.get("tree") != owner
+
+
+## 394 amended (61), the coordinator's go and conditions, 2026-11-16: a landing keeps its queue
+## place across a freeze. Four cuts that day each refused the head of a queue about twenty deep:
+## each take's lock answered exit 3, its script gave the take back and queued again with a new
+## ticket at the back, and at the unfreeze the rows came back in whatever order their waiters woke
+## (enemy-ai's digger, three hours queued, sent back at 19:00). A take of suite or suite_remote
+## given back while main is frozen (main_frozen(), the pending mark counting), its tree never
+## having taken the land lock since it started (the lock's log), keeps its place: a record
+## (places/<tree>.json) of its queue time, which the tree's next take of those kinds reuses as its
+## ticket, so it sorts where it stood. A record holds nothing and blocks nothing: no row is held
+## for it and none waits on it; it is only a ticket to reuse. Unclaimed PLACE_KEEP_SECONDS after
+## it was kept or main was last seen frozen, it is dropped. One per tree; no tree's land script
+## changes. Rejected: holding another tree's landing row at its place while frozen (the first
+## take of this, 19:37-20:35 that day): waiters on older gate code judged the held row able to
+## start and waited behind it, release's cut export among them.
+PLACES = "places"
+PLACE_KEEP_SECONDS = 3600.0
+## How far back the lock's log is read for a take by the tree (lines).
+LOCK_LOG_TAIL = 400
+
+
+def freeze_mark(now=None):
+    """(owner, age in s, live) of the land lock's freeze, its pending mark or the lock held with
+    "main frozen" in its what, alive or not (394 amended (61)), the live one first; else None. Read
+    only."""
+    now = time.time() if now is None else now
+    lock = _host_path(os.environ.get(LAND_LOCK_ENV) or LAND_LOCK_DEFAULT)
+    found = []
+    for folder, stamp, live in ((lock + ".freeze", "beat", lambda: True),
+            (lock, "since", lambda: "main frozen" in _read_text(os.path.join(lock, "what")).lower())):
+        if not os.path.isdir(folder) or not live():
+            continue
+        try:
+            age = now - float(_read_text(os.path.join(folder, stamp)))
+        except ValueError:
+            age = float("inf")
+        found.append((_read_text(os.path.join(folder, "owner")) or "?", age, age <= LAND_LOCK_STALE_SECONDS))
+    found.sort(key=lambda each: (not each[2], each[1]))
+    return found[0] if found else None
+
+
+def lock_taken_since(tree, since):
+    """Whether the land lock's log (<lock>.log) names [tree] taking the lock at or after [since]
+    (an epoch time), within its last LOCK_LOG_TAIL lines (394 amended (61)). Read only."""
+    lock = _host_path(os.environ.get(LAND_LOCK_ENV) or LAND_LOCK_DEFAULT)
+    try:
+        with open(lock + ".log", encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()[-LOCK_LOG_TAIL:]
+    except OSError:
+        return False
+    for line in lines:
+        hit = re.match(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) taken by (\S+)", line)
+        if hit and hit.group(2) == tree:
+            try:
+                at = time.mktime(time.strptime(hit.group(1), "%Y-%m-%d %H:%M:%S"))
+            except (ValueError, OverflowError):
+                continue
+            if at >= since - 1.0:
+                return True
+    return False
+
+
+def keep_place(tree, entry, owner, now=None):
+    """Writes [tree]'s place record from its running [entry], given back while [owner]'s freeze
+    lasts (394 amended (61)). Called under the state lock."""
+    now = time.time() if now is None else now
+    os.makedirs(_path(PLACES), exist_ok=True)
+    _write(_path(PLACES, "%s.json" % tree), {"tree": tree, "kind": entry.get("asked") or entry["kind"],
+        "queued": float(entry["queued"]), "kept_at": now, "frozen_seen": now, "owner": owner})
+
+
+def places():
+    """The kept places (394 amended (61)), oldest queue time first."""
+    if not os.path.isdir(_path(PLACES)):
+        return []
+    out = []
+    for name in sorted(os.listdir(_path(PLACES))):
+        record = _read(_path(PLACES, name)) if name.endswith(".json") else None
+        if record is not None:
+            out.append(dict(record, file=name))
+    out.sort(key=lambda each: float(each.get("queued", 0.0)))
+    return out
+
+
+def place_live(record, now=None):
+    now = time.time() if now is None else now
+    return now - max(float(record.get("kept_at", 0.0)), float(record.get("frozen_seen", 0.0))) <= PLACE_KEEP_SECONDS
+
+
+def claim_place(tree, kind, now=None):
+    """The queue time [tree]'s kept place gives a take of [kind] (394 amended (61)), its record
+    removed; None when it has none, the kind is no landing's, or the record has lapsed (dropped)."""
+    if kind not in FROZEN_PASSED_KINDS:
+        return None
+    path = _path(PLACES, "%s.json" % tree)
+    with StateLock():
+        record = _read(path) if os.path.exists(path) else None
+        if record is None:
+            return None
+        _retried(os.remove, path)
+    if record.get("kind") not in FROZEN_PASSED_KINDS:
+        return None
+    if not place_live(record, now):
+        log("place_dropped", tree, kind, "its place from %s's freeze, kept %.0f min ago, lapsed (394 amended (61))" % (
+            record.get("owner", "?"), ((now or time.time()) - float(record.get("kept_at", 0.0))) / 60.0))
+        return None
+    return float(record["queued"])
+
+
+def places_kept():
+    """Whether any place record is kept (394 amended (61)): a listing, read only."""
+    try:
+        return any(name.endswith(".json") for name in os.listdir(_path(PLACES)))
+    except OSError:
+        return False
+
+
+def touch_places(now=None):
+    """While main is frozen, each kept place's frozen_seen, at most once a minute (394 amended
+    (61)): a record lapses PLACE_KEEP_SECONDS after the freeze was last seen. Under the state lock."""
+    now = time.time() if now is None else now
+    for record in places():
+        if now - float(record.get("frozen_seen", 0.0)) >= 60.0:
+            path = _path(PLACES, record["file"])
+            saved = _read(path)
+            if saved is not None:
+                saved["frozen_seen"] = now
+                _write(path, saved)
 
 
 def jumps(job, ahead, running, free_ram_gb, free_commit_gb=None):
@@ -2191,8 +2320,15 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
             file=sys.stderr)
         log("refused", tree, kind, "%.1f + %.0f GB over %.0f GB of RAM" % (row["ram_gb"], MARGIN_GB, total))
         raise SystemExit(4)
-    queued = time.time()
-    ticket = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
+    kept = claim_place(tree, kind)
+    queued = kept if kept is not None else time.time()
+    # A kept place's queue time is its ticket (394 amended (61)): it sorts where it stood.
+    ticket = "%019d-%s-%s.json" % (int(round(kept * 1e9)) if kept is not None else time.time_ns(), tree, pid or os.getpid())
+    if kept is not None:
+        log("place_kept", tree, kind, "queued again at its place from before the freeze (%s, %.0f min ago) (394 amended (61))" % (
+            time.strftime("%H:%M:%S", time.localtime(kept)), (time.time() - kept) / 60.0))
+        print("heavy_job: %s %s queued again at its place from before the freeze (queued %s)" % (
+            tree, kind, time.strftime("%H:%M:%S", time.localtime(kept))), file=sys.stderr)
     with StateLock():
         # "waiter": this wrapper, which waits for the turn; a take's pid (its
         # holder) may be none, and a queue file whose waiter died is dropped.
@@ -2258,6 +2394,10 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 if fresh is not None:
                     row = fresh
             free_ram, free_commit = _memory()
+            # 394 amended (61): while main is frozen, the kept places' last sight of it moves on (a
+            # record lapses PLACE_KEEP_SECONDS after); nothing is held, and the queue is judged as ever.
+            if places_kept() and main_frozen():
+                touch_places()
             # First in the queue, or every job before it waits on its own
             # kind alone (may_pass): an import is not held behind a suite
             # waiting for a suite. Each judged as it would run at its turn
@@ -2939,12 +3079,21 @@ def release(tree, kind):
         for entry in _entries("running"):
             if entry["tree"] == tree and kind in (entry["kind"], entry.get("asked")) and not entry.get("watched"):
                 # A swapped take (394 amended (33)) released by the kind it asked for.
+                owner = main_frozen() if FROZEN_PASSED_KINDS[0] in (entry["kind"], entry.get("asked")) or \
+                    FROZEN_PASSED_KINDS[1] in (entry["kind"], entry.get("asked")) else ""
+                kept = bool(owner) and owner != tree and not lock_taken_since(tree, float(entry.get("started", 0.0)))
+                if kept:
+                    # 394 amended (61): given back to a freeze before it reached the lock; its place kept.
+                    keep_place(tree, entry, owner)
+                    log("place", tree, entry["kind"], "given back to %s's freeze; its place (queued %s) kept for its next take" % (
+                        owner, time.strftime("%H:%M:%S", time.localtime(float(entry["queued"])))))
                 os.remove(_path("running", entry["file"]))
                 record_attached(entry["kind"], entry)
                 attached = (", attached peak %.1f GB, commit %.1f GB" % (entry.get("attached_peak_gb", 0.0),
                     entry.get("attached_peak_commit_gb", 0.0))) if entry.get("attached") else ""
                 log("done", tree, entry["kind"], "released after %.0f s%s" % (time.time() - entry["started"], attached))
-                print("heavy_job: %s %s released" % (tree, entry["kind"]))
+                print("heavy_job: %s %s released%s" % (tree, entry["kind"], "; main frozen by %s: its place in the queue "
+                    "kept for its next take (394 amended (61))" % owner if kept else ""))
                 return 0
     print("heavy_job: %s holds no %s" % (tree, kind), file=sys.stderr)
     return 1
@@ -3181,6 +3330,18 @@ def status():
         print("waiting on the land lock: %d of %d %s takes, in order: %s" % (len(waiting), LOCK_WAIT_MOST,
             "/".join(LOCK_WAIT_KINDS), ", ".join("%s (%s)" % (each["tree"], time.strftime("%H:%M:%S", time.localtime(each["started"])))
             for each in waiting)))
+    mark = freeze_mark()
+    if mark is not None and mark[2]:
+        print("main frozen by %s (beaten %.0f s ago): a landing given back to it keeps its queue place for its next "
+            "take; nothing is held (394 amended (61))" % (mark[0], mark[1]))
+    elif mark is not None:
+        print("a freeze mark by %s, unbeaten %s s (over %d s): no freeze any more, no place kept for it; release clears "
+            "the mark (394 amended (61))" % (mark[0], "%.0f" % mark[1] if mark[1] != float("inf") else "?", LAND_LOCK_STALE_SECONDS))
+    for record in places():
+        print("kept place: %s %s, queued %s, given back to %s's freeze %.0f min ago%s (394 amended (61))" % (
+            record["tree"], record.get("kind", "?"), time.strftime("%H:%M:%S", time.localtime(float(record["queued"]))),
+            record.get("owner", "?"), (time.time() - float(record.get("kept_at", 0.0))) / 60.0,
+            "" if place_live(record) else "; lapsed, dropped at its next take"))
     reasons = queue_reasons(queue, running, free_ram, free_commit, free_gpu)
     bench_row = kinds().get("bench", KINDS["bench"])
     for place, entry in enumerate(queue, 1):

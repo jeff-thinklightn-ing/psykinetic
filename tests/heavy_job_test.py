@@ -2271,7 +2271,7 @@ check(gate.jumps(load48, [scene48], [], 40.0, 40.0)[0] and not gate.jumps(load48
     "never past one of its own kind: first come among them")
 check(not gate.jumps(dict(gate.KINDS["scene"], kind="scene"), [export48], busy48, 40.0, 40.0)[0],
     "a scene does not: first come, as before")
-check(gate.GATE_REVISION == 48, "gate revision 48 (63: a lock waiter charged its own reservation only)")
+check(gate.GATE_REVISION == 49, "gate revision 49 (61: a landing given back to a freeze keeps its queue place)")
 
 mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
 saved48 = gate._read(gate._path("kinds.json"))
@@ -2864,6 +2864,249 @@ for name in os.listdir(gate._path("running")):
 fresh63()
 gate._memory = mem63
 shutil.rmtree(main_dir63, ignore_errors=True)
+print("== a landing keeps its place across a freeze (394 amended (61)) ==")
+# 11-16: four cuts, each refusing the head of a queue about twenty deep; enemy-ai's digger, three
+# hours queued, sent back at 19:00 and queued again at the back. A place record keeps its ticket;
+# it holds nothing and blocks nothing. The first take of this also held another tree's landing row
+# while frozen, and waiters on main's older gate code waited behind the held row (19:37-20:35, the
+# v0.1.226 export among them): every row here that matters runs beside a waiter on main's code.
+import threading as threading61
+import importlib.util as importlib61
+mem61, total61, poll61 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
+margins61 = gate.MARGIN_GB, gate.COMMIT_MARGIN_GB
+free61 = [40.0]
+local61 = os.environ.get("LAND_LOCAL")
+os.environ["LAND_LOCAL"] = "1"  # No saturn probe: these suites are judged as suites.
+saved61 = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=2.0, commit_gb=1.0, lean_first=False, max_running=1),
+    "scene": dict(gate.KINDS["scene"], ram_gb=1.0, commit_gb=1.0),
+    "godot_export": dict(gate.KINDS["godot_export"], ram_gb=1.0, commit_gb=1.0)})
+lock61 = os.path.join(STATE, "frozen61", "land.lock")
+was61 = os.environ.get(gate.LAND_LOCK_ENV)
+os.environ[gate.LAND_LOCK_ENV] = lock61
+os.makedirs(os.path.dirname(lock61), exist_ok=True)
+# main's present gate code, as a waiter from a checkout not yet rebased runs it.
+main_dir61 = tempfile.mkdtemp(prefix="heavy_job_main_")
+shown61 = subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(gate.__file__)), "show", "origin/main:tools/heavy_job.py"],
+    capture_output=True, text=True, encoding="utf-8", timeout=60)
+check(shown61.returncode == 0 and "GATE_REVISION" in shown61.stdout, "main's gate code read (origin/main:tools/heavy_job.py)")
+with open(os.path.join(main_dir61, "heavy_job.py"), "w", encoding="utf-8", newline="") as handle:
+    handle.write(shown61.stdout)
+spec61 = importlib61.spec_from_file_location("heavy_job_main61", os.path.join(main_dir61, "heavy_job.py"))
+old61 = importlib61.module_from_spec(spec61)
+spec61.loader.exec_module(old61)
+print("  main's gate code: revision %s beside this one's %d" % (old61.GATE_REVISION, gate.GATE_REVISION))
+for each in (gate, old61):
+    each.MARGIN_GB, each.COMMIT_MARGIN_GB = 8.0, 4.0
+    each._memory = lambda: (free61[0], free61[0])
+    each.total_ram_gb = lambda: None
+    each.POLL_SECONDS = 0.05
+
+
+def clear61():
+    for folder in ("queue", "running", gate.PLACES):
+        if os.path.isdir(gate._path(folder)):
+            for name in os.listdir(gate._path(folder)):
+                try:
+                    gate._retried(os.remove, gate._path(folder, name))
+                except FileNotFoundError:
+                    pass
+
+
+def freeze61(age):
+    folder = lock61 + ".freeze"
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    for name, text in (("owner", "psykinetic-release"), ("why", "v0.1.226 cut"), ("beat", str(int(time.time() - age)))):
+        with open(os.path.join(folder, name), "w") as handle:
+            handle.write(text + "\n")
+
+
+def unfreeze61():
+    shutil.rmtree(lock61 + ".freeze", ignore_errors=True)
+
+
+def until61(condition, seconds=30.0):
+    end = time.time() + seconds
+    while not condition() and time.time() < end:
+        time.sleep(0.05)
+    return condition()
+
+
+def trees61(folder):
+    return [each["tree"] for each in gate._entries(folder)]
+
+
+def taker61(tree, kind="suite", code=None):
+    each = threading61.Thread(target=lambda: (code or gate).take(tree, kind, os.getpid()), daemon=True)
+    each.start()
+    return each
+
+
+def queued61(tree, kind="suite", code=None):
+    # Queued, after the rows already there (each ticket its own ns).
+    each = taker61(tree, kind, code)
+    until61(lambda: tree in trees61("queue"))
+    time.sleep(0.05)
+    return each
+
+
+def status61():
+    shown = io.StringIO()
+    with contextlib.redirect_stdout(shown):
+        gate.status()
+    return shown.getvalue()
+
+
+def refused61(tree, queued, started):
+    # A take that started before the freeze and waits on the lock, as a landing's does.
+    gate._write(gate._path("running", "%s-suite-%d.json" % (tree, os.getpid())), {"tree": tree, "kind": "suite",
+        "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()), "queued": queued, "started": started,
+        "ram_gb": 2.0, "commit_gb": 1.0, "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": False})
+
+
+def drain61(trees, seconds=60.0):
+    # Releases each take as it starts (its script meeting the lock), in the order they start.
+    started = []
+    end = time.time() + seconds
+    while len(started) < len(trees) and time.time() < end:
+        for each in gate._entries("running"):
+            if each["tree"] in trees and each["tree"] not in started:
+                started.append(each["tree"])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    gate.release(each["tree"], each["kind"])
+        time.sleep(0.02)
+    return started
+
+
+clear61()
+unfreeze61()
+freeze61(5)
+econ61 = taker61("economy-rack")
+check(until61(lambda: "economy-rack" in trees61("running")),
+    "frozen (the pending mark, beaten 5 s ago): another tree's suite at the head starts as ever; nothing is held")
+shown61 = status61()
+check("main frozen by psykinetic-release" in shown61 and "nothing is held" in shown61, "status says main is frozen and nothing is held")
+gate.release("economy-rack", "suite")
+econ61.join(5)
+check([each["tree"] for each in gate.places()] == ["economy-rack"], "given back while frozen (its lock would answer 3): its place kept")
+clear61()
+freeze61(gate.LAND_LOCK_STALE_SECONDS + 100)
+refused61("lore-stale", time.time() - 600, time.time() - 30)
+gate.release("lore-stale", "suite")
+check(not gate.places() and "no freeze any more" in status61(),
+    "a mark unbeaten for %d s (land_lock.sh's stale time) is no freeze: a take given back keeps no place, status says so"
+    % (gate.LAND_LOCK_STALE_SECONDS + 100))
+unfreeze61()
+clear61()
+
+freeze61(5)
+now61 = time.time()
+refused61("enemy-ai-digger", now61 - 3 * 3600, now61 - 60)
+with contextlib.redirect_stdout(io.StringIO()) as said61:
+    gate.release("enemy-ai-digger", "suite")
+kept61 = gate.places()
+check([each["tree"] for each in kept61] == ["enemy-ai-digger"] and abs(kept61[0]["queued"] - (now61 - 3 * 3600)) < 1.0
+    and "place in the queue kept" in said61.getvalue(),
+    "a take given back while frozen, before its tree took the lock: its place kept, its queue time three hours back")
+with open(lock61 + ".log", "a") as handle:
+    handle.write("%s taken by dungeon-niche (a landing on the lock as the freeze came)\n" % time.strftime("%Y-%m-%d %H:%M:%S"))
+refused61("dungeon-niche", now61 - 600, now61 - 30)
+gate.release("dungeon-niche", "suite")
+check([each["tree"] for each in gate.places()] == ["enemy-ai-digger"],
+    "one whose tree took the lock since its start (it landed or tried to): no place kept")
+check(gate.claim_place("companions", "suite") is None and [each["tree"] for each in gate.places()] == ["enemy-ai-digger"],
+    "another tree's take claims nothing: a place is its own tree's")
+scene61 = taker61("maps", "scene", old61)
+check(until61(lambda: "maps" in trees61("running")),
+    "a scene queued on main's code with a place record kept and no row: it starts (the record is no row)")
+old61.release("maps", "scene")
+scene61.join(5)
+
+# Tonight's shape, beside main's code: the place's tree queues again while frozen, at its old
+# ticket, and a scene and the freeze's own export queue behind it on main's code. Room short at
+# first, so all three wait; with room the landing row starts (it is never held) and its script
+# gives it back at the lock; the two behind start, as they do today.
+free61[0] = 5.0
+claimed61 = taker61("enemy-ai-digger")
+until61(lambda: "enemy-ai-digger" in trees61("queue"))
+entry61 = next(each for each in gate._entries("queue") if each["tree"] == "enemy-ai-digger")
+check(abs(entry61["queued"] - (now61 - 3 * 3600)) < 1.0 and not gate.places(),
+    "the tree's next take reclaims its place: the record gone, its first queue time carried")
+behind61 = [queued61("maps", "scene", old61), queued61("psykinetic-release", "godot_export", old61)]
+check(trees61("queue") == ["enemy-ai-digger", "maps", "psykinetic-release"] and not trees61("running"),
+    "short of room: the reclaimed landing first, main's-code scene and export behind it (%s)" % trees61("queue"))
+free61[0] = 40.0
+check(until61(lambda: "enemy-ai-digger" in trees61("running")), "with room the reclaimed landing row starts though main is frozen: never held")
+with contextlib.redirect_stdout(io.StringIO()):
+    gate.release("enemy-ai-digger", "suite")
+claimed61.join(5)
+check(until61(lambda: {"maps", "psykinetic-release"} <= set(trees61("running")), 15.0),
+    "the scene and the cut's export queued behind it on main's code start, as they do today (%s)" % trees61("running"))
+check([each["tree"] for each in gate.places()] == ["enemy-ai-digger"], "the landing given back at the lock keeps its place again")
+old61.release("maps", "scene")
+old61.release("psykinetic-release", "godot_export")
+for each in behind61:
+    each.join(5)
+
+# A landing on main's code: queued while frozen after the place was kept, it sorts behind the
+# reclaimed take (queued three hours before it, where it stood before the freeze) and behind
+# nothing else, and starts as soon as that take is given back.
+free61[0] = 5.0
+lore61 = queued61("lore", "suite", old61)
+digger61 = queued61("enemy-ai-digger")
+check(trees61("queue") == ["enemy-ai-digger", "lore"],
+    "a landing on main's code queued while frozen: behind the reclaimed take, queued three hours before it, and nothing else (%s)" % trees61("queue"))
+free61[0] = 40.0
+check(drain61(["enemy-ai-digger", "lore"]) == ["enemy-ai-digger", "lore"], "it starts next, its turn kept")
+for each in (lore61, digger61):
+    each.join(5)
+clear61()
+gate._write(gate._path(gate.PLACES, "lore.json"), {"tree": "lore", "kind": "suite", "queued": now61 - 7200,
+    "kept_at": now61 - gate.PLACE_KEEP_SECONDS - 100, "frozen_seen": now61 - gate.PLACE_KEEP_SECONDS - 100, "owner": "psykinetic-release"})
+check(gate.claim_place("lore", "suite") is None and not os.path.exists(gate._path(gate.PLACES, "lore.json")),
+    "a place unclaimed past %d s from the freeze's last sight: dropped" % gate.PLACE_KEEP_SECONDS)
+clear61()
+
+# The coordinator's row: two trees refused at the freeze with older tickets and three rows queued
+# meanwhile on main's code come back in strict ticket order at the unfreeze, the later refused
+# woken first.
+freeze61(5)
+now61 = time.time()
+refused61("animation", now61 - 300, now61 - 120)
+refused61("dungeon", now61 - 200, now61 - 100)
+gate.release("animation", "suite")
+gate.release("dungeon", "suite")
+unfreeze61()
+free61[0] = 5.0
+held61 = [queued61(tree, "suite", old61) for tree in ("q-first", "q-second", "q-third")]
+held61.append(queued61("dungeon"))
+time.sleep(0.3)
+held61.append(queued61("animation"))
+order61 = trees61("queue")
+check(order61 == ["animation", "dungeon", "q-first", "q-second", "q-third"] and not trees61("running"),
+    "the two refused back in the queue at their old tickets ahead of the three queued on main's code (%s)" % order61)
+free61[0] = 40.0
+started61 = drain61(["animation", "dungeon", "q-first", "q-second", "q-third"])
+check(started61 == ["animation", "dungeon", "q-first", "q-second", "q-third"],
+    "they start in strict ticket order, not as their waiters woke, main's code and this one's alike (%s)" % started61)
+for each in held61:
+    each.join(5)
+clear61()
+unfreeze61()
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = mem61, total61, poll61
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = margins61
+shutil.rmtree(main_dir61, ignore_errors=True)
+if local61 is None:
+    os.environ.pop("LAND_LOCAL", None)
+else:
+    os.environ["LAND_LOCAL"] = local61
+if was61 is None:
+    os.environ.pop(gate.LAND_LOCK_ENV, None)
+else:
+    os.environ[gate.LAND_LOCK_ENV] = was61
+if saved61 is not None:
+    gate._write(gate._path("kinds.json"), saved61)
 
 print("== status counts the landing takes on the older room check (394 amended (64)) ==")
 # The coordinator, 11-16 after 4b86b0b2f: the rule against solo scenes on a free lock stays until

@@ -11704,6 +11704,37 @@ free, the head fed; main's code before this mend refuses it; the second charged 
 two on the lock, the head fed; at 9.5 GB, under the true need, the head refused 0.3 short, its own alone; the log's
 line at once, not again a moment later, again past 120 s, never read as a take; a waiter on main's code behind the fed
 head refused naming it, as on this code. RESULT: PASS. Stacked on 394 amended (60). Tools and tests only; protocol
+394 amended (61) (perf, 2026-11-16; the coordinator's go and conditions after perf's reading, and its terms for the
+retake; label from tools/decision_number.sh): a landing keeps its queue place across a freeze. That day four cuts each
+refused the head of a queue about twenty deep; enemy-ai's digger, three hours queued, reached the head at 18:59 and met
+the freeze at 19:00. Each take's lock answered exit 3, its script gave the take back and queued again with a new ticket
+at the back (older scripts after five minutes, others at the unfreeze), and at the unfreeze the rows came back in
+whatever order their waiters woke. A take of suite or suite_remote given back while main is frozen (main_frozen(), 59's
+read: the pending mark <lock>.freeze or the lock held with "main frozen", beaten within LAND_LOCK_STALE_SECONDS; pending
+counts), its tree not named taking the land lock since the take started (the lock's log, <lock>.log, its last 400
+lines, lock_taken_since()), writes a place record, places/<tree>.json: its queue time, when, and the freeze's owner. The
+tree's next take of a landing kind (claim_place()) uses that time as its ticket and its "queued", so it sorts where it
+stood and its wait counts from its first queue. A place record holds nothing and blocks nothing: no row is held for it,
+none waits on it, and the queue is judged as before; it is only a ticket to reuse. One record per tree; another tree
+claims nothing; a record unclaimed PLACE_KEEP_SECONDS (an hour) after it was kept or main was last seen frozen
+(touch_places(), from any waiter's look while frozen and a record kept) is dropped at the next take (logged
+place_dropped). status prints the freeze and each kept place. No tree's land script changes. Rejected: the first take of
+this also held another tree's landing row at its place while main was frozen, judged as absent by the rows behind it.
+It ran live on the gate before it landed, as the waiter of perf's own landing runs its checkout's gate code (394
+amended (53)), from 19:37 to 20:35 that day during the v0.1.226 freeze: waiters on main's older code (GATE_REVISION 47)
+judged the held row able to start and waited behind it, art-kit's, animation's and pc-character's scenes and release's
+cut export (from about 20:15) among them, till perf stopped its waiter (C:/dev/review/perf/stalls.md). Since then a perf
+landing's takes, holds and releases run a copy of origin/main's tools/heavy_job.py from outside any checkout, so new gate
+code first judges the live queue once landed. GATE_REVISION 49. heavy_job_test, new section, each row that matters
+beside a waiter on main's present gate code: frozen, another tree's suite at the head starts, status says nothing is
+held, and given back it keeps its place; a mark unbeaten 1600 s is no freeze and keeps no place; a take given back while frozen keeps its three-hour-old
+queue time, one whose tree took the lock since its start keeps none, another tree claims nothing; a scene on main's code
+starts with a record kept; tonight's shape, the place's tree queued again while frozen at its old ticket with a scene
+and the cut's export behind it on main's code: with room the landing starts (never held), is given back at the lock and
+keeps its place again, and the two behind start as they do today; a landing on main's code queued while frozen sorts
+behind the reclaimed take alone and starts next; a record past an hour is dropped; and the coordinator's row: two trees
+refused at the freeze with older tickets and three rows queued on main's code come back in strict ticket order, the
+later of the two refused woken first. RESULT: PASS. Stacked on 394 amended (60). Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
 394 amended (64) (perf, 2026-11-16; the coordinator's ask after 63 landed; label from tools/decision_number.sh):
