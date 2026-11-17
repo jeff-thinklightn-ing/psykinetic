@@ -831,36 +831,35 @@ func _draw_content(c: Control) -> void:
 	# A chip for each level known below, below its ring, else beside or above it where the "you" mark or
 	# another chip would be covered.
 	var keep_off: Array[Rect2] = []
-	var place_rings: Array[Rect2] = []
-	if pictured:
-		var picture_rect := _inner(rects[own_area], inset)
-		var ring_cell := picture_rect.size / Vector2(picture_cells)
-		for id: String in known_place_ids(own_area):
-			var spot := Vector2((world.areas[own_area]["places"] as Dictionary)[id.get_slice("/", 1)].get("cell", Vector2i(-1000, -1000)))
-			var at_ring := picture_rect.position + (spot + Vector2(0.5, 0.5)) * ring_cell
-			place_rings.append(Rect2(at_ring - Vector2.ONE * _k(&"ring"), Vector2.ONE * _k(&"ring") * 2.0))
+	var place_rings: Array[Rect2] = _drawn_rings(_inner(rects[own_area], inset)) if pictured else ([] as Array[Rect2])
 	var chip_pad := Vector2(_k(&"chip_pad_x"), _k(&"chip_pad_y"))
 	for chip: Dictionary in _model["chips"]:
 		var at := _to_screen(chip["at"])
 		var words := _area_words(str(chip["level"]))
 		var chip_size := sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + chip_pad * 2.0
-		var drop := _k(&"chip_drop") + float(chip["depth"]) * (chip_size.y + 4.0)
-		var own_box: Rect2 = rects.get(str(chip.get("area", "")), Rect2(Vector2.ZERO, _canvas.size))
-		var rect := Rect2(at + Vector2(-chip_size.x * 0.5, drop), chip_size)
-		var fitted := false
-		for candidate: Rect2 in [rect, Rect2(at + Vector2(_k(&"mouth") + _k(&"chip_drop"), -chip_size.y * 0.5 + float(chip["depth"]) * (chip_size.y + 4.0)), chip_size),
-				Rect2(at + Vector2(-_k(&"mouth") - _k(&"chip_drop") - chip_size.x, -chip_size.y * 0.5 + float(chip["depth"]) * (chip_size.y + 4.0)), chip_size),
-				Rect2(at + Vector2(-chip_size.x * 0.5, -drop - chip_size.y), chip_size)]:
-			if own_box.encloses(candidate) and not (you_rect.size != Vector2.ZERO and you_rect.intersects(candidate)) \
-					and not keep_off.any(func(taken: Rect2) -> bool: return taken.intersects(candidate)) \
-					and not place_rings.any(func(ring: Rect2) -> bool: return ring.intersects(candidate)):
+		var own_box: Rect2 = _inner(rects.get(str(chip.get("area", "")), Rect2(Vector2.ZERO, _canvas.size)), inset + _k(&"own_edge"))
+		var rect := Rect2()
+		var least := INF
+		for candidate: Rect2 in _chip_spots(at, chip_size, int(chip["depth"])):
+			if not own_box.encloses(candidate):
+				continue
+			# What the chip would cover: the you mark, another chip, a place's ring: the first spot covering none, else the one covering least.
+			var covered_area := 0.0
+			if you_rect.size != Vector2.ZERO:
+				covered_area += you_rect.intersection(candidate).get_area()
+			for taken: Rect2 in keep_off:
+				covered_area += taken.intersection(candidate).get_area()
+			for ring: Rect2 in place_rings:
+				covered_area += ring.intersection(candidate).get_area()
+			if covered_area < least:
+				least = covered_area
 				rect = candidate
-				fitted = true
+			if covered_area <= 0.0:
 				break
-		if not fitted:
-			# None fits inside its own box: above the ring, held inside the box.
-			rect = Rect2(at + Vector2(-chip_size.x * 0.5, -drop - chip_size.y), chip_size)
-			rect.position = rect.position.clamp(own_box.position, own_box.end - chip_size)
+		if rect.size == Vector2.ZERO:
+			# No spot lies inside its own box: above the ring, held inside the box.
+			rect = Rect2(at + Vector2(-chip_size.x * 0.5, -_k(&"chip_drop") - chip_size.y), chip_size)
+			rect.position = rect.position.clamp(own_box.position, (own_box.end - chip_size).max(own_box.position))
 		c.draw_rect(rect, _kc(&"label_back"))
 		c.draw_rect(rect, UiTheme.color("brass"), false, _k(&"chip_line"))
 		c.draw_string(sans, rect.position + Vector2(chip_pad.x, chip_pad.y + sans.get_ascent(caption)), words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption, UiTheme.color("text"))
@@ -942,6 +941,48 @@ func _draw_box_rows(c: Control, area_name: String, rect: Rect2, serif: Font, san
 	var note := str(notes.get(area_name, ""))
 	if not note.is_empty():
 		c.draw_multiline_string(sans, at, note, HORIZONTAL_ALIGNMENT_LEFT, shown.size.x - _k(&"name_left") * 2.0, int(caption * 0.85), -1, UiTheme.color("text_dim"))
+
+
+## The spots a chip of [param chip_size] may take about the ring of its way's mouth at [param at]: below it (KnownWorld chip_drop), then
+## beside it on the right and the left, then above, each at once, twice and three times as far; a level under another is [param depth]
+## chips further down the column.
+func _chip_spots(at: Vector2, chip_size: Vector2, depth: int) -> Array[Rect2]:
+	var spots: Array[Rect2] = []
+	var shift := float(depth) * (chip_size.y + 4.0)
+	for stretch in [1.0, 2.0, 3.0]:
+		var drop: float = _k(&"chip_drop") * stretch
+		var side: float = (_k(&"mouth") + _k(&"chip_drop")) * stretch
+		spots.append(Rect2(at + Vector2(-chip_size.x * 0.5, drop + shift), chip_size))
+		spots.append(Rect2(at + Vector2(side, -chip_size.y * 0.5 + shift), chip_size))
+		spots.append(Rect2(at + Vector2(-side - chip_size.x, -chip_size.y * 0.5 + shift), chip_size))
+		spots.append(Rect2(at + Vector2(-chip_size.x * 0.5, -drop - chip_size.y - shift), chip_size))
+	return spots
+
+
+## Whether [param place] (a level.json place of the player's area) lies on the mouth of a level whose chip is drawn: the chip takes
+## the mouth alone, so the place has neither ring nor label.
+func _place_on_chip(place: Dictionary) -> bool:
+	var box := WorldMapModel.box_of(layout, own_area)
+	var radius := float(maxi(int(place.get("radius", 1)), 1)) + 0.5
+	var world_cell := box.position + Vector2(place.get("cell", Vector2i(-1000, -1000))) + Vector2(0.5, 0.5)
+	for chip: Dictionary in _model["chips"]:
+		if (chip["at"] as Vector2).distance_to(world_cell) <= radius:
+			return true
+	return false
+
+
+## The rects of the rings drawn on the player's picture [param rect]: one for each known place not on a drawn chip's mouth.
+func _drawn_rings(rect: Rect2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var cell_px := rect.size / Vector2(picture_cells)
+	var places: Dictionary = world.areas[own_area].get("places", {})
+	for id: String in known_place_ids(own_area):
+		var place: Dictionary = places[id.get_slice("/", 1)]
+		if _place_on_chip(place):
+			continue
+		var at := rect.position + (Vector2(place.get("cell", Vector2i(-1000, -1000))) + Vector2(0.5, 0.5)) * cell_px
+		out.append(Rect2(at - Vector2.ONE * _k(&"ring"), Vector2.ONE * _k(&"ring") * 2.0))
+	return out
 
 
 ## The player's picture's places: a ring at each known place's cell and its label, labels folded
