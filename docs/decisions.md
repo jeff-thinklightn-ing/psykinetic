@@ -44907,6 +44907,25 @@ stall or a field not); on a map not out of doors (the tavern's rooms) the rect a
 keep interiors as they are). view_test, on the real wilds: under W1, M2 and M3 out of doors, in the hut
 H2 and the forge H1 indoors. Drawing only, protocol unchanged, no new class_name.
 
+751 amended (8) (a sleeper on a drawn plain bed lies on it, clear of its headboard; pc-character's find while
+measuring the laid body for art-kit's sleeper cover, the coordinator's go; the label from decision_number.sh). Laid
+as Client3D lays a resident on prop.bed's head cell (SLEEP_MIDDLE back from the cell, SLEEP_ASIDE across, Sleep_Side
+on its AnimRig, every drawn mesh skinned with its blend shapes; C:/dev/review/pc-character/cover/cover_bounds.txt),
+every sleeper's head was in the headboard (art-kit's boards at the bed's z -0.98..-0.94 up to 0.55; the mattress's
+top 0.42, its head end -0.90): a tall heavy man at 1.08 reached z -1.09, 11 cm out behind the board, and even a
+middling woman's head and bun -0.985; and LIE_HEIGHT["prop.bed"] 0.37 sank the curled body 3 to 5 cm into the
+mattress. SLEEP_MIDDLE (0.81) was fitted on the bedroll and the strip, where nothing stands at the head end. Now on
+a drawn plain bed (_sync_bedroll's non-solid bed, its prop in SLEEP_BED_BACK) the puppet keeps "bed_back" and _lay
+lays the body SLEEP_BED_BACK["prop.bed"] (0.15) times its scale farther toward the bed's foot, and
+LIE_HEIGHT["prop.bed"] is 0.43, the mattress and a centimetre. The bedroll, the strip's lay and a furnished
+(solid) bed's (SLEEP_HEAD_BACK behind its pillow end) are as they were, their rows unchanged. The name plate goes
+with the moved head (865 amended (8) reads lay_at). view_world_test _test_sleeper_on_bed, the same lay through
+_sync_bedroll and _lay on AnimRig at three times: the tall heavy man from -0.928 to 0.654 along the bed, lowest
+0.422; a middling woman -0.835 to 0.563, lowest 0.411 (each nothing nearer the head than the board's face -0.94,
+nothing past the foot posts' 0.92, the lowest point within 2 cm of the mattress); _test_bedroll_drawn reads the
+bed's height and bed_back from the constants; parts_test _test_plate_laid's plate over the moved head within 0.1 m.
+art-kit's cover (961) is fitted to this lay. Drawing only, protocol unchanged, no new class_name.
+
 ## 749. Spawn safety: the nearest safe cell first
 
 750, combat's side (2). The heavy axes too. The coordinator: Jeff's

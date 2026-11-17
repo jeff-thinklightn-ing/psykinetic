@@ -4917,7 +4917,7 @@ func _test_room_beds() -> void:
 	keeper.activity = "sleep"
 	_rig._sync_bedroll(keeper, puppet)
 	_check(bed["cells"][0] == Vector2i(17, 7) and puppet.get_node_or_null("Bedroll") == null
-		and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
+		and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), Client3D.LIE_HEIGHT["prop.bed"]),
 		"the keeper asleep at (17, 7): on her bed (%.2f up), no bedroll on the boards" % float(puppet.get_meta("bed_height", 0.0)))
 	puppet.free()
 	keeper.free()
@@ -5867,9 +5867,10 @@ func _test_bedroll_drawn() -> void:
 	resident.facing = Vector2i(0, -1)
 	resident.activity = "sleep"
 	_rig._sync_bedroll(resident, puppet)
-	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
+	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), Client3D.LIE_HEIGHT["prop.bed"]),
 		"on a bed's head cell: no bedroll, the bed's height (%s)" % [puppet.get_meta("bed_height", 0.0)])
-	_check(not puppet.has_meta("lie_at"), "(a plain bed: no lie_at)")
+	_check(not puppet.has_meta("lie_at") and is_equal_approx(float(puppet.get_meta("bed_back", 0.0)), Client3D.SLEEP_BED_BACK["prop.bed"]),
+		"(a plain bed: no lie_at; laid SLEEP_BED_BACK farther toward its foot, 751 amended (8): %s)" % [puppet.get_meta("bed_back", null)])
 	# 799 amended (3): on the level's own bedroll (a camp trader's), no second one, the bedroll's height.
 	var decor: Array = _rig._terrain.get("decor", [])
 	var had_decor := _rig._terrain.has("decor")
@@ -15116,6 +15117,122 @@ func _test_sleeper() -> void:
 	_check(is_zero_approx(model.rotation.y) and body.position == Vector3.ZERO, "stood: as it stands (%s)" % body.position)
 	puppet.free()
 	_test_sleeper_posture()
+	_test_sleeper_on_bed()
+
+
+## 751 amended (8) (pc-character's measure for art-kit's cover; the coordinator's go): on a drawn
+## prop.bed the curled body lies clear of the headboard and on the mattress, as Client3D lays it
+## (_sync_bedroll on the bed's head cell, _lay), Sleep_Side at three times on its AnimRig, every drawn mesh skinned
+## with its blend shapes: in the bed's frame (its -z end -1.0) nothing nearer the head than the
+## board's face (art-kit's -0.94; laid SLEEP_MIDDLE back alone a tall heavy man's head reached
+## -1.09, out behind the board), nothing past the foot posts (+0.92), and its lowest point within
+## 2 cm of the mattress's top (0.42; at 0.37 it sank 3 to 5 cm). The largest sleeper, a tall heavy
+## man at 1.08, and a middling woman at 1.0.
+const BED_BOARD_FACE := -0.94
+const BED_FOOT_POSTS := 0.92
+const BED_MATTRESS := 0.42
+func _test_sleeper_on_bed() -> void:
+	print("\n== a sleeper on a drawn plain bed: clear of the headboard, on the mattress (751 amended (8)) ==")
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var plots: Array = _rig._terrain.get("plot_buildings", [])
+	var had := _rig._terrain.has("plot_buildings")
+	var head_cell := Vector2i(-620, -620)
+	var house := {"rect": Rect2i(-621, -621, 3, 4), "beds": [{"cells": [head_cell, head_cell + Vector2i(0, 1)], "head": Vector2i(0, -1), "prop": "prop.bed"}]}
+	_rig._terrain["plot_buildings"] = plots + [house]
+	var to_bed := Transform3D(Basis.IDENTITY, -Vector3(head_cell.x, 0.0, head_cell.y + 0.5))  # The bed's middle, its head -z.
+	for case: Array in [["a tall heavy man", "seed=11 body=male build=heavy stature=tall age=grown hair=cropped beard=full", 1.08],
+			["a middling woman", "seed=11 body=female build=middling stature=middling age=grown hair=bound", 1.0]]:
+		var look := PersonLook.make(str(case[1]))
+		var kind: Dictionary = Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN
+		var size := float(case[2])
+		var resident := Resident.new()
+		resident.tile = head_cell
+		resident.facing = Vector2i(0, -1)
+		resident.activity = "sleep"
+		var puppet := Node3D.new()
+		var body := Node3D.new()
+		body.name = "Body"
+		puppet.add_child(body)
+		var model := (load(kind["scene"]) as PackedScene).instantiate() as Node3D
+		model.name = "Model"
+		body.add_child(model)
+		model.rotation.y = float(kind.get("faces", 0.0))
+		model.scale = Vector3.ONE * size
+		add_child(puppet)
+		puppet.position = Vector3(head_cell.x, 0.0, head_cell.y)
+		puppet.set_meta("model_scale", size)
+		puppet.set_meta("faces", model.rotation.y)
+		puppet.set_meta("work", "sleep")
+		_rig._sync_bedroll(resident, puppet)
+		var yaw := PI * 0.5  # Facing the bed's head (-z).
+		body.rotation.y = yaw
+		_rig._lay(puppet, body, yaw)
+		look.apply(model)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		rig.loop("Idle", 0.0)
+		var reach := [INF, -INF, INF]  # The least z, the most z, the least y, in the bed's frame.
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		for t: float in [0.0, 1.7, 3.4]:
+			rig.base_at("Sleep_Side", t)  # As the game poses it (AnimRig's tree), not the clip's raw tracks.
+			rig.tree.advance(0.0)
+			for mesh_node: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				if mesh_node.is_visible_in_tree() and mesh_node.skin != null and mesh_node.get_parent() is Skeleton3D:
+					_bed_reach(mesh_node, to_bed, reach)
+		_check(float(reach[0]) >= BED_BOARD_FACE and float(reach[1]) <= BED_FOOT_POSTS,
+			"%s (%.2f): from %.3f (the headboard's face %.2f) to %.3f (the foot posts %.2f) along the bed" % [case[0], size, reach[0], BED_BOARD_FACE, reach[1], BED_FOOT_POSTS])
+		_check(absf(float(reach[2]) - BED_MATTRESS) <= 0.02,
+			"%s: its lowest point %.3f, on the mattress's top (%.2f, within 2 cm)" % [case[0], reach[2], BED_MATTRESS])
+		puppet.free()
+		resident.free()
+	if had:
+		_rig._terrain["plot_buildings"] = plots
+	else:
+		_rig._terrain.erase("plot_buildings")
+
+
+## [param mesh_node]'s vertices skinned on the CPU with its blend shapes, into [param to_frame]:
+## [param reach]'s least z, most z and least y widened to hold them.
+func _bed_reach(mesh_node: MeshInstance3D, to_frame: Transform3D, reach: Array) -> void:
+	var skeleton := mesh_node.get_parent() as Skeleton3D
+	var mesh := mesh_node.mesh as ArrayMesh
+	var skin := mesh_node.skin
+	var poses: Array[Transform3D] = []
+	for b in skin.get_bind_count():
+		var bone := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
+		poses.append(to_frame * skeleton.global_transform * skeleton.get_bone_global_pose(bone) * skin.get_bind_pose(b))
+	for surface in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+		var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+		if bones.is_empty() or verts.is_empty():
+			continue
+		var shaped := verts.duplicate()
+		var shapes := mesh.surface_get_blend_shape_arrays(surface)
+		for k in shapes.size():
+			var w := mesh_node.get_blend_shape_value(k)
+			if w == 0.0:
+				continue
+			var sv: PackedVector3Array = shapes[k][Mesh.ARRAY_VERTEX]
+			# A relative shape may come back as offsets or as whole positions: told apart by size.
+			var size_shape := 0.0
+			var size_base := 0.0
+			for i in range(0, verts.size(), 37):
+				size_shape += sv[i].length()
+				size_base += verts[i].length()
+			var offsets := mesh.get_blend_shape_mode() == Mesh.BLEND_SHAPE_MODE_RELATIVE and size_shape < size_base * 0.3
+			for i in verts.size():
+				shaped[i] += (sv[i] if offsets else sv[i] - verts[i]) * w
+		var per := bones.size() / verts.size()
+		for i in verts.size():
+			var p := Vector3.ZERO
+			for k in per:
+				var w := weights[i * per + k]
+				if w > 0.0:
+					p += (poses[bones[i * per + k]] * shaped[i]) * w
+			reach[0] = minf(float(reach[0]), p.z)
+			reach[1] = maxf(float(reach[1]), p.z)
+			reach[2] = minf(float(reach[2]), p.y)
 
 
 ## Umbrage's townsfolk at their spots (npc's spots contract; the coordinator's Umbrage focus, Jeff:

@@ -27923,7 +27923,15 @@ static func stand_offset(slot: String, rect: Rect2i, yaw: float, cell: Vector2i)
 ## same: its cell and facing. On a cell the level's decor lays a bedroll on (a
 ## camp trader's, 799 amended (3)), that one: none of its own, the bedroll's height.
 const BEDROLL := "prop.bedroll"
-const LIE_HEIGHT := {"prop.bed": 0.37, "prop.bed_straw": 0.37, "prop.bedroll": 0.09}
+## prop.bed's is its mattress's top (art-kit's 0.42) and a centimetre: the curled body's lowest point
+## lies within a centimetre or so of it (751 amended (8): at 0.37 it sank 3 to 5 cm into the mattress).
+const LIE_HEIGHT := {"prop.bed": 0.43, "prop.bed_straw": 0.37, "prop.bedroll": 0.09}
+## On a drawn plain bed (751 amended (8), pc-character's measure for art-kit's cover): the curled body
+## this much farther toward the foot, times its scale. Laid SLEEP_MIDDLE back from its head cell alone,
+## the head and hair of a tall heavy man (1.08) reached the bed's z -1.09, through the headboard's upper
+## board and out behind it, and every sleeper's was in the board; from here the largest head stops short
+## of the board's face (-0.94 of the bed's -1.0 end) and the toes lie well inside the foot posts.
+const SLEEP_BED_BACK := {"prop.bed": 0.15}
 func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 	var want := "%s|%s" % [body.tile, body.facing] if body.activity == "sleep" else ""
 	if want == str(puppet.get_meta("bedroll", "")):
@@ -27934,6 +27942,7 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 		puppet.remove_child(old)
 		old.queue_free()
 	puppet.remove_meta("lie_at")
+	puppet.remove_meta("bed_back")
 	var height := 0.0
 	if not want.is_empty():
 		var bed := _bed_under(body.tile)
@@ -27953,6 +27962,8 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 			height = float(LIE_HEIGHT[BEDROLL])
 		elif not bed.is_empty() and not bool(bed.get("solid", false)):
 			height = float(LIE_HEIGHT.get(str(bed.get("prop", "")), 0.0))
+			if SLEEP_BED_BACK.has(str(bed.get("prop", ""))):
+				puppet.set_meta("bed_back", float(SLEEP_BED_BACK[str(bed["prop"])]))
 	puppet.set_meta("bed_height", height)
 
 
@@ -28076,6 +28087,9 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 			# On a furnished bed beside its cell (751 amended (4)): the head on its pillow end.
 			var pillow: Vector2 = puppet.get_meta("lie_at")
 			offset = Vector3(pillow.x, 0.0, pillow.y) - ahead * SLEEP_HEAD_BACK * float(puppet.get_meta("model_scale", 1.0))
+		elif work.has("down") and puppet.has_meta("bed_back"):
+			# On a drawn plain bed (751 amended (8)): farther toward its foot, the head clear of the headboard.
+			offset -= ahead * float(puppet.get_meta("bed_back")) * float(puppet.get_meta("model_scale", 1.0))
 		if work.has("down"):
 			# Across the bed's or bedroll's middle, its knees not over the edge (SLEEP_ASIDE).
 			offset -= Vector3(-ahead.z, 0.0, ahead.x) * SLEEP_ASIDE * float(puppet.get_meta("model_scale", 1.0))
