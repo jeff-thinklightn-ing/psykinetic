@@ -251,7 +251,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `material.wall.dark` | 1 | art-kit, by hand | own | 2026-10-24 |
 | `material.wall.stone` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `material.wall.thicket` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `material.wall.wood` | 1 | art-gen, procedural (no model) | own | 2026-11-12 |
+| `material.wall.wood` | 1 | art-gen, procedural (no model) | own | 2026-11-16 |
 | `mine.arch_3` | 1 | art-kit, by hand | own | 2026-11-02 |
 | `mine.arch_4` | 1 | art-kit, by hand | own | 2026-11-02 |
 | `mine.arch_5` | 1 | art-kit, by hand | own | 2026-11-02 |
