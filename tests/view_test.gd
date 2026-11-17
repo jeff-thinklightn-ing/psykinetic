@@ -1983,6 +1983,8 @@ func _test_held_stab() -> void:
 		var grunts: Array[int] = []
 		var stabs: Array[int] = []
 		var most := 0
+		# How far each wait's last frame ran past its pace: a stalled frame under a loaded suite, the test's, not the game's.
+		var late: Array[int] = []
 		for i in 10:
 			var at := AnimRig.now_msec()
 			stabs.append(at)
@@ -1995,6 +1997,7 @@ func _test_held_stab() -> void:
 			while Time.get_ticks_msec() < until:
 				await get_tree().process_frame
 				most = maxi(most, playing.call(hit))
+			late.append(Time.get_ticks_msec() - until)
 		await get_tree().create_timer(0.8).timeout
 		var plays: Array = sfx.played.slice(before)
 		var swings: Array = plays.filter(func(entry: Array) -> bool: return entry[0] == swing).map(func(entry: Array) -> String: return str(entry[1]).get_file())
@@ -2007,8 +2010,13 @@ func _test_held_stab() -> void:
 			spacing.append(stabs[i] - stabs[i - 1])
 		var spaced := spacing.duplicate()
 		spaced.sort()
-		print("  at %.2f s: the stabs %s ms apart (the rigs' clock)" % [pace, spacing])
-		_check(spaced[0] >= int(pace * 1000.0) and spaced[-1] <= int(pace * 1000.0) + 120, "at %.2f s: the stabs held their pace (%d to %d ms)" % [pace, spaced[0], spaced[-1]])
+		# The bound over the pace is on the stab's own calls: each gap less its wait's last frame past the pace.
+		var paced: Array[int] = []
+		for i in spacing.size():
+			paced.append(spacing[i] - late[i])
+		print("  at %.2f s: the stabs %s ms apart (the rigs' clock); the waits' last frames past the pace %s ms" % [pace, spacing, late])
+		_check(spaced[0] >= int(pace * 1000.0) and paced.max() <= int(pace * 1000.0) + 120,
+				"at %.2f s: the stabs held their pace (%d to %d ms; at most %d less the last frame past it)" % [pace, spaced[0], spaced[-1], paced.max()])
 		print("  at %.2f s: swings %s; hits %s; grunts at %s ms (gaps %s); the hit's voices at once, most %d" % [pace, swings, hits,
 				grunts.map(func(at: int) -> int: return at - grunts[0]) if not grunts.is_empty() else [], gaps, most])
 		var synced := not SoundKit.files(swing).is_empty() and not SoundKit.files(hit).is_empty()
