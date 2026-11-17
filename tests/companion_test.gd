@@ -178,6 +178,7 @@ func _ready() -> void:
 	_test_drinks_a_remedy()
 	_test_lead_to_near_water()  # Loads the wilds and back.
 	_test_return_cell_his_side()  # Loads the wilds and back.
+	_test_fight_leash()  # Loads the wilds and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_speech_floor()  # Late: its five calm quarter hours move the clock on (917).
 	_test_last_words()  # She dies in it: keep it last of those that need her.
@@ -1980,6 +1981,142 @@ func _walk_crosses_door(from: Vector2i, to: Vector2i) -> bool:
 			return true
 		prev = cell
 	return false
+
+
+## Decision 957, her fight leash (the coordinator's ruling on ui-design's grey3b look: an old grey
+## darting from her bites drew her 34 cells from a player who stood still). On open ground in the
+## wilds, her player standing still: a foe going for her that steps away cell by cell holds her
+## within the leash; a foe going away past it is let go, her "let_go" line said once a foe; her
+## player set on it, she follows past it; hurt by it from out of her reach, she comes back; a foe
+## going for him within it is hers; a foe in her reach at the edge gets her blow.
+func _test_fight_leash() -> void:
+	print("\n== her fight leash: no chase past 7 cells from her player unless it is his fight; a foe going away let go, her line once (957) ==")
+	var was := String(World.zone.name)
+	if not _main.load_map("wilds"):
+		_check(false, "the wilds load")
+		return
+	var owner := _player()
+	var pet := _companion()
+	if owner == null or pet == null or not pet.spawned or pet.zone != "wilds":
+		_check(false, "a player and her companion in the wilds (%s, %s)" % [owner, pet])
+		_main.load_map(was)
+		return
+	_kill_monsters()
+	# A free row of 18 cells, a cell free above and below each, west of Umbrage.
+	var start := World.NO_CELL
+	for dy in range(0, 30):
+		for dx in range(0, 40):
+			var at := Vector2i(120 + dx, 200 + dy)
+			var clear := true
+			for i in 18:
+				for off: int in [-1, 0, 1]:
+					var c := at + Vector2i(i, off)
+					if not World.is_free(c) or World.is_burning(c):
+						clear = false
+						break
+				if not clear:
+					break
+			if clear:
+				start = at
+				break
+		if start != World.NO_CELL:
+			break
+	if start == World.NO_CELL:
+		_check(false, "a free row of 18 cells west of Umbrage")
+		_main.load_map(was)
+		return
+	var reach := int(Companion.leash_rules().get("reach", 0))
+	var stance_was := pet.stance
+	pet.stance = Companion.Stance.GUARD
+	pet.order = ""
+	pet.guide = null
+	_put(owner, start)
+	_put(pet, start + Vector2i(1, 0))
+	var foe := _spawn_imp(start + Vector2i(3, 0))
+	foe.acts = false
+	foe.max_hp = 9999
+	foe.hp = 9999
+	foe.target = pet
+	var spoken: Array[String] = []
+	var listen := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(listen)
+	# Stepping away a cell every 6 ticks to 16 cells off, going for her all the while.
+	var most := 0
+	for t in 110:
+		if t % 6 == 5 and foe.tile.x < start.x + 16:
+			_put(foe, foe.tile + Vector2i(1, 0))
+		foe.target = pet
+		World.step()
+		most = maxi(most, World.distance(owner.tile, pet.tile))
+	_check(reach == 7 and most <= reach + 1 and World.distance(owner.tile, foe.tile) > reach + 3,
+		"a foe going for her steps away to %d off: she follows to %d at most, the leash %d (+1 for a dodge) (her at %s)" % [
+			World.distance(owner.tile, foe.tile), most, reach, pet.tile])
+	# Going away past the leash, while she holds at its edge fighting it: let go, her line once.
+	_put(pet, start + Vector2i(reach, 0))
+	_put(foe, start + Vector2i(reach + 3, 0))
+	for t in 3:
+		foe.target = pet
+		World.step()
+	foe.target = null
+	for t in 20:
+		World.step()
+	var lines := Companion.leash_lines(str(pet.traits.get("temperament", "")))
+	var heard := spoken.filter(func(line: String) -> bool: return line in lines)
+	var near_him := World.distance(owner.tile, pet.tile)
+	_put(pet, start + Vector2i(reach, 0))
+	_put(foe, start + Vector2i(reach + 3, 0))
+	foe.target = pet
+	for t in 3:
+		World.step()
+	foe.target = null
+	for t in 20:
+		World.step()
+	var again := spoken.filter(func(line: String) -> bool: return line in lines)
+	pet.said.disconnect(listen)
+	_check(heard.size() == 1 and again.size() == 1 and pet.current_intent != Companion.Intent.ATTACK and near_him <= 3,
+		"going away past it: let go, she comes to heel (%d off) and says her line once, not again for the same foe (%s; %s)" % [near_him, heard, again])
+	# His fight: set on it, she follows past the leash.
+	_put(pet, start + Vector2i(5, 0))
+	_put(foe, start + Vector2i(10, 0))
+	foe.target = pet
+	owner.action_target = foe
+	var past := 0
+	for t in 60:
+		foe.target = pet
+		World.step()
+		past = maxi(past, World.distance(owner.tile, pet.tile))
+	owner.action_target = null
+	_check(past > reach, "her player set on it: she follows past the leash (%d off)" % past)
+	# Hurt from out of her reach at the edge: back toward him.
+	_put(pet, start + Vector2i(reach, 0))
+	_put(foe, start + Vector2i(12, 0))
+	foe.target = pet
+	pet._struck_from = foe
+	pet._struck_at = World.tick
+	World.step()
+	World.step()
+	_check(World.distance(owner.tile, pet.tile) < reach, "struck from out of her reach at the edge: she comes back toward him (%d off)" % World.distance(owner.tile, pet.tile))
+	pet._struck_from = null
+	# A foe in reach at the edge: her blow.
+	_put(pet, start + Vector2i(reach, 0))
+	_put(foe, start + Vector2i(reach + 1, 0))
+	foe.target = pet
+	foe.struck_by = null
+	foe.struck_tick = -100000
+	for t in 20:
+		foe.target = pet
+		World.step()
+	_check(foe.struck_by == pet, "a foe in her reach at the edge, past the leash: her blow (%s)" % [foe.struck_by])
+	# Going for him within the leash: hers.
+	_put(pet, start + Vector2i(1, 0))
+	_put(foe, start + Vector2i(0, 1) + Vector2i(reach - 2, 0))
+	foe.target = owner
+	World.step()
+	_check(not pet.leashed(foe) and pet.current_intent == Companion.Intent.ATTACK and pet.intent_target == foe,
+		"a foe going for him within the leash: hers (%s)" % Companion.INTENT_NAMES[pet.current_intent])
+	World.damage(foe, 99999)
+	pet.stance = stance_was
+	_main.load_map(was)
 
 
 ## 803 amended (11), the coordinator's ruling (A): Jeff's "i keep taking

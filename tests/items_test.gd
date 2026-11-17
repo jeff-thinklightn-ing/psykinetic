@@ -3707,6 +3707,19 @@ func _test_arrows() -> void:
 	_steps(60)
 	_check(imp.hp == shot_hp - 2 and imp.ailments.has("bleed"), "1 hp every 30 ticks (%d -> %d)" % [shot_hp, imp.hp])
 	World.despawn(imp)
+	# The row reads a bleed alone, so no foe about the host: the room's CorridorImp1, wounded and let
+	# go past her leash (957) where she once chased it down, comes back to stand by him. Moved off and
+	# held for the two rows; none near (as before 957), nothing moves.
+	var kept_off: Array[GridEntity] = []
+	for e: GridEntity in World.get_entities():
+		if e is Monster and e.hp > 0 and e.zone == host.zone and absi(e.tile.x - host.tile.x) <= World.BANDAGE_SAFE \
+				and absi(e.tile.y - host.tile.y) <= World.BANDAGE_SAFE:
+			kept_off.append(e)
+			World._relocate(e, _far_cell(host))
+	var kept_acts := kept_off.map(func(e: GridEntity) -> bool: return e.acts)
+	for e: GridEntity in kept_off:
+		e.acts = false
+	print("  (kept off the host for the bleed rows: %s)" % [kept_off.map(func(e: GridEntity) -> String: return "%s to %s" % [e.name, e.tile])])
 	World.afflict(host, "bleed", 150, 30, 1)
 	host.hp = host.max_hp - 3
 	_steps(31)
@@ -3722,6 +3735,8 @@ func _test_arrows() -> void:
 			World.items.end(World.take_item(host, host, slot), "gone")
 	World.cure(host, "bleed")
 	host.hp = host.max_hp
+	for i in kept_off.size():
+		kept_off[i].acts = kept_acts[i]
 	for pet: GridEntity in pets:
 		pet.acts = true
 

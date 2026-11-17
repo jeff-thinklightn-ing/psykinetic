@@ -57,6 +57,26 @@
 		"bond": {"wary": -1, "fond": 0, "close": 1, "devoted": 2},
 		"company": 1
 	},
+	"leash": {
+		"_note": "Decision 957: her fight leash. reach: cells from her player past which she takes no closing step at a foe that is not his fight; press: the same when he asked her to press. let_go: her line (voice's, C:/dev/review/voice/first_fight_lines.md section 5) when she lets a foe going away go and comes to heel, once a foe: the default's lines and her temperament's own.",
+		"reach": 7,
+		"press": 14,
+		"let_go": {
+			"default": [
+				"Let that one go. I'm staying with you.",
+				"That one's gone to ground. I'll stay by you.",
+				"That one's off. Out there somewhere, I expect."
+			],
+			"steady and watchful": ["Let that one go. I'll stay by you."],
+			"quick and wary": ["I'm not chasing that one off on my own."],
+			"warm and talkative": ["Oh, let that one go! I'd sooner stay with you."],
+			"careful and thoughtful": ["Better not follow that one. I'll stay close."],
+			"restless and curious": ["Tempting, but I'm not chasing that one."],
+			"quiet and patient": ["Let that one go."],
+			"blunt and fearless": ["Let that one run. Not worth leaving you for."],
+			"cheerful under pressure": ["Off that one goes! Fine by me."]
+		}
+	},
 	"first_steps": {
 		"_note": "Decision 945 (Jeff, 2026-11-15: \"use the companion help the beginner guide lost players\"; the coordinator's package \"the first five minutes\"): her guide for a newcomer and a player at a loss (sim/first_steps.gd). on: the package's switch (false until it is whole; the client's card line reads it too). rules, in seconds unless named: first_offer_s after her first words the Mughouse is offered; next_offer_s at the door, or out of it, before the pond; lapse_s an unanswered offer lapses; quiet_after_no_s every unasked offer quiet after a no; gap_s between unasked offers at least; per_hour at most; stray_wait_s she waits for a player who stepped off her walk; nothing_new_s / nothing_new_cells nothing new while moving; circle_s / circle_steps / circle_cells circling outdoors; stand_s standing in the open; risen_s after a rising; hurt_s / hurt_below hurt and untended; dusk_hour / dawn_hour the bed's hours; barrow_days a place reached on so many days is never 'nothing new'. decks: voice's lines (lore's facts), by temperament where a deck has them; %s in offer.catch / arrive.catch is the taker, in asked / asked_one the choice.* clauses.",
 		"on": false,

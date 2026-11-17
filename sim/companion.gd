@@ -255,6 +255,14 @@ const LEFT_FOUGHT_TICKS := 50
 const LEFT_DONE := 3
 const LEFT_STUCK_TICKS := 10
 const BREAK_LEFT: Array[String] = ["Right behind you.", "I can't hold this alone. Coming.", "Too much for me here. I'm with you."]
+## Her fight leash (decision 957; the coordinator's ruling on ui-design's grey3b look: an old grey
+## darting from her bites drew her 34 cells from a player who stood still): companion_traits.json
+## "leash": "reach" (7) cells from her player, "press" (14) when he asked her to press; past it she
+## takes no closing step at a foe that is not his fight, holds at the edge (a foe in reach always
+## gets her blow), comes back from past it, and lets go a foe going away (not after her or him, or
+## broken for its den), coming to heel with her "let_go" line (voice's) once a foe.
+const LEASH_REACH := 7
+const LEASH_PRESS := 14
 ## Wary or colder, how long she hesitates over a plain order (decision 621),
 ## and the orders she hesitates over.
 const HESITATE_TICKS := 15
@@ -1851,6 +1859,12 @@ var _rest_still_since := 0
 ## last fought from anywhere; her cell and since when, for a cornered stop.
 var _left_broke := false
 var _keeper_fought := -100000
+## Her leash (957): foes let go past it (instance id -> true, while they stay past it), those her
+## line was said for (once a foe), and the last blow on her: its tick and who struck it.
+var _let_go: Dictionary = {}
+var _let_go_said: Dictionary = {}
+var _struck_at := -100000
+var _struck_from: GridEntity = null
 var _left_still_tile := World.NO_CELL
 var _left_still_since := 0
 
@@ -2224,6 +2238,9 @@ func _hostile_near_her(reach: int) -> bool:
 func _on_struck_any(entity: GridEntity, _amount: int, source: GridEntity, _cause: StringName) -> void:
 	if source != null and source == keeper and entity is Monster:
 		_keeper_fought = World.tick
+	if entity == self and source != null:
+		_struck_at = World.tick  # Her leash's (957): a foe hurting her from out of her reach.
+		_struck_from = source
 
 
 ## A shot anywhere (World.loosed): her player's, hit or miss, is his part.
@@ -2273,6 +2290,83 @@ func _left_to_it() -> bool:
 	_left_still_tile = tile
 	_left_still_since = World.tick
 	return true
+
+
+## Her leash in a fight (957): how far from her player she follows a foe ("reach", or "press" when
+## he asked her to press); -1 for none (her player not up and in her zone, her hold, an order of his,
+## a walk of hers).
+func leash() -> int:
+	if not _alive(keeper) or keeper.zone != zone or World.is_downed(keeper) or stance == Stance.HOLD \
+			or not order.is_empty() or guide != null and guide.going():
+		return -1
+	var rules := leash_rules()
+	return int(rules.get("press", LEASH_PRESS)) if stance == Stance.PRESS else int(rules.get("reach", LEASH_REACH))
+
+
+## Whether her leash keeps her from chasing [param foe] (957): it stands past the leash from her
+## player, and is not his fight (not set on by him, not struck by him in LEFT_FOUGHT_TICKS). One
+## within the leash of him, going for him or not, is hers.
+func leashed(foe: GridEntity) -> bool:
+	var reach := leash()
+	if reach < 0 or not _alive(foe) or World.distance(keeper.tile, foe.tile) <= reach or keeper.action_target == foe:
+		return false
+	var monster := foe as Monster
+	return monster == null or monster.struck_by != keeper or World.tick - monster.struck_tick > LEFT_FOUGHT_TICKS
+
+
+## At her leash, [param foe] past it and out of her reach (957). Going away (not after her or her
+## player, or broken for its den: Apex.to_den's walk) she lets it go. Past the leash herself (a
+## dodge took her there), or hurt from out of her reach by it, she goes back toward her player.
+## Else she holds, closing only while a step keeps her within the leash.
+func _at_leash(foe: GridEntity) -> void:
+	var monster := foe as Monster
+	if monster == null or monster.target != self and monster.target != keeper or monster.get("_wallow_from") != null:
+		_let_foe_go(foe)
+		return
+	var from_him := World.distance(tile, keeper.tile)
+	if from_him > leash() or _struck_from == foe and World.tick - _struck_at <= LEFT_FOUGHT_TICKS:
+		_step_toward(keeper.tile, true)
+	elif from_him < leash():
+		_close_in(foe)
+
+
+## [param foe] let go past her leash (957): she comes to heel, says her "let_go" line (voice's) the
+## first time for this foe, and counts it no foe of hers while it stays out there.
+func _let_foe_go(foe: GridEntity) -> void:
+	var id := foe.get_instance_id()
+	if _let_go.size() > 64:
+		_let_go.clear()
+	if _let_go_said.size() > 64:
+		_let_go_said.clear()
+	_let_go[id] = true
+	current_intent = Intent.FOLLOW
+	intent_target = null
+	_held_foe = null
+	if _let_go_said.has(id):
+		return
+	_let_go_said[id] = true
+	var lines := leash_lines(str(traits.get("temperament", "")))
+	if not lines.is_empty():
+		_say(str(lines[absi(hash(_name_of(self) + str(World.tick))) % lines.size()]), true, true)
+	_log({"kind": "stance", "companion": _name_of(self), "mind": "hands", "trigger": "leash", "outcome": "let go",
+		"note": "a foe going away past %d of her player" % leash()})
+
+
+## Her leash's rules (companion_traits.json "leash").
+static func leash_rules() -> Dictionary:
+	var t: Variant = CompanionCard.tables().get("leash", {})
+	return t if t is Dictionary else {}
+
+
+## Her "let_go" lines for [param temperament]: the default's and her temperament's own.
+static func leash_lines(temperament: String) -> Array:
+	var deck: Variant = leash_rules().get("let_go", {})
+	if not deck is Dictionary:
+		return []
+	var out: Array = (deck.get("default", []) as Array).duplicate() if deck.get("default") is Array else []
+	if deck.get(temperament) is Array:
+		out.append_array(deck[temperament])
+	return out
 
 
 ## Broken off (780 amended (32)): to her player at heel, no blow on the way;
@@ -3308,11 +3402,13 @@ func note_carried_off() -> void:
 ## keeper (_wound_words), which the release template dereferences.
 ## Decision 897 (World.despawn tells every entity; Main's call above, at
 ## once, stays): the base's own first (shelter_lead, an order on it), then
-## hers, the foe she keeps a moment (706) and the seam she mines.
+## hers, the foe she keeps a moment (706), the one that last struck her from out of reach (957) and the seam she mines.
 func forget(entity: GridEntity) -> void:
 	super(entity)
 	if _held_foe == entity:
 		_held_foe = null
+	if _struck_from == entity:
+		_struck_from = null  # Her leash's last blow from out of reach (957).
 	if _mine_seam == entity:
 		_mine_seam = null
 	if keeper == entity:
@@ -7313,6 +7409,8 @@ func _execute() -> void:
 				pass  # Round behind an apex mid-tell (780 amended (5)).
 			elif World.in_reach(self, intent_target):
 				World.try_attack(self, intent_target)
+			elif leashed(intent_target):
+				_at_leash(intent_target)  # Past her leash (957): no chase.
 			else:
 				_close_in(intent_target)
 		Intent.MINE:
@@ -7423,6 +7521,8 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 		if _danger.has(cell) or not World.is_walkable(cell) or (cell != tile and not World.is_free(cell)):
 			continue
 		var score := World.distance(tile, cell) * 100.0 - World.distance(from.tile, cell)
+		if _alive(keeper) and keeper.zone == zone:
+			score += World.distance(keeper.tile, cell) * 0.001  # A tie to the cell nearer her player (957).
 		if cell in strikes:  # She can strike from it (decision 699).
 			score -= 50.0
 		scored.append([score, scored.size(), cell])
@@ -7719,6 +7819,10 @@ func _approach(target: Variant, reach: int) -> void:
 ## second). One next to her is fought all the same (_adjacent_hostile).
 func _out_of_reach(entity: GridEntity) -> bool:
 	var id := entity.get_instance_id()
+	if _let_go.has(id):
+		if leashed(entity) and not World.in_reach(self, entity):
+			return true  # Let go past her leash (957): not hers while it stays out there.
+		_let_go.erase(id)
 	if not _unreachable.has(id):
 		return false
 	var entry: Dictionary = _unreachable[id]

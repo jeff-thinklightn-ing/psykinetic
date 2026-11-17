@@ -60563,3 +60563,63 @@ put back); _test_laying_refusals (an undo and a new_area accept during an accept
 the quit's join leaves a whole level); _test_recover_overlays (a leftover .new dropped, a lone .old
 restored). Server only; protocol unchanged; no new class_name.
 Wood at the hut's door, ui's side (economy's package, approved by the coordinator 2026-11-16, the count on ui-design's mock C:/dev/review/ui-design/rack_mock/index.md; the decision is economy's and takes its number when its server side lands, so this paragraph names none; ui takes no label of its own): the client's behaviour, inert while the server tells no rack. The "huts" message's entry for a healer's hut gains "rack": [laid, need] (bundles of wood laid of bundles wanted: a ruin [0, 2], a disrepair [0, 1]) and "rack_cell": [x, y] (the server's pick, outside the hut's rect, clear of every door; the client never works it out and no test row names the Wilds' cell as a rule), both absent while the economy switch is off, the hut stands or a mend is under way, and with an older server. Main.racks_told reads them from hut_states (a rack only while laid < need); Main.rack_at is the told rack on a cell. A left click on a rack's cell (Main._rack_click, beside the altar's and the throne's at the click handler, the click scheme only) with a bundle of wood in the pack (levels/items.json "wood_bundle") lays at once within RACK_REACH (2 cells, as the server checks) and otherwise walks there and lays on arrival (_update_rack, as the altar does), by the "hut_give" command {hut: place id} with no count (the server lays every bundle he carries while the rack is short: a command, not a message kind, nothing in MESSAGE_KINDS). Nothing is sent when the walk is cut off short of reach, the rack was filled or taken down on the way, or the wood has left his hands; a click with no wood, or on a cell that is no told rack's, is the ordinary click (a walk). The count is "L of M" (Main.rack_count_view) while he stands within two cells of a told rack, drawn as a row of UiNamePlates at the rack's top (Client3D.rack_view, _add_rack_row, RACK_COUNT_HEIGHT 1.05 m, key RACK_PLATE_KEY), one screen size at every depth and stepping apart from a name or bar it meets; no caption, icon or prompt, no colour, font or size in a script (style_budget untouched); beyond two cells, with the field absent or the rack full, nothing. A refusal by the server is silent and the count moves only when the "huts" message says so. Rows: click_route_test _test_rack_click (carrying nothing: ordinary; two cells off: lays at once, once; a cell beside the rack: nothing; five cells off: walks, lays on arrival once; the walk cut off, the rack gone on the way, the wood gone from his hands: nothing laid; the count reads '1 of 2' within two cells and none beyond, none with no rack told (an older server, the switch off, the hut standing: no count and an ordinary click, release's condition), none with the rack full), view_test (the rack's count is one row among the plates and gone when Main says none), view_world_test (every Client3D var sorted: rack_view and _rack_row in VIEW). Client only; no wire change from this side (the command is economy's; release issues the protocol word at economy's first take); no new class_name; no bullet (it lands only inside economy's package, switched on together).
+## 957. Her fight leash: no chase past 7 cells from a player who stands his ground (companions)
+
+The coordinator's ruling on ui-design's grey3b look (C:/dev/review/ui-design/looks/grey3b_73a11a1c5,
+enemy-ai's read of its server.log): with the old grey on her, her player standing where he was left, the
+pair travelled 34 cells south in grey 1's 55 s, from (229,204) to (217,238). The grey's tactic is "dart":
+after each bite he steps out of her reach and comes back; between bites her mind went DODGE then ATTACK
+(GUARD), she swung as he stepped away ("hit dropped ... no longer lined up") and followed. Nothing tied her
+ATTACK to her player: GUARD's foe (_guard_target) is a hostile within GUARD_RANGE of her or him, or any
+going for either within SIGHT_RANGE of her, measured from her; the 706 hold the same. The one bound to
+him, 780 amended (32)'s _left_to_it, needs her under half her hp, and she sat at exactly half (10 of 20).
+- The leash (Companion.leash): companion_traits.json "leash" "reach" 7 cells from her player's tile,
+  "press" 14 when he asked her to press; none when he is not up and in her zone, at her hold, an order of
+  his, or a walk of hers.
+- Leashed (Companion.leashed): a foe past the leash from him, and not his fight (not his action target,
+  not struck by him in LEFT_FOUGHT_TICKS). One within the leash of him, going for him or not, is hers.
+- In ATTACK (Companion._execute): a foe in her reach always gets her blow; leashed and out of reach, she
+  takes no closing step past the leash (_at_leash): she holds at its edge, closing only while a step
+  keeps her within it; past it herself (a dodge clears the red past it when that is the only way, and
+  she takes it), or struck from out of her reach by it (her last blow taken, _on_struck_any), she steps
+  back toward him. A foe at range beyond the leash so never pins her at its edge. A companion looses
+  no bow today, so the leash bounds her steps only; any blow she lands from inside it (a reach weapon's
+  line) she lands. Whoever gives her a bow later meets the leash's question here: whether she looses
+  from inside it at a foe past it.
+- Let go (_let_foe_go): a leashed foe going away (not after her or him, or broken for its den: Apex.to_den's
+  walk, its _wallow_from) she lets go: FOLLOW, her held foe dropped, and it is no foe of hers while it
+  stays past the leash and out of her reach (_out_of_reach, which every chooser reads). Her "let_go" line
+  (voice's, C:/dev/review/voice/first_fight_lines.md section 5: no place, no direction, no promise it will
+  or won't come back) is said the first time for each foe, never again for the same one; logged as a
+  "leash" stance row, never a name.
+- Her dodge (_read_telegraphs): of two cells that clear the red alike, the one nearer her player.
+- 780 amended (32)'s break-off is untouched.
+- Before it queues: enemy-ai reruns the old grey's harm along (monster_test _test_old_wolf_fights_along,
+  against 1.56/1.88/1.09) and grey3b's setup in the sim (bites at her, step-outs, bites landed, lunges,
+  against 14 of 18) on this take; after it lands, case 3b again on the laptops with the grey's tile per
+  tick, pass: she never leaves his screen at the play camera and her line is heard once.
+- The reads (11-16): enemy-ai's grey3b sim on this take, the grey on her and her player 3 back, 32 fights:
+  bites at her 245 to 215, stepped out 87% to 81%, bitten 13% to 19%, her harm a fight 6.41 as before, 119
+  lunges over her none struck, no bite at the player, her farthest from him 18.6 to 8.1 and past 7 cells 86%
+  to 15% of ticks; along, the old grey's harm and the 32/32 wins unchanged. ui-design's joined look grey3c
+  (Lenovo): 8 cells at most, on his screen in every sample. The let-go line was not heard there (it was,
+  twice, in grey4 on the later step-back try, af2b7cf4e, the same line's code), so the bullet leaves it out.
+- A step back to his side between bites (the coordinator's ruling on grey3c) was tried and called off:
+  it kept her nearer him (past 7 cells 7%) but bitten 32% and harm 10.0 a fight, and enemy-ai's split
+  showed every landed bite caught her mid-swing (663 amended (2)), none mid-walk. It comes back as its own
+  row with combat: she begins no swing whose stand would still hold her when a told blow on her cell lands,
+  then the step back, enemy-ai's sim the gate.
+- tests/companion_test _test_fight_leash, on open ground in the wilds, her player still: a foe going for
+  her stepping away to 16 off holds her within the leash (+1 for a dodge); going away past it while she
+  holds at the edge, let go, she comes to heel and says her line once, not again for the same foe; her
+  player set on it, she follows past it; struck from out of her reach at the edge, she comes back; a foe
+  in her reach at the edge gets her blow; a foe going for him within the leash is hers. Server only,
+  protocol unchanged, no new class_name.
+- The first landing failed items_test's bleed rows ("a bleed is no blow ... still calm enough to bandage"
+  and the bandage after it). The take failed 1 of 1 and main passed 4 of 4, with the row's three parts printed:
+  bleeding and hp as wanted, World.calm false for a live Monster within BANDAGE_SAFE. The test room's
+  CorridorImp1, hurt to 9 hp and going away 10 cells from the host, is let go by her leash at tick ~200,
+  where on main she chased it down to 1 hp across the room. It comes back for her and stands at (5, 3)/(5, 4)
+  by the host while the row has her held still. The row reads a bleed alone, so items_test _test_arrows now
+  moves any live foe within BANDAGE_SAFE of the host to a far cell and holds it for the two rows, then
+  gives its acts back. On main it moves none; on the take it moves CorridorImp1; both PASS.

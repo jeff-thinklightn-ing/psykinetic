@@ -49,7 +49,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 
 ## Lines in the code (3071)
 
-### companions (Pip, Wren, Nix) (670)
+### companions (Pip, Wren, Nix) (671)
 
 | | Line | Where |
 |---|---|---|
@@ -259,6 +259,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | beside her player again, or nothing going for her: the usual rules again | `sim/companion.gd` _left_to_it() |
 |  | %s has gone on and left you to it, and you are losing: you break off and go after them. | `sim/companion.gd` _left_to_it() |
 |  | under half, her player gone past %d from what is at her | `sim/companion.gd` _left_to_it() |
+|  | a foe going away past %d of her player | `sim/companion.gd` _let_foe_go() |
 |  | %s stays by you, so you sit down to rest and get your breath back. | `sim/companion.gd` _tend_rest_ask() |
 |  | her ask to rest, taken by his staying | `sim/companion.gd` _tend_rest_ask() |
 |  | once a hurt spell; his yes or his staying by her takes it | `sim/companion.gd` _tend_rest_ask() |
@@ -3210,7 +3211,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (1103)
+## Lines in the data (1114)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3248,7 +3249,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (257)
+### levels/companion_traits.json (268)
 
 | | Line | Key |
 |---|---|---|
@@ -3263,6 +3264,17 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | This way. Watch your step. | `guide.set_off.careful and thoughtful[0]` |
 |  | This way, come on. | `guide.set_off.restless and curious[0]` |
 |  | On we go. | `guide.set_off.resume[0]` |
+|  | Let that one go. I'm staying with you. | `leash.let_go.default[0]` |
+|  | That one's gone to ground. I'll stay by you. | `leash.let_go.default[1]` |
+|  | That one's off. Out there somewhere, I expect. | `leash.let_go.default[2]` |
+|  | Let that one go. I'll stay by you. | `leash.let_go.steady and watchful[0]` |
+|  | I'm not chasing that one off on my own. | `leash.let_go.quick and wary[0]` |
+|  | Oh, let that one go! I'd sooner stay with you. | `leash.let_go.warm and talkative[0]` |
+|  | Better not follow that one. I'll stay close. | `leash.let_go.careful and thoughtful[0]` |
+|  | Tempting, but I'm not chasing that one. | `leash.let_go.restless and curious[0]` |
+|  | Let that one go. | `leash.let_go.quiet and patient[0]` |
+|  | Let that one run. Not worth leaving you for. | `leash.let_go.blunt and fearless[0]` |
+|  | Off that one goes! Fine by me. | `leash.let_go.cheerful under pressure[0]` |
 |  | Shall we try the Mughouse? A hearth and a cup of ale would do us both good. | `first_steps.decks.offer.mughouse.default[0]` |
 |  | I could do with a sit by a fire. Shall we try the Mughouse? | `first_steps.decks.offer.mughouse.default[1]` |
 |  | Shall we look in at the Mughouse first? There's a hearth, and ale at the counter. | `first_steps.decks.offer.mughouse.default[2]` |
