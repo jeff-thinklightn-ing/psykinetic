@@ -43575,6 +43575,105 @@ in disrepair, nothing ordered, open. Also offers, towns, economy,
 respawn_places, regen, farm and suite_test PASS. No new log line; none
 carries a player's name or id. Server only, protocol unchanged, no new
 class_name.
+
+733 amended (2): wood at the hut's door, a log rack players fill (the
+coordinator's approval, 2026-11-16, of economy's option A over a word in
+town; package "wood at the hut's door"; label from tools/decision_number.sh).
+A player could see a hut empty and falling (733/759's holed roof, broken
+walls, cold pot, dark windows) but not that it waited, nor that he could help.
+Jeff's hungry-town pattern: a want the place shows, a bonus for answering it,
+nothing lost by walking past. The coordinator's limits: no caption or prompt,
+only a count; the bonus to each who laid wood, never only the last (bonuses,
+not contests); wood given is given; no log line names a player; the rack only
+while the hut is not standing and no mend is under way.
+(a) Towns.rack(id): [laid, need] in bundles, the unit a player lays (the
+coordinator: never a sum that doesn't add up, "5 of 4"): need the mend's wood
+for its state (healers.repair: 4 for disrepair, 10 for a ruin) over a
+bundle's (Towns.RACK_ITEM wood_bundle's yield, 5), rounded up (disrepair 1,
+ruin 2); laid the bundles laid this fall (the hut's "laid"), at most need; []
+while healers.rack.on is off, the hut stands, its mend is under way or it
+wants no wood. More is refused: the rack takes bundles while it is short,
+each bundle's wood banked in the hut's own store, where 733's mend takes its
+supplies (a disrepair's one bundle leaves 1 wood over at the hut for its next
+mend; a short bundle's less, and the mend buys the rest).
+(b) The rack's cell, Main.rack_cell(id), found once a hut: on its level the
+building whose front is the hut's place cell; from the first cell outside its
+rect that way (the turf house's front is its approach through the bank, 718),
+healers.rack.beside (1) cells along its front, on the door's left looking
+out, else its right, on the floor outside the rect. The wilds' hut: front
+(152,232), rack (151,231). A hut a town built, not its level, has no cell and
+no rack. The rack is drawn (art-kit's prop.log_rack), not an entity, and
+stops nobody. Economy draws it (the coordinator: the drawing follows the
+data): Client3D._show_rack, from _show_state for any building with a hut id,
+puts RACK_SLOT under the room as a node RACK_NODE "LogRack" (metas "hut" and
+"cell"; kept on the building's dict as "rack", no new Client3D var) at the
+entry's rack_cell on the ground, turned as the hut's own node (its back to
+the hut, its open front out of the hut's front), one of state_empty,
+state_part and state_full shown by Client3D.rack_fill (none laid, all the
+bundles wanted, between); none drawn, and one drawn freed, while the entry
+has no "rack" or the slot is missing. No colour, font or size of its own: the
+count over it is ui's row (their take, on ui-design's mock).
+(c) The "huts" message's entry gains "rack": [laid, need] and "rack_cell":
+[x, y], both present only while the rack shows; absent, no rack, as before.
+New command "hut_give" {hut: place id, count: the most bundles, all if left
+out} (a World.command like "contribute", not a message kind): Main.hut_give,
+in the hut's area within RACK_REACH (2) cells of the rack cell, lays the
+player's wood_bundles one at a time (World.consume; Towns.rack_lay banks its
+yield and counts him among this fall's givers) until the rack is full; the
+rest stay in his pack. Off, no rack, too far or no wood: nothing taken, no
+word. One line by kind and count ("[towns] the healer's hut <id>: wood laid N
+(B bundles), rack L of M, step S"), and the area sent "huts". Its keeper, if
+it has one, says to the giver one of healers.rack.said.laid in turn (voice's:
+"That's good wood. It'll go into the walls." / "Every log helps. Fill that
+rack and I can set this place right." / "Thank you. I'll put it to use."),
+as a "party" line; nothing when nobody keeps it.
+(d) Full: kept, its keeper sets about the mend at once (Towns.rack_lay calls
+_hut_mend); unkept, Towns.hut(id)'s rack_full is the day it filled and
+Main._vacancy_run ends the vacancy the next day; the keeper seated then mends
+it at once (Towns.keeper_came, from _seat_healers). With the rack on,
+_hut_mend buys only what the hut's own store lacks (Towns._hut_lacking), so a
+full rack buys nothing and a part-filled one buys the rest. Off, it buys all
+as before. hut_day_words: "no keeper, one comes in 1 day" once full.
+(e) The bonus, at the mend's order (Towns._rack_thanks): each giver of this
+fall gets one free care at the hut (its retainer's gold 0 in the barter's
+"care", taken once by "retain", Towns.use_care_free, his line then one of
+healers.rack.said.free: "No charge. You brought the wood." / "This one's on
+me, for the wood.") and healers.rack.regard (2) halves with the hut's town,
+regard_move's REGARD_HUT "brought wood to mend the healer's hut" (voice's). The givers and rack_full are then cleared;
+nothing comes back if the hut falls again.
+Where the givers are kept (the coordinator's question): beside the hut, by
+player id, in Towns' own store, as a town's regard (_towns[town]["regard"])
+and a building's gifts (its "by", credit_build) already are: _huts[id]["by"]
+{player_id: bundles} and ["free"] {player_id: 1}, saved with the huts
+(huts_from_dict reads them). So a giver who is away when the mend is ordered
+is thanked all the same. Towns.hut() and the "huts" message never carry them,
+nor does any log line or console verb.
+Test-only console verb "hut <place id> [standing|disrepair|ruin]" (unknown
+without --test-hp beside --run-marker): the hut's state and rack, or set
+(Towns.set_hut, a mend in hand given up). Off until economy switches it on
+after a joined laptop look (a player with wood at a ruined hut, the rack
+filling, the keeper coming and hammering); art-kit, ui (the click, on
+ui-design's mock: the count "L of M" a name-plate row within 2 cells) and
+voice (the keeper's word) carry their pieces. Tests: towns_test _test_rack
+(off; 0 of 2; two givers fill it; no more taken; hut() without ids; the save
+by id; one comes the next day; restored; the keeper come, mended at once,
+nothing bought, each giver a free care once and regard; kept, in disrepair, one
+bundle fills it and it is mended at once; off, the wood at the hut unused);
+hut_town_test _test_rack (joined on the laid world: the rack's cell (151,231)
+outside the turf house and its bank; the huts message's rack and cell, no id;
+too far, nothing; two bundles laid, the third kept; kept, mended at once,
+nothing bought from Umbrage; the host's first care free; no rack under way);
+view_world_test (_test_turf_house): a ruin told no rack, none drawn; told [0,
+2] and a cell, the slot at the cell turned as the hut with its metas, empty;
+[1, 2] part, the same node; [2, 2] full; a disrepair's [0, 1] empty; mended,
+the rack freed (run with art-kit's prop.log_rack, which lands first).
+Also economy, offers, respawn_places, first_steps, resident, door_day, larder,
+regen and protocol tests PASS. Protocol: no new number (release; a comment
+line under 59's in net/net.gd): an old client keeps the two keys unread and
+draws the hut as before, an old server drops the command; a player on an old
+client sees no rack until they update (release's condition for the
+switch-on: ui's row, the new client against an old server, no keys, no give).
+No new class_name.
 ## 736, items' side: the starter vendor's wares and the starter mark
 
 Economy's starter vendor (736) sells the base weapons at a token price, and

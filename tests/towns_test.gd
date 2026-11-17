@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_day_line()
 	_test_repairs_words()
 	_test_hut_day_words()
+	_test_rack()
 	_test_newcomer_want()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -381,6 +382,71 @@ func _test_hut_day_words() -> void:
 	_check(words.ends_with("ruin; being mended 50%") and not words.contains("Ned") and not words.contains("ned"), "being mended, no name (%s)" % words)
 	_towns._huts["tt/healers_hut"] = {"state": Towns.STANDING, "level": 1, "job": 0}
 	_check(_towns.hut_day_words("tt/healers_hut") == "" and _towns.hut_day_words("tt/no_hut") == "", "standing, or no such hut: nothing")
+
+
+## 733 amended (2), package "wood at the hut's door": the log rack. Off, none; on, a ruin's rack takes wood to
+## its need and no more; full and unkept, a keeper the next day, who mends it at once without buying; each
+## giver a free care (once) and regard; the givers by id only in the save, never in hut(); kept, a full rack
+## mended at once; standing or mending, no rack.
+func _test_rack() -> void:
+	print("
+== the log rack at a healer's hut (733 amended (2)) ==")
+	var rules := RULES.duplicate(true)
+	rules["healers"] = {"vacant_days": 21, "repair": {"disrepair": {"needs": {"wood": 4}, "steps": 1500}, "ruin": {"needs": {"wood": 10}, "steps": 3000}},
+		"rack": {"on": false, "regard": 2}}
+	var clock := func() -> int: return _now
+	_book = ItemBook.new(clock)
+	_stock = Stockpile.new({}, clock, _book)
+	_stock.deposit(TOWN, "wood", 60, "test")
+	_work = Production.new({}, _stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new({}, _work, rules, clock)
+	_towns._town(TOWN)
+	_towns.hut_town = func(_id: String) -> String: return TOWN
+	var hut := "tt/healers_hut"
+	var day := maxi(DayNight.day_steps, 1)
+	_now = 5 * day
+	_towns._huts[hut] = {"state": Towns.RUIN, "level": 0, "job": 0, "empty_since": 0}
+	_check(_towns.rack(hut).is_empty() and not _towns.rack_lay(hut, "p1", 5), "off: no rack, nothing taken")
+	rules["healers"]["rack"]["on"] = true
+	_towns.rules = rules
+	_check(_towns.rack(hut) == [0, 2], "on, a ruin nobody keeps: 0 of 2 bundles (%s)" % [_towns.rack(hut)])
+	_check(_towns.rack_lay(hut, "p1", 5) and _towns.rack(hut) == [1, 2] and not _towns.hut(hut).has("rack_full") and _stock.count(hut, "wood") == 5, "a bundle laid: 1 of 2, its 5 wood at the hut")
+	_check(_towns.rack_lay(hut, "p2", 5) and _towns.rack(hut) == [2, 2] and int(_towns.hut(hut).get("rack_full", -1)) == 5, "a second giver fills it, its day noted")
+	_check(not _towns.rack_lay(hut, "p3", 5) and _stock.count(hut, "wood") == 10, "full: no more taken")
+	_check(not _towns.hut(hut).has("by") and not str(_towns.hut(hut)).contains("p1"), "hut(): no giver's id (%s)" % [_towns.hut(hut)])
+	var saved := _towns.huts_to_dict()
+	_check(int(saved[hut]["by"]["p1"]) == 1 and int(saved[hut]["by"]["p2"]) == 1 and int(saved[hut]["laid"]) == 2, "the save keeps the givers by id, beside the hut")
+	_check(_towns.hut_day_words(hut).ends_with("no keeper, one comes in 1 day"), "full, unkept: one comes the next day (%s)" % _towns.hut_day_words(hut))
+	_check(int(_towns.hut(hut)["empty_since"]) == 0 and _work.jobs().is_empty(), "unkept: no mend yet")
+	var copy := Towns.new({}, _work, rules, clock)
+	copy.huts_from_dict(saved)
+	_check(copy.huts_to_dict()[hut].get("by", {}) == {"p1": 1, "p2": 1} and copy.rack(hut) == [2, 2] and int(copy.hut(hut).get("rack_full", -1)) == 5, "restored: the givers and its full day")
+	_now = 6 * day
+	_work.add_worker("ned", "Ned", ["medicine_man"], hut, "wilds")
+	_work.add_workshop(hut, "medicine_man", hut)
+	_work.assign(hut, "ned")
+	var town_wood := _stock.count(TOWN, "wood")
+	_towns.keeper_came(hut)
+	var job := int(_towns._huts[hut]["job"])
+	_check(job != 0 and _work.job(job).get("recipe") == Towns.HUT_REPAIR + hut, "the keeper come: the mend ordered at once")
+	_check(_stock.count(TOWN, "wood") == town_wood, "nothing bought from the town (%d, was %d)" % [_stock.count(TOWN, "wood"), town_wood])
+	_check(_towns.rack(hut).is_empty(), "its mend under way: the rack gone")
+	_check(_towns.care_free(hut, "p1") and _towns.care_free(hut, "p2") and not _towns.care_free(hut, "p3"), "each who laid wood: a free care; not one who didn't")
+	_check(_towns.regard(TOWN, "p1")["why"] == [Towns.REGARD_HUT] and _towns.regard(TOWN, "p2")["why"] == [Towns.REGARD_HUT], "each: regard with the hut's town")
+	_check(not _towns._huts[hut].has("by") and not _towns._huts[hut].has("rack_full") and not _towns._huts[hut].has("laid"), "the givers and its full day cleared")
+	_check(_towns.use_care_free(hut, "p1") and not _towns.care_free(hut, "p1") and not _towns.use_care_free(hut, "p1"), "a free care, once")
+	_towns._hut_mended(hut)
+	_check(_towns.rack(hut).is_empty(), "standing: no rack")
+	# Kept, in disrepair: the rack full is mended at once.
+	_towns._huts[hut] = {"state": Towns.DISREPAIR, "level": 1, "job": 0}
+	_stock.take(hut, "wood", _stock.count(hut, "wood"), "test")
+	_check(_towns.rack(hut) == [0, 1], "kept, in disrepair: 0 of 1 bundle (%s)" % [_towns.rack(hut)])
+	_check(_towns.rack_lay(hut, "p3", 5) and int(_towns._huts[hut]["job"]) != 0 and _towns.care_free(hut, "p3"), "one bundle fills it: mended at once, the giver thanked")
+	# Off: a mend buys everything, as before (no hut_supplies here: none ordered).
+	rules["healers"]["rack"]["on"] = false
+	_towns._huts[hut] = {"state": Towns.DISREPAIR, "level": 1, "job": 0}
+	_towns._hut_mend(hut, _towns._huts[hut], "ned", rules["healers"])
+	_check(int(_towns._huts[hut]["job"]) == 0, "off: the wood at the hut is not used; the mend waits on its buying")
 
 
 func _check(ok: bool, label: String) -> void:

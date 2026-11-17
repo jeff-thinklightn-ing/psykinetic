@@ -92,6 +92,7 @@ func _run() -> void:
 	World.towns._huts[NOWHERE]["level"] = 0
 	_check(not main._hut_shut(NOWHERE) and main.care_rule(NOWHERE) is Dictionary, "a ruin, kept, no town: still open")
 	_test_reload_keeps_decor(main)
+	_test_rack(main)
 	print("RESULT: %s (%d failed)" % ["PASS" if _failed == 0 else "FAIL", _failed])
 	Net.state_path = ""
 	get_tree().quit(0 if _failed == 0 else 1)
@@ -149,6 +150,46 @@ func _test_reload_keeps_decor(main: Node) -> void:
 		"after the reload the wilds' seats and carts are the laid level's (%d seats), not the stale ones" % seats.size())
 	_check(int(Level.loads.get("wilds", 0)) - int(before.get("wilds", 0)) == 1, "one read, the reload's own (%d)"
 		% (int(Level.loads.get("wilds", 0)) - int(before.get("wilds", 0))))
+
+
+## 733 amended (2), package "wood at the hut's door", joined: the wilds' hut a ruin, its rack's cell beside its
+## door (on the floor, outside the turf house, never its front cell); the "huts" message carries [laid, need]
+## and the cell only while on; the host's "hut_give" from too far takes nothing; near, his bundles laid up to the
+## need, the rest kept; kept, the full rack mended at once without buying; his first care there free.
+func _test_rack(main: Node) -> void:
+	print("== the log rack, joined (733 amended (2)) ==")
+	var host: Player = main._players.get(Net.local_id)
+	World.towns._huts[WILDS] = {"state": Towns.RUIN, "level": 0, "job": 0, "ruin": 0}
+	World.stockpile.take(WILDS, "wood", World.stockpile.count(WILDS, "wood"), "test")
+	_check(not main.huts_of("wilds")[WILDS].has("rack"), "off: no rack in the huts message")
+	World.towns.rules["healers"]["rack"]["on"] = true
+	var front: Vector2i = World.holdings.place(WILDS)["cell"]
+	var cell: Vector2i = main.rack_cell(WILDS)
+	var level := Level.load_level("wilds")
+	var rect := Rect2i()
+	for each: Dictionary in level["buildings"]:
+		if each.get("front", Level.front_cell(each["rect"], each["facing"])) == front:
+			rect = each["rect"]
+	_check(cell != main.NO_RACK and not rect.has_point(cell) and (level["terrain"]["floor"] as Array).has(cell) and absi(cell.x - front.x) <= 1 and absi(cell.y - front.y) <= 1
+		and cell.x != front.x, "the rack's cell beside the door, on the floor outside the turf house and its bank (front %s, rack %s)" % [front, cell])
+	var sent: Dictionary = main.huts_of("wilds")[WILDS]
+	_check(sent.get("rack") == [0, 2] and sent.get("rack_cell") == [cell.x, cell.y] and not str(sent).contains(host.player_id),
+		"on: the huts message, [0, 2] bundles and its cell, no id (%s)" % [sent])
+	for i in 3:
+		main._hand_item(host.player_id, "wood_bundle", "test")
+	World._relocate(host, cell + Vector2i(0, -4) if World.is_walkable(cell + Vector2i(0, -4)) else cell + Vector2i(0, 4))
+	_check(main.hut_give(host, {"hut": WILDS}) == 0 and World.count_of(host, "wood_bundle") == 3, "4 cells off: nothing laid")
+	World._relocate(host, cell + Vector2i(0, -2) if World.is_walkable(cell + Vector2i(0, -2)) else cell + Vector2i(0, 2))
+	var keeper := str(World.production.workshop(WILDS).get("worker", ""))
+	var town_wood := World.stockpile.count(UMBRAGE, "wood")
+	var laid: int = main.hut_give(host, {"hut": WILDS})
+	_check(laid == 10 and World.count_of(host, "wood_bundle") == 1, "2 cells off: two bundles laid, 10 wood, the third kept (laid %d, kept %d)" % [laid, World.count_of(host, "wood_bundle")])
+	var job := int(World.towns._huts[WILDS]["job"])
+	_check(not keeper.is_empty() and job != 0 and World.stockpile.count(UMBRAGE, "wood") == town_wood and not main.huts_of("wilds")[WILDS].has("rack"),
+		"kept: the mend ordered at once, nothing bought from Umbrage, the rack gone (job %d)" % job)
+	_check(World.towns.care_free(WILDS, host.player_id) and main._care_free(WILDS, host.player_id), "the host's first care there free")
+	_check(main.hut_give(host, {"hut": WILDS}) == 0 and World.count_of(host, "wood_bundle") == 1, "its mend under way: no rack, nothing taken")
+	World.towns.rules["healers"]["rack"]["on"] = false
 
 
 func _check(ok: bool, label: String) -> void:

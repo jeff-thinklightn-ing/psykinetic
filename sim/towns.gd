@@ -549,7 +549,10 @@ func hut_day_words(id: String) -> String:
 	elif _keeper_of(id).is_empty():
 		if entry.has("empty_since"):
 			var vacant := int(rules.get("healers", {}).get("vacant_days", 21))
-			var left := maxi(vacant - (now() / maxi(DayNight.day_steps, 1) - int(entry["empty_since"])), 0)
+			var today := now() / maxi(DayNight.day_steps, 1)
+			var left := maxi(vacant - (today - int(entry["empty_since"])), 0)
+			if entry.has("rack_full"):
+				left = clampi(int(entry["rack_full"]) + 1 - today, 0, left)  # 733 amended (2): a full rack brings one the next day.
 			why = "no keeper, one comes today" if left == 0 else "no keeper, one comes in %d day%s" % [left, "" if left == 1 else "s"]
 		else:
 			why = "no keeper"
@@ -3749,8 +3752,9 @@ func hut(place_id: String) -> Dictionary:
 		return {}
 	var entry: Dictionary = _huts[place_id]
 	var out := {"state": str(entry["state"]), "level": int(entry["level"])}
-	if entry.has("empty_since"):
-		out["empty_since"] = int(entry["empty_since"])
+	for key: String in ["empty_since", "rack_full"]:  # rack_full: the day its rack filled (733 amended (2)); never its givers.
+		if entry.has(key):
+			out[key] = int(entry[key])
 	return out
 
 
@@ -3765,9 +3769,15 @@ func huts_from_dict(saved: Dictionary) -> void:
 		if not each is Dictionary or not str(each.get("state", "")) in [STANDING, DISREPAIR, RUIN]:
 			continue
 		var entry := {"state": str(each["state"]), "level": maxi(int(each.get("level", 1)), 0), "job": int(each.get("job", 0))}
-		for key: String in ["empty_since", "decay", "ruin", "turn"]:  # "turn" the day last stepped (758: twice a day after a restart without it).
+		for key: String in ["empty_since", "decay", "ruin", "turn", "rack_full", "laid"]:  # "turn" the day last stepped (758: twice a day after a restart without it).
 			if each.has(key):
 				entry[key] = int(each[key])
+		for key: String in ["by", "free"]:  # The rack's givers and their free care, by player id (733 amended (2)).
+			if each.get(key) is Dictionary:
+				var kept := {}
+				for player_id: Variant in each[key]:
+					kept[str(player_id)] = int(each[key][player_id])
+				entry[key] = kept
 		_huts[str(id)] = entry
 
 
@@ -3855,11 +3865,14 @@ func _huts_turn() -> void:
 func _hut_mend(id: String, entry: Dictionary, keeper: String, rule: Dictionary) -> void:
 	var mend: Dictionary = rule.get("repair", {}).get("ruin" if entry["state"] == RUIN else "disrepair", {})
 	var needs: Dictionary = mend.get("needs", {})
-	if not hut_supplies.is_valid() or not bool(hut_supplies.call(id, keeper, needs)):
+	# 733 amended (2): with the rack on, what lies at the hut (wood laid in its rack) is used, and only the rest bought.
+	var buy := _hut_lacking(id, needs) if rack_on() else needs
+	if not buy.is_empty() and (not hut_supplies.is_valid() or not bool(hut_supplies.call(id, keeper, buy))):
 		return
 	var trade := str(production.worker(keeper).get("trades", ["medicine_man"])[0])
 	entry["job"] = production.order_build(id, HUT_REPAIR + id, trade, needs, int(mend.get("steps", 1500)))
 	print("[towns] %s sets about mending the healer's hut %s (%s), step %d" % [production.worker(keeper).get("name", keeper), id, entry["state"], now()])
+	_rack_thanks(id, entry)
 
 
 ## Hut [param id]'s mend done: standing again, a ruin at level 1.
@@ -3874,6 +3887,150 @@ func _hut_mended(id: String) -> void:
 	entry.erase("ruin")
 	print("[towns] the healer's hut %s is mended, step %d" % [id, now()])
 	hut_changed.emit(id)
+
+
+# --- The log rack at a healer's hut's door (733 amended (2)) ----------------------------
+
+## The rack's word in a town's regard (voice's).
+const REGARD_HUT := "brought wood to mend the healer's hut"
+## What a rack takes (the coordinator: counted in what a player lays, a bundle).
+const RACK_ITEM := "wood_bundle"
+
+
+## Whether the rack is on (economy.json healers.rack.on; package "wood at the
+## hut's door"): off, no rack is shown, none taken, and a mend buys all it
+## needs, as before.
+func rack_on() -> bool:
+	return bool(rules.get("healers", {}).get("rack", {}).get("on", false))
+
+
+## Hut [param id]'s rack (733 amended (2)): [laid, need] in bundles (the
+## coordinator: the unit a player lays, never a sum that doesn't add up), need
+## the mend's wood for its state (healers.repair) over a bundle's (RACK_ITEM's
+## yield), rounded up (disrepair 1, ruin 2), laid the bundles laid this fall,
+## at most need; [] while it is off, the hut stands, its mend is under way, or
+## the mend wants no wood. Shown only then (the coordinator: it never points
+## at nothing).
+func rack(id: String) -> Array:
+	var entry: Dictionary = _huts.get(id, {})
+	if not rack_on() or entry.is_empty() or str(entry["state"]) == STANDING or int(entry.get("job", 0)) != 0:
+		return []
+	var need := _rack_need(entry)
+	if need <= 0:
+		return []
+	return [mini(int(entry.get("laid", 0)), need), need]
+
+
+func _rack_need(entry: Dictionary) -> int:
+	var wood := int(rules.get("healers", {}).get("repair", {}).get("ruin" if str(entry["state"]) == RUIN else "disrepair", {}).get("needs", {}).get("wood", 0))
+	var each := maxi(int(Items.yield_of(RACK_ITEM).get("wood", 5)), 1)
+	return ceili(float(wood) / each) if wood > 0 else 0
+
+
+## A bundle of [param wood] laid in hut [param id]'s rack by player [param
+## player_id] (733 amended (2)): its wood banked at the hut's own store, where
+## its mend takes its supplies (a short bundle's less: the mend buys the rest),
+## one more laid, and the player counted among this fall's givers (by id,
+## beside the hut as a town's regard is kept). Its day noted when it fills;
+## kept, its keeper sets about the mend at once. False, and nothing moved,
+## when there is no rack or it is full.
+func rack_lay(id: String, player_id: String, wood: int) -> bool:
+	var shown := rack(id)
+	if shown.is_empty() or int(shown[0]) >= int(shown[1]) or wood <= 0 or player_id.is_empty():
+		return false
+	var entry: Dictionary = _huts[id]
+	production.stockpile.deposit(id, "wood", wood, "the rack", "wood laid at the healer's hut")
+	entry["laid"] = int(entry.get("laid", 0)) + 1
+	var by: Dictionary = entry.get_or_add("by", {})
+	by[player_id] = int(by.get(player_id, 0)) + 1
+	if int(entry["laid"]) >= int(shown[1]) and not entry.has("rack_full"):
+		entry["rack_full"] = now() / maxi(DayNight.day_steps, 1)
+		var keeper := _keeper_of(id)
+		if not keeper.is_empty():
+			_hut_mend(id, entry, keeper, rules.get("healers", {}))  # Kept: he sets about it at once, with what lies there.
+	return true
+
+
+## [param needs] less what hut [param id]'s own store holds: what its mend
+## must still buy ({} for nothing).
+func _hut_lacking(id: String, needs: Dictionary) -> Dictionary:
+	var out := {}
+	for what: String in needs:
+		var lacking := int(needs[what]) - production.stockpile.count(id, what)
+		if lacking > 0:
+			out[what] = lacking
+	return out
+
+
+## Hut [param id]'s mend ordered (733 amended (2); the coordinator: the bonus to
+## each who laid wood, never only the last): every giver of this fall gets one
+## free care there (kept until used) and healers.rack.regard halves with the
+## hut's town; then the givers and the rack's full day are cleared. Wood
+## given is given: nothing comes back if the hut falls again.
+func _rack_thanks(id: String, entry: Dictionary) -> void:
+	var by: Dictionary = entry.get("by", {})
+	entry.erase("by")
+	entry.erase("rack_full")
+	entry.erase("laid")
+	if by.is_empty():
+		return
+	var free: Dictionary = entry.get_or_add("free", {})
+	var town := str(hut_town.call(id)) if hut_town.is_valid() else ""
+	var halves := int(rules.get("healers", {}).get("rack", {}).get("regard", 2))
+	var players: Array = by.keys()
+	players.sort()
+	for player_id: String in players:
+		free[player_id] = 1
+		if not town.is_empty():
+			regard_move(town, player_id, halves, REGARD_HUT)
+	print("[towns] the healer's hut %s: %d who laid wood thanked, step %d" % [id, players.size(), now()])
+
+
+## Whether player [param player_id] has a free care waiting at hut [param id]
+## (733 amended (2)).
+func care_free(id: String, player_id: String) -> bool:
+	return int(_huts.get(id, {}).get("free", {}).get(player_id, 0)) > 0
+
+
+## A keeper just seated at hut [param id] (main's _seat_healers, 733 amended
+## (2)): its rack full, he sets about the mend at once with the wood laid.
+func keeper_came(id: String) -> void:
+	var entry: Dictionary = _huts.get(id, {})
+	if entry.is_empty() or str(entry["state"]) == STANDING or int(entry.get("job", 0)) != 0 or not entry.has("rack_full"):
+		return
+	var keeper := _keeper_of(id)
+	if not keeper.is_empty():
+		_hut_mend(id, entry, keeper, rules.get("healers", {}))
+
+
+## Test-only (main's hut verb, 733 amended (2)): hut [param id] set to
+## [param state] (level 1, 0 for a ruin), a mend in hand given up, the day's
+## turn kept. Whether it was.
+func set_hut(id: String, state: String) -> bool:
+	if not _huts.has(id) or state not in [STANDING, DISREPAIR, RUIN]:
+		return false
+	var entry: Dictionary = _huts[id]
+	if int(entry.get("job", 0)) != 0:
+		production.cancel(int(entry["job"]))
+	entry["job"] = 0
+	entry["state"] = state
+	entry["level"] = 0 if state == RUIN else 1
+	for key: String in ["decay", "ruin"]:
+		entry.erase(key)
+	if state == DISREPAIR:
+		entry["decay"] = now() / maxi(DayNight.day_steps, 1)
+	elif state == RUIN:
+		entry["ruin"] = now() / maxi(DayNight.day_steps, 1)
+	hut_changed.emit(id)
+	return true
+
+
+## Player [param player_id]'s free care at hut [param id] used. Whether one was.
+func use_care_free(id: String, player_id: String) -> bool:
+	if not care_free(id, player_id):
+		return false
+	(_huts[id]["free"] as Dictionary).erase(player_id)
+	return true
 
 
 # --- Visitors (decision 711) -----------------------------------------------------------

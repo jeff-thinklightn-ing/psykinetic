@@ -6300,6 +6300,28 @@ func _test_turf_house() -> void:
 			and not _rig._window_lit(window, 21.0, -0.5), "told empty, the healer still said awake: no smoke, the pot cold, a window dark; it stands")
 	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1}})
 	_check(smoke.visible and hearth.visible and _rig._window_lit(window, 21.0, -0.5), "no longer empty: its fire lit and smoking, a window lit")
+	# 733 amended (2), package "wood at the hut's door": its log rack at the told cell, its back to the hut, one
+	# state by the count in bundles; none while the entry has no "rack"; gone when it is mended.
+	_rig.set_huts({hut: {"state": Towns.RUIN, "level": 0}})
+	_check(not house.has("rack") and _rig._room.find_children(Client3D.RACK_NODE + "*", "", false, false).is_empty(), "a ruin told no rack: none drawn")
+	var rack_at := Vector2i(5, 6)
+	_rig.set_huts({hut: {"state": Towns.RUIN, "level": 0, "rack": [0, 2], "rack_cell": [rack_at.x, rack_at.y]}})
+	var rack: Node3D = house.get("rack")
+	_check(ArtKit.has(Client3D.RACK_SLOT) and rack != null and rack.get_parent() == _rig._room and str(rack.name).begins_with(Client3D.RACK_NODE)
+			and rack.position.is_equal_approx(Vector3(rack_at.x, _rig._elevation(rack_at), rack_at.y)) and is_equal_approx(rack.rotation.y, node.rotation.y)
+			and rack.get_meta("hut", "") == hut and rack.get_meta("cell", Vector2i(-1, -1)) == rack_at,
+			"told a rack: art-kit's at its cell, turned as the hut, its hut and cell on it (%s)" % [rack.position if rack != null else "none"])
+	var shown := func() -> Array:
+		return rack.find_children("state_*", "Node3D", true, false).filter(func(s: Node3D) -> bool: return s.visible).map(func(s: Node3D) -> String: return str(s.name))
+	_check(shown.call() == ["state_empty"], "0 of 2: empty (%s)" % [shown.call()])
+	_rig.set_huts({hut: {"state": Towns.RUIN, "level": 0, "rack": [1, 2], "rack_cell": [rack_at.x, rack_at.y]}})
+	_check(house.get("rack") == rack and shown.call() == ["state_part"], "1 of 2: part, the same rack (%s)" % [shown.call()])
+	_rig.set_huts({hut: {"state": Towns.RUIN, "level": 0, "rack": [2, 2], "rack_cell": [rack_at.x, rack_at.y]}})
+	_check(shown.call() == ["state_full"], "2 of 2: full (%s)" % [shown.call()])
+	_rig.set_huts({hut: {"state": Towns.DISREPAIR, "level": 1, "rack": [0, 1], "rack_cell": [rack_at.x, rack_at.y]}})
+	_check(shown.call() == ["state_empty"], "a disrepair's 0 of 1: empty (%s)" % [shown.call()])
+	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1}})
+	_check(not house.has("rack") and rack.is_queued_for_deletion(), "mended, no rack told: the rack taken away")
 	_rig.hut_states.clear()
 	_rig.set_awake("turf_town", {})
 	_rig.town_states.erase("turf_town")

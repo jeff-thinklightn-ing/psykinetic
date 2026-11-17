@@ -681,6 +681,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 780 amended (38) (the old grey's told bite): a "telegraph" may carry kind "bite" (his target's one cell, for his lead); an old client draws its cell only. No new number (release).
 ## 951 (a first fight, enemy-ai): a "telegraph" may carry kind "stab" (a told lead's one cell, any row with "tells"); an old client draws its cell only. No new number (release).
 ## No new number (419 amended (11), release): a look may carry hair "tail" and beard "long" (PersonLook.PLAYER_CHOICES); an old client draws its seeded pick, an old server drops the word.
+## 733 amended (2): a "huts" entry may carry "rack": [laid, need] and "rack_cell": [x, y] (healers.rack.on, a hut not standing or under a mend), and a new command "hut_give" {hut, count}; an old client ignores both keys and draws the hut as before, an old server drops the command. No new number (release).
 const PROTOCOL_REVISION := 59
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

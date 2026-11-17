@@ -12041,6 +12041,55 @@ func _show_state(building: Dictionary) -> void:
 	if decline != building.get("decline", ""):
 		_show_decline(building, decline)
 	_show_smoke(building)
+	_show_rack(building)
+
+
+## The log rack's slot (art-kit's, package "wood at the hut's door") and the
+## node it is drawn as, under the room (ui's click reads its "hut" and "cell"
+## metas).
+const RACK_SLOT := "prop.log_rack"
+const RACK_NODE := "LogRack"
+
+
+## Healer's hut [param building]'s log rack (733 amended (2)): RACK_SLOT at
+## its "huts" entry's rack_cell, turned as the hut (its back to it, its open
+## front out the way the hut's door faces), one of its states shown by the
+## count (rack_fill). None drawn, and one drawn taken away, while the entry
+## has no "rack" (the rack off, the hut standing or its mend under way) or
+## the slot is missing.
+func _show_rack(building: Dictionary) -> void:
+	var hut := str(building.get("hut", ""))
+	if hut.is_empty():
+		return
+	var entry: Dictionary = hut_states.get(hut, {})
+	var rack: Variant = entry.get("rack")
+	var at: Variant = entry.get("rack_cell")
+	var node: Node3D = building.get("rack")
+	if not rack is Array or (rack as Array).size() < 2 or not at is Array or (at as Array).size() < 2 or not ArtKit.has(RACK_SLOT):
+		if node != null and is_instance_valid(node):
+			node.queue_free()
+		building.erase("rack")
+		return
+	if node == null or not is_instance_valid(node):
+		node = ArtKit.instance(RACK_SLOT)
+		node.name = RACK_NODE
+		_room.add_child(node)
+		building["rack"] = node
+	var cell := Vector2i(int(at[0]), int(at[1]))
+	node.position = Vector3(cell.x, _elevation(cell), cell.y)
+	node.rotation.y = (building["node"] as Node3D).rotation.y
+	node.set_meta("hut", hut)
+	node.set_meta("cell", cell)
+	var fill := rack_fill(rack)
+	for state: Node3D in node.find_children("state_*", "Node3D", true, false):
+		state.visible = state.name == "state_" + fill
+
+
+## The rack's state for its count [param rack] ([laid, need] in bundles):
+## "empty" at none, "full" at the bundles wanted, "part" between.
+static func rack_fill(rack: Array) -> String:
+	var laid := int(rack[0])
+	return "empty" if laid <= 0 else "full" if laid >= int(rack[1]) else "part"
 
 
 ## [param building]'s state: a healer's hut's own (hut_states, 733) when

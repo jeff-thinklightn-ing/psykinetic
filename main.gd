@@ -86,6 +86,15 @@ var _healer_terms := {}
 var _huts_empty := {}
 ## How near a player keeps a healer from leaving: he goes unseen (759).
 const HEALER_UNSEEN := 16
+## The log rack at a healer's hut's door (733 amended (2), package "wood at the
+## hut's door"): no cell for it (rack_cell), how near a player lays wood in it,
+## and what he lays (a bundle, its wood its yield).
+const NO_RACK := Vector2i(-1, -1)
+const RACK_REACH := 2
+## Each hut's rack cell, found once (rack_cell).
+var _rack_cells := {}
+## Each hut's keeper's last rack line, so they come in turn (_rack_keeper_says).
+var _rack_said := {}
 ## Threat in town (decision 762): a hostile within a town's radius + this
 ## raises it; it lifts THREAT_CLEAR_HOURS game hours after the last was seen.
 const THREAT_REACH := 4
@@ -9462,7 +9471,103 @@ func huts_of(area: String) -> Dictionary:
 			out[id] = {"state": hut["state"], "level": hut["level"]}
 			if _hut_empty(id):
 				out[id]["empty"] = true  # Nobody keeps it (759): no smoke, a cold pot, dark windows (buildings'); absent, as before.
+			var shown: Array = World.towns.rack(id) if World.towns.has_method("rack") else []
+			var at := rack_cell(id) if not shown.is_empty() else NO_RACK
+			if at != NO_RACK:
+				out[id]["rack"] = shown  # [laid, need] in bundles (733 amended (2)); absent: no rack, as before.
+				out[id]["rack_cell"] = [at.x, at.y]
 	return out
+
+
+## Server: where healer's hut [param hut]'s log rack stands (733 amended (2)):
+## on its level, the building whose front is the hut's place cell; from the
+## first cell outside its rect that way (a banked turf house's front is in
+## its bank), the cell healers.rack.beside cells along its front, on the
+## door's left looking out, else its right, on the floor outside the rect;
+## NO_RACK for none (a hut a town built, not its level: no rack). Found once
+## a hut.
+func rack_cell(hut: String) -> Vector2i:
+	if _rack_cells.has(hut):
+		return _rack_cells[hut]
+	var cell := NO_RACK
+	var place: Dictionary = World.holdings.place(hut) if World.holdings != null else {}
+	var front: Vector2i = place.get("cell", NO_RACK)
+	var level := Level.load_level(str(place.get("area", hut.get_slice("/", 0)))) if not place.is_empty() else {}
+	var beside := maxi(int(World.production.rules.get("healers", {}).get("rack", {}).get("beside", 1)), 1) if World.production != null else 1
+	for building: Dictionary in level.get("buildings", []):
+		if str(Level.BUILDING_PLACES.get(str(building["slot"]), building.get("place", ""))) != "healers_hut" \
+				or building.get("front", Level.front_cell(building["rect"], building["facing"])) != front:
+			continue
+		var facing: Vector2i = building["facing"]
+		var left := Vector2i(facing.y, -facing.x)
+		var floor_cells: Array = level["terrain"]["floor"]
+		var rect: Rect2i = building["rect"]
+		var outside := front
+		while rect.has_point(outside):
+			outside += facing  # A banked hut's front is its approach through the bank (718): the rack stands outside it.
+		for way: Vector2i in [left, -left]:
+			var at := outside + way * beside
+			if floor_cells.has(at) and not rect.has_point(at):
+				cell = at
+				break
+		break
+	_rack_cells[hut] = cell
+	return cell
+
+
+## Server: the "hut_give" command (733 amended (2), package "wood at the
+## hut's door") {hut: its place id, count: the most bundles to lay, all he
+## carries if left out}: [param player], in the hut's area within RACK_REACH
+## cells of its rack (rack_cell), lays the wood he carries in it, a bundle at
+## a time (Towns.RACK_ITEM, its wood its yield: a short one's share), until it
+## holds the bundles wanted; the rest stays in his pack. Nothing taken (no
+## word: the rack takes nothing) while off, with no rack there, too far or with
+## no wood. A "huts" message to the hut's area when any was laid, one line by
+## kind and count (the coordinator: never a name or an id), and its keeper, if
+## it has one, says one of healers.rack.said.laid (voice's) to the giver. The
+## wood laid.
+func hut_give(player: Player, args: Dictionary) -> int:
+	var hut := str(args.get("hut", ""))
+	if World.towns == null or not World.towns.has_method("rack") or World.towns.rack(hut).is_empty():
+		return 0
+	var cell := rack_cell(hut)
+	var area := str(World.holdings.place(hut).get("area", hut.get_slice("/", 0)))
+	if cell == NO_RACK or player.zone != area or World.distance(player.tile, cell) > RACK_REACH:
+		return 0
+	var most := int(args.get("count", 0))
+	var laid := 0
+	var bundles := 0
+	for uid: int in World.units(player, Towns.RACK_ITEM):
+		var shown: Array = World.towns.rack(hut)
+		if shown.is_empty() or int(shown[0]) >= int(shown[1]) or (most > 0 and bundles >= most):
+			break
+		var wood := int(World.items.yields_of(uid).get("wood", 0))
+		if wood <= 0 or not World.consume(player, uid, "laid in the healer's hut's rack"):
+			continue
+		World.towns.rack_lay(hut, player.player_id, wood)
+		laid += wood
+		bundles += 1
+	if laid > 0:
+		var now: Array = World.towns.rack(hut)
+		print("[towns] the healer's hut %s: wood laid %d (%d bundle%s), rack %s, step %d" % [hut, laid, bundles, "" if bundles == 1 else "s",
+			"%d of %d" % [int(now[0]), int(now[1])] if not now.is_empty() else "gone (its mend ordered)", World.steps])
+		Net.broadcast("huts", {"states": huts_of(area)})
+		_rack_keeper_says(hut, player, "laid")
+	return laid
+
+
+## Hut [param hut]'s keeper, if it has one, says one of healers.rack.said
+## [param moment] (voice's: "laid", "free") to [param player], in turn by the
+## hut's laid count (733 amended (2)). Nothing said when nobody keeps it.
+func _rack_keeper_says(hut: String, player: Player, moment: String) -> void:
+	if World.towns == null or not World.towns.hut_kept(hut) or World.production == null:
+		return
+	var lines: Array = World.production.rules.get("healers", {}).get("rack", {}).get("said", {}).get(moment, [])
+	if lines.is_empty():
+		return
+	var keeper := str(World.production.worker(World.towns._keeper_of(hut)).get("name", ""))
+	_rack_said[hut] = int(_rack_said.get(hut, -1)) + 1
+	Net.broadcast_to([player.owner_peer], "party", {"from": keeper, "text": str(lines[int(_rack_said[hut]) % lines.size()])})
 
 
 ## The view's buildings drawn as their towns have them: the server's own
@@ -9719,7 +9824,9 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "", done
 			# The healer's care (584 amended): what his hut takes, and whether and how you are in it.
 			var rule := care_rule(hut)
 			var given := care_given(player.player_id, hut)
-			data["care"] = {"gold": rule["retainer"], "herbs": rule["herbs"], "antlers": rule["antlers"],
+			# 733 amended (2): one who laid wood in its rack has his first care there free.
+			var free := World.towns != null and World.towns.has_method("care_free") and World.towns.care_free(hut, player.player_id)
+			data["care"] = {"gold": 0 if free else rule["retainer"], "herbs": rule["herbs"], "antlers": rule["antlers"],
 				"in_care": in_care(player.player_id, hut), "by": care_via(player.player_id, hut),
 				"given": {"herbs": int(given.get("herbs", 0)), "antlers": int(given.get("antlers", 0))}}  # 584 amended (2).
 	elif not place.is_empty() and World.economy != null:
@@ -9979,6 +10086,12 @@ func care_clear(player_id: String, place_id: String, keys: Array) -> void:
 		record.care_given.erase(place_id)
 
 
+## Whether player [param player_id] has a free care at hut [param hut] (733
+## amended (2): one who laid wood in its rack).
+func _care_free(hut: String, player_id: String) -> bool:
+	return World.towns != null and World.towns.has_method("care_free") and World.towns.care_free(hut, player_id)
+
+
 ## Server: the "retain" command (584 amended) {resident: the medicine
 ## man's path, pay: "gold" | "herbs" | "antlers", gold if left out}: the
 ## player hands him care_rule's retainer gold (into his purse), or the herbs
@@ -10006,7 +10119,7 @@ func retain(player: Player, args: Dictionary) -> String:
 		why = "already in his care"
 	elif pay not in ["gold", "herbs", "antlers"]:
 		why = "he takes gold, herbs or antlers"
-	elif pay == "gold" and World.gold_of(me) < int(rule["retainer"]):
+	elif pay == "gold" and World.gold_of(me) < int(rule["retainer"]) and not _care_free(hut, me):
 		why = "not enough gold (%d)" % int(rule["retainer"])
 	var paid: Array[int] = []
 	if why.is_empty() and pay != "gold":
@@ -10017,7 +10130,12 @@ func retain(player: Player, args: Dictionary) -> String:
 	var met := false
 	if why.is_empty():
 		var name := str(World.production.worker(body.worker_id).get("name", "The healer"))
-		if pay == "gold":
+		if pay == "gold" and _care_free(hut, me):
+			World.towns.use_care_free(hut, me)  # 733 amended (2): his wood in its rack paid for it.
+			print("[towns] the healer's hut %s: a free care taken, step %d" % [hut, World.steps])
+			_rack_keeper_says(hut, player, "free")
+			met = true
+		elif pay == "gold":
 			World.add_gold(me, -int(rule["retainer"]), "the healer's retainer")
 			World.production.pay(body.worker_id, int(rule["retainer"]), "a retainer")
 			met = true
@@ -18654,6 +18772,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		ask_town_sheet(entity as Player, args)
 	elif command_name == "contribute" and entity is Player:
 		contribute(entity as Player, args)
+	elif command_name == "hut_give" and entity is Player:
+		hut_give(entity as Player, args)  # 733 amended (2): wood laid in a healer's hut's rack.
 	elif command_name == "give" and entity is Player:
 		give(entity as Player, args)
 	elif command_name == "stance" and entity is Player:
@@ -26045,6 +26165,8 @@ func _seat_healers() -> void:
 			World.production.assign(id, who)
 			_begin_term(id, who, false)
 			print("[return] %s the %s keeps %s" % [name, trade.replace("_", " "), id])
+			if World.towns != null and World.towns.has_method("keeper_came"):
+				World.towns.keeper_came(id)  # 733 amended (2): a full rack, mended at once.
 
 
 ## A healer's old age (decision 759; the coordinator, so that a hut ever
@@ -26202,7 +26324,10 @@ func _vacancy_run(place_id: String) -> bool:
 	if not hut.has("empty_since"):
 		return false
 	var days := int(World.production.rules.get("healers", {}).get("vacant_days", 21))
-	return World.towns.now() / maxi(DayNight.day_steps, 1) - int(hut["empty_since"]) >= days
+	var today := World.towns.now() / maxi(DayNight.day_steps, 1)
+	if hut.has("rack_full") and today > int(hut["rack_full"]):
+		return true  # 733 amended (2): its rack full, the word got out; one comes the next day.
+	return today - int(hut["empty_since"]) >= days
 
 
 ## Whether healer's hut [param place_id] is shut (733, economy's Towns.hut):
@@ -27910,8 +28035,7 @@ func rack_at(tile: Vector2i) -> Dictionary:
 	return {}
 
 
-## How near the local player must stand to lay wood at a rack (cells; the server checks the same), and what he lays: a bundle of wood.
-const RACK_REACH := 2
+## What the local player lays at a rack: a bundle of wood. How near he must stand is RACK_REACH, the server's own (733 amended (2)).
 const RACK_WOOD := "wood_bundle"
 ## The rack a click asked to lay at, walked to first ({hut}); {} if none.
 var _rack_wanted := {}
@@ -29555,6 +29679,9 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"owe":  # 918 amended (3), test-only: never in the help, unknown without --test-hp beside --run-marker.
 			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return owe_command(words)
+		"hut":  # 733 amended (2), test-only: never in the help, unknown without --test-hp beside --run-marker.
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return hut_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
@@ -29919,6 +30046,29 @@ func owe_command(words: PackedStringArray) -> String:
 	World.production.set_owed(id, gold)
 	print("[economy] the admin set what %s owes %s to %d (was %d), step %d" % [town, who, gold, had, World.steps])
 	return "%s: the town owes %s %d (was %d)" % [town, who, gold, had]
+
+
+## "hut <place id> [standing|disrepair|ruin]" (733 amended (2), test-only,
+## for the rack's tours and ui's build): the healer's hut's state and its
+## rack, or set to a state (Towns.set_hut: its mend given up), every peer
+## sent the "huts" message.
+func hut_command(words: PackedStringArray) -> String:
+	if words.size() < 2 or words.size() > 3:
+		return "usage: hut <place id> [standing|disrepair|ruin] (test-only)"
+	var hut := words[1]
+	if World.towns == null or World.towns.hut(hut).is_empty():
+		return "hut: no healer's hut %s" % hut
+	if words.size() == 3:
+		if not World.towns.set_hut(hut, words[2]):
+			return "hut: %s is not standing, disrepair or ruin" % words[2]
+		print("[economy] the admin set the healer's hut %s %s, step %d" % [hut, words[2], World.steps])
+		Net.broadcast("huts", {"states": huts_of(hut.get_slice("/", 0))})
+	var state: Dictionary = World.towns.hut(hut)
+	var shown: Array = World.towns.rack(hut)
+	var at := rack_cell(hut)
+	return "%s: %s (level %d), rack %s%s" % [hut, state["state"], int(state["level"]),
+		"%d of %d" % [int(shown[0]), int(shown[1])] if not shown.is_empty() else "none",
+		" at %d,%d" % [at.x, at.y] if not shown.is_empty() and at != NO_RACK else ""]
 
 
 ## "give <player> <item> [count]" (709 amended; playtest's tours): that
