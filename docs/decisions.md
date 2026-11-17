@@ -13916,17 +13916,22 @@ the face's own hue reads as hair against the face at the nearest zoom.
   chestnut on 8. Blond and grey on skin 2, which heads by day draws only 10 and 18 % lighter than the face and which
   the first take darkened toward it (crown against face 16.1 to 12.2 and 16.7 to 14.0), are so spared by
   construction, not by a measured pass.
-- Only by day: by dusk the low sun lights the crown and leaves the face in shade, so the face is the darker and a
-  darker hairline moves the crown toward it. Take 3 at 19:00 (the sun 1 degree up), crown against face, deep against
-  its off: chestnut/6 -1.2 dE, chestnut/7 -0.5, dark/8 -0.2, fair/3 -1.5 ("on" -1.7, -1.4, -0.2, -2.5), where the bar
+- Only by day: by dusk the face is the darker, the carried lantern (451 amended (8): shown as the day's light goes,
+  the brightest light by then) lighting the crown and not the face, so a darker hairline moves the crown toward it.
+  Take 3 at 19:00 (the tour's "hour 19": the sim's daylight 0.21, the sun about 11 degrees under the horizon, the
+  lantern shown at 1.185), crown against face, deep against its off: chestnut/6 -1.2 dE, chestnut/7 -0.5, dark/8 -0.2, fair/3 -1.5 ("on" -1.7, -1.4, -0.2, -2.5), where the bar
   was the root doing no harm, within a point. So the root's share follows the open sky's daylight: the shader global
   hair_root_day, which Client3D writes beside look_day (set_hair_root_day, from _update_sky on an outdoor level, 0 in
   a room or underground, where _update_sky stops and look_day keeps the last outdoor value): full from 0.98 (the sun
-  about 8 degrees up), none at or under 0.64 (1 degree up), a ramp between. 19:00 is then the off picture by
-  construction: the "no harm" bar is neither met nor moved, it no longer applies. Zone-wide: a roofed cell out of
-  doors keeps the root as at noon (what was measured). In summer the ramp is the last hour before sunset (about 18:00
-  to 18:56, under four real minutes of a 90-minute day) and the first after dawn; in winter (the noon sun about 22
-  degrees) it is full from about 09:00 to 15:00. The take-2 19:00 hairline bars (4.3 to 4.9 against 13.2 and 10.3)
+  about 8 degrees up), which is where the carried lantern begins to show (its LANTERN_DAY_LEAST 0.02 of dark), none
+  at or under 0.64 (the sun about 1 degree up), a ramp between. 19:00 (0.01) is then the off picture by
+  construction: the "no harm" bar is neither met nor moved, it no longer applies. 0.64 was first set on a misreading
+  of mine (take 3's 19:00 taken for the sun 1 degree up, from another run's setup); take 3 measured only 1.00 and
+  0.01, so where between them the harm begins is a judgment, read on the ramp strip (17:30 to 18:56) before landing.
+  Zone-wide: a roofed cell out of doors keeps the root as at noon (what was measured). The ramp lies while the sun
+  is between about 8 and 1 degrees up, under an hour of game time on a summer evening (a few real minutes of a
+  90-minute day) and as long again after dawn; in winter (the noon sun about 22 degrees) it is full for about the
+  six hours round noon. The take-2 19:00 hairline bars (4.3 to 4.9 against 13.2 and 10.3)
   were withdrawn before take 3: dE2000 at so low an L* weighs a step of light at about 1/1.6, and only a near-black
   band could have met them.
 - The character window holds it full (CharacterPreview sets hair_root_full 1 on every part): a hair colour is picked
@@ -13943,7 +13948,8 @@ the face's own hue reads as hair against the face at the nearest zoom.
   better a read by eye, it cost skins 2 and 8 more than a point of their nearest two names (7.2 to 6.1, 6.2 to 5.0;
   its names read from take 2's run, the coordinator's allowance, each choice as root 3 draws it there).
 - view_test _test_hair_root (the layer on the caps alone, both bodies, the imports) and _test_hair_root_by_day (the
-  share none with the sun 1 degree up and at night, full at noon, a ramp between; hair_root_day the look's daylight
+  share full where the lantern begins to show (1 - LANTERN_DAY_LEAST), none at take 3's 19:00 and at night, a ramp
+  between; hair_root_day the look's daylight
   out of doors, 0 in the tavern's upstairs room and back; the character window's every part held full). That row's
   first draft compared on the test's own map, which has no sky, so its two out-of-doors checks passed without
   reading anything; it now loads the wilds level and reads Umbrage at noon (1.000) and at midnight (0). Client only,

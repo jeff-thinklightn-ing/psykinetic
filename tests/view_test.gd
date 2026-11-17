@@ -847,7 +847,7 @@ func _test_bandaging() -> void:
 ## is (0, 0): no root. And the import keeps light baking off UV2 (meshes/light_baking 1): at 2 Godot unwraps into UV2
 ## over the hairline without a word (art-kit's watch point).
 ## The darker root by day (419 amended (12); the coordinator's ruling (iv) on root3_69ca53c76): full under an open
-## midday sky, none by dusk (the sun 1 degree up, take 3's 19:00) and at night, a ramp between, from the
+## midday sky (while the carried lantern is hidden), none by dusk (take 3's 19:00) and at night, a ramp between, from the
 ## shader global hair_root_day that Client3D writes beside look_day; 0 in a room or underground; the
 ## character window's body held full (hair_root_full) whatever the hour.
 func _test_hair_root_by_day() -> void:
@@ -856,11 +856,12 @@ func _test_hair_root_by_day() -> void:
 	var code := (load("res://art/models/characters/human_body.gdshader") as Shader).code
 	var none := _shader_const(code, "ROOT_DAY_NONE")
 	var full := _shader_const(code, "ROOT_DAY_FULL")
-	var dusk := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, 1.0)  # The sun 1 degree up (take 3's 19:00 stills).
+	var dusk := Client3D.day_share(0.21)  # Take 3's 19:00: the sim's daylight 0.21 (its tour log).
 	var noon := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, 50.0)
 	_check(smoothstep(none, full, dusk) == 0.0 and smoothstep(none, full, noon) == 1.0 and smoothstep(none, full, 0.0) == 0.0
-		and smoothstep(none, full, (none + full) * 0.5) > 0.0 and smoothstep(none, full, (none + full) * 0.5) < 1.0,
-		"the root's share: none with the sun 1 degree up (daylight %.3f), at night, full at noon (%.3f), a ramp between (%.2f..%.2f)" % [dusk, noon, none, full])
+		and smoothstep(none, full, (none + full) * 0.5) > 0.0 and smoothstep(none, full, (none + full) * 0.5) < 1.0
+		and is_equal_approx(full, 1.0 - Client3D.LANTERN_DAY_LEAST),
+		"the root's share: full while the carried lantern is hidden (from %.2f, 1 - LANTERN_DAY_LEAST), none at take 3's 19:00 (daylight %.3f) and at night, full at noon (%.3f), a ramp between (%.2f..%.2f)" % [full, dusk, noon, none, full])
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
 	var had_hour := DayNight.hour(DayNight.now())

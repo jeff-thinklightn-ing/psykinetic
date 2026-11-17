@@ -23,10 +23,11 @@ instance uniform vec4 dye : source_color = vec4(0.0);
 // show, the cap's quads coarser than the band; "deep", the coordinator's pick on root3_69ca53c76 over 9 cm at 0.5).
 // Only hair near the face's own light needs it: the full root while the hair's light is at most ROOT_FULL_TO of the
 // skin's, none from ROOT_NONE_FROM (blond and grey on the pale skins, drawn close to the face's light by heads by day,
-// keep their crown as it was). And only by day: by dusk the low sun lights the crown and leaves the face in shade, so
-// a darker hairline moved the crown toward the face (take 3 at 19:00); the root is full from ROOT_DAY_FULL of the
-// open sky's daylight (hair_root_day, Client3D's look_day on an outdoor level, 0 in a room or underground), none at or
-// under ROOT_DAY_NONE (the sun 1 degree up), between them a ramp. hair_root_full 1 holds it full whatever the hour
+// keep their crown as it was). And only by day: by dusk the carried lantern lights the crown and not the face, so a
+// darker hairline moved the crown toward the face (take 3 at 19:00, the sim's daylight 0.21); the root is full from
+// ROOT_DAY_FULL of the open sky's daylight (hair_root_day, Client3D's look_day on an outdoor level, 0 in a room or
+// underground), where the lantern begins to show (1 - Client3D.LANTERN_DAY_LEAST), none at or under ROOT_DAY_NONE
+// (the sun about 1 degree up), between them a ramp. hair_root_full 1 holds it full whatever the hour
 // (the character window's body, where a hair colour is picked to read as it will by day).
 const float ROOT_BAND = 0.07;
 const float ROOT_DARK = 0.55;
