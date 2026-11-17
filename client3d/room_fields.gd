@@ -391,6 +391,7 @@ const ROOM: Array[StringName] = [
 	&"_ledge_near_also",
 	&"_ledge_near_sample",
 	&"_ledge_split",
+	&"_light_open",
 	&"_lined",
 	&"_mask_origin",
 	&"_mask_size",
