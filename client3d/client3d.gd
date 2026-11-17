@@ -4163,8 +4163,9 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## the head's top (the eyes' height, under a brim), on FACE_LAYER alone, which only people's body,
 ## head, hair and worn meshes carry (_tag_body): it lights faces (its carrier's, and another person's
 ## within FACE_LIGHT_RANGE) and nothing else, no ground, no wall, no floor past a thin wall. Its
-## energy FACE_LIGHT_ENERGY times the lantern's dark (lantern_dark: none by day in the open, full by
-## night, under a roof or underground), shown while the Lantern is (covered with L, off); lying
+## energy FACE_LIGHT_ENERGY times its own dark (face_dark: out of doors the lantern's, none by day in
+## the open, full by night; in an inside lit by the clock less by as much of the day as reaches that
+## floor; full underground or in a room without), shown while the Lantern is (covered with L, off); lying
 ## (asleep, knocked down, downed) it is off. 858's body fill, if night_look_2 is switched on, takes
 ## its place: never both (environment's ruling, 451's paragraph). The drawn facing is the Body's yaw
 ## as last drawn (its turn eased, a standing turn's shuffle), never the entity's: it never leads the
@@ -4172,19 +4173,22 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## cell ahead is closed to light (lantern_reach) it stops LANTERN_WALL_GAP inside its carrier's own
 ## cell; and, shadowless, it would shine through a wall, so its range is clipped by the grid
 ## (face_light_range: the nearest edge closed to light around it, environment's read, 11-17), never
-## under FACE_RANGE_LEAST times its carrier's own face's distance, its energy lifted by as much as the
-## clip takes off that face (omni_window), so the face is lit the same by a wall as in the open. The
+## under FACE_RANGE_LEAST times its carrier's own face's distance, its energy lifted (face_lift) by as
+## much as the clip and the light's nearer stand take off that face, so the face is lit the same by a
+## wall as in the open. The
 ## sim's light (Fields, at the carrier's tile), emit_light and the pane are as they were.
 const FACE_LIGHT_AHEAD := 0.45
 const FACE_LIGHT_OVER := -0.15
-const FACE_LIGHT_ENERGY := 0.13
+## 0.13 left the pale faces under their crowns at night (the third look, 11-17): 0.30.
+const FACE_LIGHT_ENERGY := 0.30
 const FACE_LIGHT_RANGE := 1.5
 const LANTERN_WALL_GAP := 0.15
 ## The carrier's face, from its head's axis and top (the eyes: a tenth ahead, 0.12 under the top).
 const FACE_AHEAD_OF_AXIS := 0.1
 const FACE_UNDER_TOP := 0.12
-## The least range, times the light's distance to its carrier's face (the window there 0.27).
-const FACE_RANGE_LEAST := 1.2
+## The least range, times the light's distance to its carrier's face (the window there 0.64: at 1.2 it
+## was 0.27, and the lift that made it up lit the nose, nearer the light, past the cheek to white).
+const FACE_RANGE_LEAST := 1.5
 ## How long a carrier's face light keeps its range while it stands still (s).
 const FACE_RANGE_AGAIN := 0.5
 
@@ -4236,6 +4240,37 @@ static func omni_window(d: float, r: float) -> float:
 	n *= n
 	n = maxf(1.0 - n, 0.0)
 	return n * n
+
+
+## The face light's distance to its carrier's face in the open: FACE_LIGHT_AHEAD ahead, FACE_LIGHT_OVER
+## from the head's top, the face FACE_AHEAD_OF_AXIS ahead and FACE_UNDER_TOP under it.
+static func face_open_distance() -> float:
+	return Vector2(FACE_LIGHT_AHEAD - FACE_AHEAD_OF_AXIS, FACE_LIGHT_OVER + FACE_UNDER_TOP).length()
+
+
+## What a face light [param to_face] from its carrier's face, in a range of [param lit] with a falloff of
+## [param attenuation] (Godot's: its window times distance^-attenuation), is lifted by so the face takes
+## what it takes in the open (face_open_distance, FACE_LIGHT_RANGE): by a wall the light stands nearer
+## the face and its window is cut, and both count (the window alone overshot about 1.4x, the third look).
+static func face_lift(to_face: float, lit: float, attenuation: float) -> float:
+	var open := face_open_distance()
+	var here := omni_window(to_face, lit) * pow(maxf(to_face, 0.0001), -attenuation)
+	return omni_window(open, FACE_LIGHT_RANGE) * pow(open, -attenuation) / maxf(here, 0.0001)
+
+
+## How dark it is for a face light (451, environment's read, 11-17): out of doors (or under a roof on an
+## outdoor level) the lantern's own, lantern_dark of [param ambient]; in an inside the clock lights
+## ([param inside_lit], 946) one less the day's share of [param light] times that floor's share of its
+## zone's light ([param share], ambient_share): the Mughouse's common room 0.125 at noon, its attic
+## 0.875, every floor 1 at night; in any other room or underground 1. The lantern keeps lantern_dark.
+static func face_dark(ambient: float, outdoor: bool, inside_lit: bool, light: float, share: float) -> float:
+	if outdoor:
+		return lantern_dark(ambient, true)
+	if inside_lit:
+		return 1.0 - day_share(light) * clampf(share, 0.0, 1.0)
+	return 1.0
+
+
 ## Whether [param puppet]'s face light stands and where (its position set): false lying.
 func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 	var body := puppet.get_node_or_null("Body") as Node3D
@@ -4266,18 +4301,21 @@ func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 		light.set_meta("range_until", now + int(FACE_RANGE_AGAIN * 1000.0))
 	if not is_equal_approx(light.omni_range, lit):
 		light.omni_range = lit
-	light.set_meta("lift", omni_window(to_face, FACE_LIGHT_RANGE) / maxf(omni_window(to_face, lit), 0.01))
+	light.set_meta("lift", face_lift(to_face, lit, light.omni_attenuation))
 	return true
 
 
 ## [param entity]'s face light this frame, beside its [param lantern] (shown or not as the lantern
-## is): its energy by the lantern's dark at its cell, off by day, lying, covered, or while 858's body
-## fill shows.
+## is): its energy by its own dark (face_dark) at its cell, off by day, lying, covered, or while 858's
+## body fill shows.
 func _light_face(entity: GridEntity, puppet: Node3D, lantern: OmniLight3D) -> void:
 	var face := puppet.get_node_or_null("FaceLight") as OmniLight3D
 	if face == null:
 		return
-	var dark := lantern_dark(World.fields.ambient_at(entity.tile) if World.fields != null else DayNight.light, _outdoor)
+	# An inside the clock lights: 946's own test (its _inside_lit, once that lands).
+	var inside_lit := bool(_terrain.get("interior", false)) and not _outdoor and not _neighbour
+	var dark := face_dark(World.fields.ambient_at(entity.tile) if World.fields != null else DayNight.light, _outdoor,
+			inside_lit, DayNight.light, ambient_share(_terrain))
 	var shown := lantern.visible and dark >= LANTERN_DAY_LEAST and not (_body_fill != null and _body_fill.visible) \
 			and _place_face_light(puppet, face)
 	face.light_energy = FACE_LIGHT_ENERGY * dark * float(face.get_meta("lift", 1.0))

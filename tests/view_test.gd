@@ -3503,7 +3503,8 @@ func _test_face_light() -> void:
 					continue
 				var at := puppet.position + light.position
 				var heads := []
-				for past: float in [0.5, 0.3]:
+				# Past it: its cell's middle, 0.3 m (0.45 from a light nose to the wall) and 0.25 (0.40, the margin).
+				for past: float in [0.5, 0.3, 0.25]:
 					var head := Vector3(cell.x + step.x * (0.5 + past), puppet.position.y + face_y, cell.y + step.y * (0.5 + past))
 					heads.append(at.distance_to(head))
 					if kind == "walking along it":
@@ -3511,9 +3512,21 @@ func _test_face_light() -> void:
 				var opened := Client3D.face_light_range(Vector2(at.x, at.z), 0.0, never)
 				var lift_here := float(light.get_meta("lift", 1.0))
 				var to_face := light.position.distance_to(Vector3(faced.x * Client3D.FACE_AHEAD_OF_AXIS, face_y, faced.y * Client3D.FACE_AHEAD_OF_AXIS))
-				var same := absf(Client3D.omni_window(to_face, light.omni_range) * lift_here - Client3D.omni_window(to_face, Client3D.FACE_LIGHT_RANGE)) < 0.001
+				var falls := light.omni_attenuation
+				var open_d := Client3D.face_open_distance()
+				var same := absf(Client3D.omni_window(to_face, light.omni_range) * pow(to_face, -falls) * lift_here
+						- Client3D.omni_window(open_d, Client3D.FACE_LIGHT_RANGE) * pow(open_d, -falls)) < 0.001
 				rows[kind] = [cell, step, light.omni_range, heads, opened, same]
 				clear = clear and same and heads.all(func(d: float) -> bool: return d > light.omni_range and d < opened)
+	# The lift: none in the open; nose to a wall it makes up the window and the nearer stand both.
+	var open_lift := Client3D.face_lift(Client3D.face_open_distance(), Client3D.FACE_LIGHT_RANGE, 1.0)
+	var wall_d := Vector2(0.5 - gap - Client3D.FACE_AHEAD_OF_AXIS, Client3D.FACE_LIGHT_OVER + Client3D.FACE_UNDER_TOP).length()
+	var wall_lift := Client3D.face_lift(wall_d, wall_d * Client3D.FACE_RANGE_LEAST, 1.0)
+	var wall_takes := Client3D.omni_window(wall_d, wall_d * Client3D.FACE_RANGE_LEAST) / wall_d * wall_lift
+	var open_takes := Client3D.omni_window(Client3D.face_open_distance(), Client3D.FACE_LIGHT_RANGE) / Client3D.face_open_distance()
+	_check(is_equal_approx(open_lift, 1.0) and absf(wall_takes - open_takes) < 0.0001 and wall_lift > 1.0 and wall_lift < 1.3,
+			"the lift: 1 in the open (%.3f); nose to a wall (%.3f m from the face, its range %.3f) %.3f, the face taking what it takes in the open (%.3f, %.3f)" % [
+			open_lift, wall_d, wall_d * Client3D.FACE_RANGE_LEAST, wall_lift, wall_takes, open_takes])
 	# Its range kept while the light stands still (found again only once it moves, or after FACE_RANGE_AGAIN).
 	var kept_until := int(light.get_meta("range_until", 0))
 	_rig._place_face_light(puppet, light)
@@ -3539,6 +3552,32 @@ func _test_face_light() -> void:
 		var hers: Node3D = _rig._puppets[pet.get_instance_id()]
 		var her_face := hers.get_node_or_null("FaceLight") as OmniLight3D
 		_check(her_face != null and her_face.light_cull_mask == Client3D.FACE_LAYER and not her_face.shadow_enabled, "the companion's face light the same")
+	# Its dark (face_dark, environment's read, 11-17): an inside the clock lights by how much of the day
+	# reaches that floor (ambient_share); any other room or underground full; out of doors the lantern's.
+	var floors := {}
+	for level: String in ["umbrage_tavern", "umbrage_tavern_up", "umbrage_tavern_attic"]:
+		var share := Client3D.ambient_share(Level.load_level(level)["terrain"])
+		floors[level] = [snappedf(Client3D.face_dark(0.0, false, true, 1.0, share), 0.001), Client3D.face_dark(0.0, false, true, DayNight.NIGHT, share)]
+	var crypt_noon := Client3D.face_dark(0.0, false, false, 1.0, 1.0)
+	_check(floors["umbrage_tavern"][0] < 0.2 and floors["umbrage_tavern_attic"][0] > 0.8
+			and floors["umbrage_tavern_up"][0] > floors["umbrage_tavern"][0] and floors["umbrage_tavern_up"][0] < floors["umbrage_tavern_attic"][0]
+			and floors.values().all(func(r: Array) -> bool: return is_equal_approx(float(r[1]), 1.0)) and is_equal_approx(crypt_noon, 1.0)
+			and is_zero_approx(Client3D.face_dark(1.0, true, false, 1.0, 1.0)) and is_equal_approx(Client3D.face_dark(DayNight.NIGHT, true, false, 1.0, 1.0), 1.0),
+			"its dark: the Mughouse [noon, night] %s; a room the clock doesn't light, underground, at noon %.2f; an open noon none, its night full" % [floors, crypt_noon])
+	# Drawn so: an inside the clock lights at noon, its energy by face_dark.
+	var interior_was: Variant = _rig._terrain.get("interior", null)
+	_rig._terrain["interior"] = true
+	_rig._outdoor = false
+	DayNight.light = 1.0
+	_rig._process(0.0)
+	var want_dark := Client3D.face_dark(0.0, false, true, 1.0, Client3D.ambient_share(_rig._terrain))
+	_check(is_equal_approx(light.light_energy, Client3D.FACE_LIGHT_ENERGY * want_dark * float(light.get_meta("lift", 1.0)))
+			and light.visible == (want_dark >= Client3D.LANTERN_DAY_LEAST),
+			"an inside at noon: the face light at %.3f, its dark %.3f" % [light.light_energy, want_dark])
+	if interior_was == null:
+		_rig._terrain.erase("interior")
+	else:
+		_rig._terrain["interior"] = interior_was
 	DayNight.light = light_was
 	_rig._outdoor = outdoor_was
 	player.emit_light = lit_was
