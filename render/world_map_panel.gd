@@ -1045,14 +1045,16 @@ func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2, 
 		if said.has(words):
 			# Its new words laid again: they may be longer than the town's name was, so clear of the other labels (four
 			# pixels apart) and of every ring but its own.
-			var keep: Array[Rect2] = keep_off.duplicate()
+			# What it gives up, last first: the other places' rings, then the other labels; the chips and the frame it keeps.
+			var with_labels: Array[Rect2] = keep_off.duplicate()
 			for j in groups.size():
 				if j != i:
-					keep.append((groups[j]["rect"] as Rect2).grow(4.0))
+					with_labels.append((groups[j]["rect"] as Rect2).grow(4.0))
+			var with_rings: Array[Rect2] = with_labels.duplicate()
 			for id: Variant in rings:
 				if not (group["ids"] as Array).has(id):
-					keep.append(rings[id])
-			groups[i] = WorldMapModel.reword(group, _nearest_place_name(group["ids"], group["at"], rect, cell_px), keep, gap, measure, inside)
+					with_rings.append(rings[id])
+			groups[i] = WorldMapModel.reword(group, _nearest_place_name(group["ids"], group["at"], rect, cell_px), [with_rings, with_labels, keep_off], gap, measure, inside)
 		else:
 			said[words] = true
 

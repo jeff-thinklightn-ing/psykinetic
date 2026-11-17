@@ -240,18 +240,26 @@ static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, 
 
 
 ## [param group] reading [param words] instead (a town's name said once in the window, so a later fold reads its nearest place's):
-## its rect laid again for the new words beside its ring, clear of [param keep_off] and inside [param inside] as _placed has it;
-## where no spot is clear it keeps the place it had, so the words may be longer than it but never nowhere.
-static func reword(group: Dictionary, words: String, keep_off: Array[Rect2], gap: float, measure: Callable, inside := Rect2()) -> Dictionary:
+## its rect laid again for the new words beside its ring. [param keeps] is what it may give up, most to keep first: the rects to
+## keep clear of with everything counted, then with less; each tried in turn (as _placed has it: right, left, above, below, at once,
+## twice and three times the gap, inside [param inside]); where none lies clear of even the last, it keeps the place it had, held
+## inside [param inside], so the words may cover something but never leave the box.
+static func reword(group: Dictionary, words: String, keeps: Array, gap: float, measure: Callable, inside := Rect2()) -> Dictionary:
 	var out := group.duplicate()
 	out["name"] = words
 	var size: Vector2 = measure.call(words)
-	var rect := _placed(group["at"], size, keep_off, gap, inside)
-	if rect.size != Vector2.ZERO:
-		out["rect"] = rect
-	else:
-		var old: Rect2 = group["rect"]
-		out["rect"] = Rect2(old.position, size)
+	for keep: Array in keeps:
+		var kept: Array[Rect2] = []
+		kept.assign(keep)
+		var rect := _placed(group["at"], size, kept, gap, inside)
+		if rect.size != Vector2.ZERO:
+			out["rect"] = rect
+			return out
+	var old: Rect2 = group["rect"]
+	var held := Rect2(old.position, size)
+	if inside.size != Vector2.ZERO:
+		held.position = held.position.clamp(inside.position, (inside.end - size).max(inside.position))
+	out["rect"] = held
 	return out
 
 

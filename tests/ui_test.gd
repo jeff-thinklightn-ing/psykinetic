@@ -2288,6 +2288,11 @@ func _test_world_map_window() -> void:
 	panel._name_towns_once(groups_in, Rect2(Vector2.ZERO, Vector2(cells) * 4.0), Vector2(4.0, 4.0), [] as Array[Rect2], 10.0, measure_in, Rect2(0, 0, 500, 500))
 	_check(groups_in[0]["name"] == "Umbrage" and groups_in[1]["name"] == str(panel.world.areas["wilds"]["places"][ids[1].get_slice("/", 1)]["name"]),
 		"a town's name is said once: the second fold reads its nearest place's name alone (%s)" % [groups_in[1]["name"]])
+	# Where nothing is clear of everything the re-laid label gives up the rings, then the labels, never the box.
+	var tight := WorldMapModel.reword({"at": Vector2(100, 100), "rect": Rect2(110, 90, 40, 20)}, "a long name", [[Rect2(0, 0, 500, 500)], [Rect2(90, 80, 250, 40)], [] as Array[Rect2]], 10.0, measure_in, Rect2(0, 0, 300, 300))
+	var held := WorldMapModel.reword({"at": Vector2(250, 100), "rect": Rect2(260, 90, 40, 20)}, "a long name", [[Rect2(0, 0, 500, 500)]], 10.0, measure_in, Rect2(0, 0, 300, 300))
+	_check((tight["rect"] as Rect2).size == Vector2(110, 20) and Rect2(0, 0, 300, 300).encloses(tight["rect"]) and Rect2(0, 0, 300, 300).encloses(held["rect"]),
+		"a re-laid label that has no clear spot gives up the rings, then the labels, and is held inside the box when nothing is clear (%s, %s)" % [tight["rect"], held["rect"]])
 	var renamed_width: float = (groups_in[1]["rect"] as Rect2).size.x
 	_check(is_equal_approx(renamed_width, str(groups_in[1]["name"]).length() * 10.0) and Rect2(0, 0, 500, 500).encloses(groups_in[1]["rect"]),
 		"and its label is laid again for the longer words, inside the box (%s)" % [groups_in[1]["rect"]])
