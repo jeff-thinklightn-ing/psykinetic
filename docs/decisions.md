@@ -15125,8 +15125,15 @@ the floor's share of its zone's light (ambient_share, 769 amended (6)): at noon 
 lantern nearly out; upstairs 0.625; the attic 0.875, nearly full; every floor 1 at night. Crypts, plane-less rooms and
 out of doors as 451 amended (8). _lantern_dark_at is the one helper every carried light reads: the lantern's light and
 its shown test (LANTERN_DAY_LEAST), its pane, and pc-character's face light (its face_dark goes in its own take). The
-room's key light and 946's day ambient stand as they are: the room alone clipped nobody, and 946 amended (2), a key
-eased down by day, was given back. view_test: each floor's dark at noon and 21:30 at its spawn, the ground floor under
+room's key light stands as it is: the room alone clipped nobody, and 946 amended (2), a key eased down by day, was given
+back. 946's day ambient is lifted, INSIDE_DAY_LIFT 1.6 to 2.0 (the coordinator's ruling the same day on ui-design's
+roomlift_db8f864de, 1.6, 1.8 and 2.0 swept with Rhea on): with the lanterns low the lantern's pool had been doing part of
+946's day without anyone meaning it to, and at 1.6 the room at noon read darker near the player than by lamplight. At
+2.0 nothing clipped, faces at 0.61 to 0.81 of their outdoor noon; the noon ambient on the ground floor 0.962 against
+21:00's 0.481. No flat ambient puts back the full lantern's pool at the player's feet, and none is asked: the read is
+the room away from his pool lighter by day than by night. Every floor takes the same factor (upstairs and the attic
+too, still dark). A look's knob, --look-inside-lift=<f> (Client3D.inside_day_lift, ignored in a release build), sets it
+for a sweep; a tour that sets the var mid-scene clears _inside_step, or the floor keeps its last step's paint. view_test: each floor's dark at noon and 21:30 at its spawn, the ground floor under
 0.2 by day and rising up the house, all 1 at night. Proof (ui-design, Rhea beside the player as in play): skins 1 and 3
 in the Keeper's room and the common room at noon and 15:00, no face clipped, and the 21:00 pair as the base's. Client
 only; protocol unchanged; no new class_name.
