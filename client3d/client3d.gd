@@ -31292,6 +31292,11 @@ func _build_inside_day() -> void:
 	_inside_patches.multimesh = multimesh
 	_inside_patches.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_room.add_child(_inside_patches)
+	# Above the ground floor no apron (946, the floors above; the coordinator's ruling on ui-design's look
+	# of 11-16: upstairs the yard ran level up to the walls, a ground-floor room in a field): past
+	# its walls the background alone, the day's haze and the night's dark by the clock, open air.
+	if int(_terrain.get("storey", 0)) > 0:
+		return
 	# The apron: one quad under the floor, the level's rect and INSIDE_APRON
 	# and more round it.
 	var low := Vector2i(1 << 30, 1 << 30)

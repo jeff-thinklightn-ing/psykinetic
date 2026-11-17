@@ -61886,3 +61886,11 @@ reader is client-side); no new class_name; no bullet (environment's package, voi
 Built over maps' timber stairs (589 amended (3) and (4), landed first; the coordinator's ruling, 11-16): 589 amended (4)'s
 east stand moved (17,12) to (17,13), off the window's cell (maps' own move, done in environment's merge), so upstairs
 holds three lights, the landing table's candle and the two stands; level_test's upstairs-candles row reads all three.
+The floors above (the coordinator's ruling of 11-16 on ui-design's look of f355ad4b0 beside dc9814744,
+C:/dev/review/ui-design/looks/mughouse946m_f355ad4b0_vs_dc9814744.png: the ground floor passed; upstairs at noon the
+yard's grass ran level up to the upper floor's walls, so the landing read as a ground-floor room in a field, and the
+attic, with no windows, had the same grass round it). A level's terrain carries its "storey" (Level.level_from: its
+place in its building's "storeys", 0 the ground floor or no building); above 0 the inside draws no apron, so past its
+walls is the background alone by the clock, the day's haze and the night's dark: open air, not ground at the floor's
+height. The ground floor's apron, panes and patches unchanged; upstairs keeps its panes and patches. view_test: the
+Mughouse's storeys 0, 1 and 2, the apron on the ground floor alone.

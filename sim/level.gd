@@ -859,6 +859,9 @@ static func level_from(level_name: String, made: Dictionary, templates: Dictiona
 	var level := parsed if not parsed.is_empty() else parse(made["layout"], made["height"], made["config"], made.get("relief"), templates)
 	level["name"] = level_name
 	level["terrain"]["level"] = level_name
+	# Its storey in its building (946, the floors above): 0 the ground floor (or no building), 1 the floor
+	# above, and so on, by its "storeys" list; the client draws no ground round a storey above 0.
+	level["terrain"]["storey"] = maxi((level.get("storeys", []) as Array).find(level_name), 0)
 	# A slot in its land's look (718), unless the entry names a variant.
 	var land := str(made["config"].get("land", level_name))
 	for building: Dictionary in level["buildings"]:
