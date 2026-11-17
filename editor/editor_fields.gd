@@ -104,8 +104,9 @@ const NOT_OFFERED: Array[String] = ["legend", "became", "loot", "clearings", "ro
 	# The co-op tomb's (813: crypt.gd writes its plates, secrets and laid rooms).
 	"plates", "secrets", "laid_rooms",
 	# An interior's own (811: tools/make_interior.py writes them from its spec;
-	# 811 amended (4): its common room's lit candles).
-	"town", "storeys", "beds", "lit_candles",
+	# 811 amended (4): its common room's lit candles; 946 amended (1): each floor's
+	# marked windows, an empty list for none).
+	"town", "storeys", "beds", "lit_candles", "windows",
 	# A fallow field's furrows (827, terrain's side: written by hand, like decor).
 	"furrows",
 	# The town's spots (853, npc's): laid with builder mode's spot tool (859), not here.
