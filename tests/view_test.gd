@@ -289,6 +289,8 @@ func _ready() -> void:
 		_test_options_panel()
 		await _test_preview_tunic()
 		_test_hair_covers_head()
+		_test_hair_root()
+		_test_hair_root_by_day()
 		_test_hair_value()
 		_test_look_pins()
 		_test_hair_pick_kept()
@@ -837,6 +839,120 @@ func _test_bandaging() -> void:
 	patient.free()
 	player.free()
 	bandaging.free()
+
+
+## The hair's darker root (419 amended (12)): the human bodies carry body_gen's "hairline" layer as UV2, which human_body.gdshader
+## darkens the hair by. On each hair cap (Hair_Cropped, Hair_Bound, the cap of Hair_Long) y is 1 and x its distance from the
+## hairline, from 0 at the line to over 10 cm at the crown; the cap's forehead line (in front of the head, over the brow) is
+## at the line. Every other part, a beard, the bun, the tail, long hair's fall, a hood, a hat and the body with its brows,
+## is (0, 0): no root. And the import keeps light baking off UV2 (meshes/light_baking 1): at 2 Godot unwraps into UV2
+## over the hairline without a word (art-kit's watch point).
+## The darker root by day (419 amended (12); the coordinator's ruling (iv) on root3_69ca53c76, tied to the lantern):
+## full while the carried lantern is hidden, none once it shows at half its strength (and so at take 3's 19:00 and at
+## night), a straight ramp between, from the shader global hair_root_day that Client3D writes beside look_day; 0 in
+## a room or underground; the character window's body held full (hair_root_full) whatever the hour. The shader's two
+## ends are 1 less Client3D's LANTERN_DAY_LEAST and ROOT_GONE_LANTERN, so neither is retuned without the other.
+func _test_hair_root_by_day() -> void:
+	print("
+== the hair's darker root follows the daylight; the character window's held full (419 amended (12)) ==")
+	var code := (load("res://art/models/characters/human_body.gdshader") as Shader).code
+	var none := _shader_const(code, "ROOT_DAY_NONE")
+	var full := _shader_const(code, "ROOT_DAY_FULL")
+	var dusk := Client3D.day_share(0.21)  # Take 3's 19:00: the sim's daylight 0.21 (its tour log).
+	var noon := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, 50.0)
+	var share := func(day: float) -> float: return clampf((day - none) / (full - none), 0.0, 1.0)  # The shader's by_day.
+	_check(is_equal_approx(full, 1.0 - Client3D.LANTERN_DAY_LEAST) and is_equal_approx(none, 1.0 - Client3D.ROOT_GONE_LANTERN),
+		"the root's ends are the lantern's: full from %.2f (1 - LANTERN_DAY_LEAST, the lantern hidden), none from %.2f (1 - ROOT_GONE_LANTERN, at half its strength)" % [full, none])
+	_check(share.call(dusk) == 0.0 and share.call(0.0) == 0.0 and share.call(noon) == 1.0 and is_equal_approx(share.call((none + full) * 0.5), 0.5),
+		"the root's share: none at take 3's 19:00 (daylight %.3f) and at night, full at noon (%.3f), straight between (half at %.2f)" % [dusk, noon, (none + full) * 0.5])
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	var had_hour := DayNight.hour(DayNight.now())
+	DayNight.set_hour(12.0)
+	_rig._sky_step = -1
+	_rig._update_sky(0.0)
+	_check(_rig._outdoor and _rig._look_daylight > 0.98 and is_equal_approx(Client3D.hair_root_day, _rig._look_daylight),
+		"out of doors at noon (Umbrage): hair_root_day the look's daylight (%.3f, %.3f)" % [Client3D.hair_root_day, _rig._look_daylight])
+	var room := Level.load_level("umbrage_tavern_up")
+	_rig.rebuild(room["terrain"], room["spawn_points"].values()[0])
+	_check(not _rig._outdoor and Client3D.hair_root_day == 0.0, "in a room: none (%.3f)" % Client3D.hair_root_day)
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	DayNight.set_hour(0.0)
+	_rig._update_sky(0.0)
+	_check(_rig._outdoor and Client3D.hair_root_day < 0.01 and is_equal_approx(Client3D.hair_root_day, _rig._look_daylight),
+		"out of doors at midnight: the daylight's again, none (%.3f)" % Client3D.hair_root_day)
+	DayNight.set_hour(had_hour)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_rig._sky_step = -1
+	_rig._update_sky(0.0)
+	var preview := CharacterPreview.new()
+	add_child(preview)
+	preview.show_look(PersonLook.make("seed=4 body=male hair=cropped"))
+	var held: Array = []
+	for mesh: MeshInstance3D in preview._model.find_children("*", "MeshInstance3D", true, false):
+		held.append(mesh.get_instance_shader_parameter("hair_root_full"))
+	_check(not held.is_empty() and held.all(func(v: Variant) -> bool: return v != null and float(v) == 1.0),
+		"the character window's body: every part's root held full (%d parts)" % held.size())
+	preview.free()
+
+
+## The float [param name] is set to in shader [param code] ("const float NAME = x;"), NAN if none.
+func _shader_const(code: String, name: String) -> float:
+	var found := RegEx.create_from_string("const float " + name + " = ([0-9.]+);").search(code)
+	return float(found.get_string(1)) if found != null else NAN
+
+
+func _test_hair_root() -> void:
+	print("
+== the hair's darker root: the hairline in UV2 on the hair caps alone (419 amended (12)) ==")
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var import_text := FileAccess.get_file_as_string(String(build[1]) + ".import")
+		_check(import_text.contains("meshes/light_baking=1"), "%s: the import keeps light baking off UV2" % build[0])
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		var body := model.find_child("Body", true, false) as MeshInstance3D
+		var skeleton := body.get_parent() as Skeleton3D
+		var head := skeleton.get_bone_global_rest(skeleton.find_bone("Head")).origin
+		var others: Array = []
+		for node in model.find_children("*", "MeshInstance3D", true, false):
+			var mi := node as MeshInstance3D
+			var on := 0
+			var off := 0
+			var bad := 0
+			var least := INF
+			var most := 0.0
+			var brow_line := 0
+			for s in mi.mesh.get_surface_count():
+				var arrays := mi.mesh.surface_get_arrays(s)
+				var uv2: Variant = arrays[Mesh.ARRAY_TEX_UV2]
+				if uv2 == null:
+					off += (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+					continue
+				var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				for i in (uv2 as PackedVector2Array).size():
+					var at: Vector2 = uv2[i]
+					if is_equal_approx(at.y, 1.0):
+						on += 1
+						least = minf(least, at.x)
+						most = maxf(most, at.x)
+						var rel: Vector3 = verts[i] - head
+						if at.x < 0.002 and rel.z > 0.05 and rel.y > 0.15:
+							brow_line += 1
+					elif at.is_zero_approx():
+						off += 1
+					else:
+						bad += 1
+			if String(mi.name) in ["Hair_Cropped", "Hair_Bound"]:
+				_check(on > 0 and off == 0 and bad == 0 and least < 0.002 and most > 0.10 and brow_line >= 3,
+					"%s %s: every point on the cap, from the line (%.3f m) to the crown (%.3f m), %d on the forehead's line" % [
+						build[0], mi.name, least, most, brow_line])
+			elif String(mi.name) == "Hair_Long":
+				_check(on > 0 and off > 0 and bad == 0 and least < 0.002 and most > 0.10 and brow_line >= 3,
+					"%s Hair_Long: the cap carries its hairline (%d points, %.3f..%.3f m), the fall none (%d)" % [
+						build[0], on, least, most, off])
+			elif on > 0 or bad > 0:
+				others.append("%s %d/%d" % [mi.name, on, bad])
+		_check(others.is_empty(), "%s: no root on any other part (a beard, the bun, the tail, a hood, a hat, the body) %s" % [build[0], others])
+		model.free()
 
 
 ## The hair caps cover the back of a person's head (body_gen's clear_of_head, 419 amended (3)): every point of the Body's head

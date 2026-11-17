@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Up close by day, hair near a face's own colour is a shade darker at its hairline, so it reads as hair (419 amended (12)).
 - Anyone who slouches, a companion or a townsperson, runs with arms beside the body too (953 amended (3)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).

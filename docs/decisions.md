@@ -13997,6 +13997,72 @@ tail and the long beard, reaching people only by intent.
   meshes, so art and client ship together. Protocol: no new number (release): the server's tidy_look keeps the two
   words, so client and server go out together (needs the deploy); an old client draws its seeded pick. No new class_name.
 
+419 amended (12) (pc-character, 2026-11-16; label by decision_number.sh; the shading row's darker root, the
+coordinator's rulings on root2_e23cf09bf and root3_69ca53c76): hair is darker along its hairline by day, so a cap of
+the face's own hue reads as hair against the face at the nearest zoom.
+- The mesh: body_gen's write_hairline gives each human part a second UV layer, "hairline" (the game's UV2): on a hair
+  cap each corner's distance in metres from the hairline as it is seen (seen_hairline: where the cap comes out of the
+  head, its tucked front points under the skin at 0), v 1; every other part (a beard, a brow, the bun, the fall, the
+  tail, a hood, a hat, the body) 0, no root. The imports keep light baking off UV2.
+- The shader (human_body.gdshader): at the line the hair is ROOT_DARK 0.55 of its colour, back to its own by
+  ROOT_BAND 7 cm up the cap, a ramp and not a cap (the steepest rise up the hair 2.0 to 3.2 L* a pixel at noon against
+  1.3 to 1.7 without; at 3 cm it did not show, the cap's quads coarser than the band).
+- Only hair near the face's own light: the full root while the drawn hair's light is at most 0.55 of the skin's
+  (linear luminance), none from 0.85, a ramp between that no choice falls in. Of the 64 hair-and-skin choices 24 are
+  spared, drawn as before: blond on skins 2 to 8, grey on 2 to 8, fair on 5 to 8, red on 6 to 8, brown on 7 and 8,
+  chestnut on 8. Blond and grey on skin 2, which heads by day draws only 10 and 18 % lighter than the face and which
+  the first take darkened toward it (crown against face 16.1 to 12.2 and 16.7 to 14.0), are so spared by
+  construction, not by a measured pass.
+- Only by day: by dusk the face is the darker, the carried lantern (451 amended (8): shown as the day's light goes,
+  the brightest light by then) lighting the crown and not the face, so a darker hairline moves the crown toward it.
+  Take 3 at 19:00 (the tour's "hour 19": the sim's daylight 0.21, the sun about 11 degrees under the horizon, the
+  lantern shown at 1.185), crown against face, deep against its off: chestnut/6 -1.2 dE, chestnut/7 -0.5, dark/8
+  -0.2, fair/3 -1.5 ("on" -1.7, -1.4, -0.2, -2.5), where the bar was the root doing no harm, within a point. So the
+  root answers the lantern (the coordinator's ruling, made on that finding): its share follows the shader global
+  hair_root_day, which Client3D writes beside look_day (set_hair_root_day, from _update_sky on an outdoor level, 0 in
+  a room or underground, where _update_sky stops and look_day keeps the last outdoor value), the open sky's daylight,
+  of which the carried lantern's strength is the rest (lantern_dark, its light LANTERN_ENERGY times it): full from
+  0.98, while the lantern is hidden (1 - LANTERN_DAY_LEAST), none from 0.5 down, the lantern at half its strength
+  (1 - Client3D.ROOT_GONE_LANTERN), a straight ramp between; view_test holds both ends to the two lantern constants,
+  so neither is retuned alone. 19:00 (0.012) is then the off picture by construction: the "no harm" bar is neither
+  met nor moved, it no longer applies. A first none point, 0.64, was set on a misreading of mine (take 3's 19:00
+  taken for the sun 1 degree up, from another run's setup) and is gone. Take 3 measured only 1.00 and 0.012, so the
+  half-strength end was proved apart (C:/dev/review/pc-character/heads_by_day/root5_proof_table.txt; joined on the
+  Atlas, take 3's build, so the full root, the low camera at 0.4, each deep against its own off): the bar, the crown
+  against the face no worse than off by more than half a point. At the lantern's quarter (17:45, its light 0.312,
+  hair_root_day 0.740, where the ramp draws the root at half) the full root meets it on all four: chestnut/6 +1.2,
+  chestnut/7 +0.9, dark/8 +0.7, fair/3 +2.3. At its half (18:06, 0.604, 0.496) chestnut/7 is -0.7, the crown (L*
+  25.6) taken onto a face (23.7) of its own light, where the root is already none, the others +1.0, +0.9, +0.8: the
+  none point stays at half. The strip on this build (the same camera, chestnut/6) draws the root full at noon, at
+  0.80 at 17:30 and none from 18:15 as the ramp says; at the playing zoom (low 1.0) it is not seen. A resident, who carries no lantern, follows the same zone-wide value: by day the root is
+  the gain measured, and as the light goes its crown is lit by nothing the face is not, so the root going with the
+  players' lanterns costs it only a darker hairline it would hardly show by then. Zone-wide: a roofed cell out of
+  doors keeps the root as at noon (what was measured). The ramp lies while the sun is between about 8 degrees up and
+  1 under, under an hour of game time on a summer evening (a few real minutes of a 90-minute day) and as long again
+  after dawn; in winter (the noon sun about 22 degrees) it is full for about the six hours round noon.
+  The take-2 19:00 hairline bars (4.3 to 4.9 against 13.2 and 10.3) were withdrawn before take 3: dE2000 at so low an L* weighs a step of light at about 1/1.6, and only a near-black
+  band could have met them.
+- The character window holds it full (CharacterPreview sets hair_root_full 1 on every part): a hair colour is picked
+  there to read as it will by day.
+- Measured (C:/dev/review/pc-character/heads_by_day/root3_table.txt and root3_close_noon.png, joined on the Atlas,
+  pinned noon, the nearest zoom, each setting shot straight after its own off, aligned on the face's interior; no L*
+  set against another run's): the hairline dE at noon, off to deep, chestnut/6 10.5 to 15.2 (the bar 13.2),
+  chestnut/7 6.5 to 9.7 (10.3), dark/8 10.2 to 12.5 (13.2), each within the point the coordinator set; fair/3's crown
+  against face +2.3; black/7 within the pose noise; the extras (long, bound, hood, hat, beard) at most 0.1 L* on the
+  head's mean, a hood or hat untouched, a beard its own colour with a soft join. The nearest two names per skin, crown
+  against crown: no skin loses more than a point; skin 8's falls 5.7 to 5.1, a known cost the coordinator accepted.
+  At the playing zoom it is not seen: the head's change within black/7's pose noise in every pair.
+- "On" (9 cm at 0.5) was measured beside it and set aside: its hairline a shade darker (15.5, 10.7, 13.0) and no
+  better a read by eye, it cost skins 2 and 8 more than a point of their nearest two names (7.2 to 6.1, 6.2 to 5.0;
+  its names read from take 2's run, the coordinator's allowance, each choice as root 3 draws it there).
+- view_test _test_hair_root (the layer on the caps alone, both bodies, the imports) and _test_hair_root_by_day (the
+  share's ends held to LANTERN_DAY_LEAST and ROOT_GONE_LANTERN; none at take 3's 19:00 and at night, full at noon,
+  straight between; hair_root_day the look's daylight
+  out of doors, 0 in the tavern's upstairs room and back; the character window's every part held full). That row's
+  first draft compared on the test's own map, which has no sky, so its two out-of-doors checks passed without
+  reading anything; it now loads the wilds level and reads Umbrage at noon (1.000) and at midnight (0). Client only,
+  protocol unchanged, no new class_name.
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and
