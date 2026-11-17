@@ -4788,6 +4788,12 @@ func _test_daylight_indoors() -> void:
 	var storeys: Array[String] = []
 	var no_apron: Array[String] = []
 	var panes: Array[int] = []
+	# 451 amended (9): a carried lantern's dark on each floor, noon then 21:30, by the room's own day.
+	var lantern_darks: Array[String] = []
+	var lamp_phase_was := DayNight.phase
+	var lamp_anchor_was := DayNight.anchor
+	var lamp_by_day_was := Client3D.lantern_by_day
+	Client3D.lantern_by_day = true
 	for name: String in ["umbrage_tavern", "umbrage_tavern_up", "umbrage_tavern_attic"]:
 		var storey_level := Level.load_level(name)
 		_rig.rebuild(storey_level["terrain"], storey_level["spawn_points"].values()[0])
@@ -4795,9 +4801,27 @@ func _test_daylight_indoors() -> void:
 		if _rig._inside_lit() and _rig._inside_apron == null:
 			no_apron.append(name)
 		panes.append(_rig._inside_panes.size())
+		var at: Vector2i = storey_level["spawn_points"].values()[0]
+		DayNight.set_hour(12.0)
+		var noon_dark := _rig._lantern_dark_at(at)
+		DayNight.set_hour(21.5)
+		var night_dark := _rig._lantern_dark_at(at)
+		lantern_darks.append("%.3f/%.3f" % [noon_dark, night_dark])
+		var noon_want := Client3D.inside_lantern_dark(1.0, Client3D.ambient_share(_rig._terrain))
+		if not is_equal_approx(noon_dark, noon_want) or not is_equal_approx(night_dark, 1.0):
+			lantern_darks.append("BAD " + name)
+	DayNight.phase = lamp_phase_was
+	DayNight.anchor = lamp_anchor_was
+	DayNight.update()
+	Client3D.lantern_by_day = lamp_by_day_was
 	_check(storeys == ["umbrage_tavern 0", "umbrage_tavern_up 1", "umbrage_tavern_attic 2"]
 			and no_apron == ["umbrage_tavern_up", "umbrage_tavern_attic"] and panes == [4, 4, 0],
 			"the Mughouse's storeys %s: the ground floor's apron laid, none round the floors above (%s); panes %s, none in the attic" % [storeys, no_apron, panes])
+	var noon_darks := lantern_darks.map(func(pair: String) -> float: return float(pair.split("/")[0]) if not pair.begins_with("BAD") else -1.0)
+	_check(lantern_darks.size() == 3 and noon_darks[0] < 0.2 and noon_darks[0] < noon_darks[1] and noon_darks[1] < noon_darks[2] and noon_darks[2] > 0.8
+			and is_equal_approx(Client3D.inside_lantern_dark(DayNight.NIGHT, 0.875), 1.0) and is_equal_approx(Client3D.inside_lantern_dark(1.0, 0.0), 1.0)
+			and is_equal_approx(Client3D.inside_lantern_dark(1.0, 1.0), 0.0),
+			"a carried lantern's dark in the Mughouse, noon/21:30 by floor, the room's own day (451 amended (9)): %s; full at night on every floor" % [lantern_darks])
 	# An outdoor level none of it.
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
