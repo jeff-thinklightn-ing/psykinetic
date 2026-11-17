@@ -30995,8 +30995,8 @@ const INSIDE_PANE_FADED := 0.1
 ## grey by INSIDE_DAY_WARM, its energy INSIDE_DAY_LIFT times the night's;
 ## by night the zone's look as before (the hearth and candles carry it; the
 ## Mughouse's 0.48).
-const INSIDE_DAY_LIFT := 1.6
-## A look's knob for the lift (451 amended (9)'s sweep): set by the client flag
+const INSIDE_DAY_LIFT := 2.0
+## (2.0 since 451 amended (9), 1.6 before.) A look's knob for the lift (451 amended (9)'s sweep): set by the client flag
 ## --look-inside-lift=<f>; INSIDE_DAY_LIFT by default, ignored in a release build
 ## (OS.has_feature("template")); it changes only the drawn room's ambient.
 static var inside_day_lift := INSIDE_DAY_LIFT
