@@ -23629,6 +23629,7 @@ func _sync_puppets() -> void:
 			_teeter_lean(entity, puppet, body, now)
 			(puppet.get_meta("rig") as AnimRig).every = _pose_every(puppet)
 			_animate(puppet)
+			_sleep_hat(puppet)
 			_footfall_sounds(entity, puppet, puppet.get_meta("rig") as AnimRig)
 			_stroke_sounds(entity, puppet, puppet.get_meta("rig") as AnimRig)
 		elif puppet.has_meta("creature_view"):
@@ -28924,6 +28925,44 @@ static func _seated_share(puppet: Node3D, now: int) -> float:
 		return clampf((now - int(puppet.get_meta("seat_at", 0))) / (SEAT_EASE * 1000.0), 0.0, 1.0)
 	var since := now - int(puppet.get_meta("unseat_until", -(1 << 40)))
 	return clampf(1.0 - since / (SEAT_EASE * 1000.0), 0.0, 1.0)
+
+
+## Hats off in bed (751 amended (9), the coordinator's ruling): a body asleep, its lying-down clip
+## played (its "laid", past busy_until; a sleeper first seen already down at once), draws no brimmed
+## hat (PersonLook's Hat_Brimmed, the look's own or a trade's), and bound hair its bun again, which no
+## hat makes room for; a hood, a cap and any worn head piece stay. Awake (its "laid" gone, the frame
+## CLIP_SLEEP_UP starts) the hat is back and the bun put away, so the get-up has no bare-headed frame.
+## Knocked down or downed ("lying", "downed") it keeps the hat. Only a hat drawn as it lies down is
+## taken off: under a bard's hat or a worn piece there is none. A player's or companion's worn
+## gear is drawn again on waking (_sync_worn_gear's key cleared), so a piece put on asleep still wins.
+const SLEEP_HAT := "Hat_Brimmed"
+func _sleep_hat(puppet: Node3D) -> void:
+	var off := bool(puppet.get_meta("laid", false)) and Time.get_ticks_msec() >= int(puppet.get_meta("busy_until", 0))
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	if model == null or off == puppet.has_meta("hat_off"):
+		return
+	var hat := model.find_child(SLEEP_HAT, true, false) as MeshInstance3D
+	var bun := model.find_child(PersonLook.HAIR_KNOT, true, false) as MeshInstance3D
+	var look := puppet.get_meta("look") as PersonLook if puppet.has_meta("look") else null
+	var bound := look != null and look.hair == "bound" and bun != null
+	if off:
+		# Kept whether one was taken (false: none drawn), so it is looked for once a sleep.
+		var took := hat != null and hat.visible
+		puppet.set_meta("hat_off", took)
+		if took:
+			hat.visible = false
+			if bound:
+				bun.visible = true
+		return
+	var taken: bool = puppet.get_meta("hat_off")
+	puppet.remove_meta("hat_off")
+	if not taken:
+		return
+	if hat != null:
+		hat.visible = true
+	if bound:
+		bun.visible = false
+	model.remove_meta("worn_gear")
 
 
 ## A work lain down to (its "down", 751: a sleeper) is lain down to once, its

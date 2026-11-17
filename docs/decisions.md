@@ -45070,6 +45070,23 @@ the most beyond the clip's own a thirtieth 3.9, 3.6 and 3.7 cm for the man, 3.5,
 2.7 and 2.8 on the bedroll, inside the board and posts in each (-0.913 to 0.903 the man's widest). Stall-free the
 hips' path is the clock-timed ease's within 1.3 mm at every frame (build/bedclip's probe on 377372dfb and on this,
 man, woman and bedroll), so the keeper's-bed strips stand. Drawing only, protocol unchanged, no new class_name.
+every seventh frame of Sleep_Down and Sleep_Up the body (CPU-skinned) inside the board and the foot posts. Drawing
+only, protocol unchanged, no new class_name.
+751 amended (9) (pc-character, 2026-11-17; label by decision_number.sh; the coordinator's ruling, hats off in bed,
+built on the lay of (8)): a sleeper takes off a brimmed hat. Client3D._sleep_hat, each frame after _animate: a body
+asleep, its lying-down clip played (its "laid" and past busy_until; one first seen asleep at once), draws no
+Hat_Brimmed (the look's own or a trade's), and bound hair shows its bun again (PersonLook.HAIR_KNOT, which no hat
+makes room for). The frame its "laid" goes (the frame CLIP_SLEEP_UP starts) the hat is back and the bun put away,
+so the get-up has no bare-headed frame; the lying-down clip keeps it on till it has played. Kept as the puppet's
+"hat_off" (whether one was taken), so a sleeper with no hat drawn (under a bard's hat, a worn piece, or none) is
+looked at once a sleep and left as it is. A hood, a cap and any worn head piece stay; knocked down or downed
+("lying", "downed") the hat stays. On waking a player's or companion's worn gear is drawn again (_sync_worn_gear's
+key cleared), so a piece put on asleep still wins. The brim's dip into the mattress (8)'s leftover goes with the
+hat. Beds, bedrolls and a companion asleep by the fire alike: all lie through the same "laid". view_test
+_test_sleep_hat: a woman with bound hair in a brimmed hat through the game's own clips (asleep no hat and the bun;
+Sleep_Up's first frame the hat back, the bun away; Sleep_Down the hat on till played), a tall heavy man knocked
+down and downed keeping his, a hood kept on with nothing put back. Drawing only, protocol unchanged, no new
+class_name, no bullet.
 
 ## 749. Spawn safety: the nearest safe cell first
 

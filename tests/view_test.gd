@@ -15122,6 +15122,7 @@ func _test_sleeper() -> void:
 	_test_sleeper_posture()
 	_test_sleeper_on_bed()
 	_test_sleeper_lies_down()
+	_test_sleep_hat()
 
 
 ## 751 amended (8) (pc-character's measure for art-kit's cover; the coordinator's go): on a drawn
@@ -15136,6 +15137,76 @@ func _test_sleeper() -> void:
 const BED_BOARD_FACE := -0.94
 const BED_FOOT_POSTS := 0.92
 const BED_MATTRESS := 0.42
+## Hats off in bed (751 amended (9), the coordinator's ruling): asleep, no brimmed hat and bound hair's bun again; up
+## again (the frame the get-up clip starts) the hat back; knocked down it stays; a hood stays.
+func _test_sleep_hat() -> void:
+	print("
+== hats off in bed: asleep bare-headed (the bun again), the hat back as she gets up ==")
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var made := func(words: String) -> Array:
+		var look := PersonLook.make(words)
+		var kind: Dictionary = Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN
+		var puppet := Node3D.new()
+		var body := Node3D.new()
+		body.name = "Body"
+		puppet.add_child(body)
+		var model := (load(kind["scene"]) as PackedScene).instantiate() as Node3D
+		model.name = "Model"
+		body.add_child(model)
+		add_child(puppet)
+		look.apply(model)
+		puppet.set_meta("look", look)
+		return [puppet, model, AnimRig.make(model, lib, 0.0, true, null)]
+	var shown := func(model: Node3D, part: String) -> bool:
+		var mesh := model.find_child(part, true, false) as MeshInstance3D
+		return mesh != null and mesh.visible
+	var hat := Client3D.SLEEP_HAT
+	var bun := PersonLook.HAIR_KNOT
+	# A woman with bound hair in a brimmed hat: asleep in her bed, then up again, the clips the game plays.
+	var her: Array = made.call("seed=11 body=female build=middling stature=middling age=grown hair=bound headwear=hat")
+	var puppet: Node3D = her[0]
+	var model: Node3D = her[1]
+	var rig: AnimRig = her[2]
+	var sleep: Dictionary = Client3D.ACTIVITIES["sleep"]
+	var now := Time.get_ticks_msec()
+	_check(shown.call(model, hat) and not shown.call(model, bun), "awake: the hat, no bun under it")
+	_rig._lying_down(puppet, rig, sleep, 0.0, now, 1.0)  # First seen asleep: already down.
+	_rig._sleep_hat(puppet)
+	_check(not shown.call(model, hat) and shown.call(model, bun), "asleep: no hat, her bound hair's bun again")
+	var woke := _rig._lying_down(puppet, rig, {}, 0.0, now, 1.0)
+	_rig._sleep_hat(puppet)
+	_check(woke and rig.playing() == Client3D.CLIP_SLEEP_UP and shown.call(model, hat) and not shown.call(model, bun),
+			"getting up (%s, its first frame): the hat back, the bun put away" % rig.playing())
+	# Lain down to while seen: the hat stays on through the lying-down clip, off once it has played.
+	_rig._lying_down(puppet, rig, sleep, 0.0, now, 1.0)
+	_rig._sleep_hat(puppet)
+	var lying_down := rig.playing()
+	var during: bool = shown.call(model, hat)
+	puppet.set_meta("busy_until", 0)
+	_rig._sleep_hat(puppet)
+	_check(during and lying_down == str(sleep["down"]) and not shown.call(model, hat),
+			"lying down (%s): the hat on till the clip has played, then off" % lying_down)
+	puppet.free()
+	# Knocked down: the hat stays.
+	var him: Array = made.call("seed=11 body=male build=heavy stature=tall age=grown hair=cropped beard=full headwear=hat")
+	(him[0] as Node3D).set_meta("lying", true)
+	(him[0] as Node3D).set_meta("downed", true)
+	_rig._sleep_hat(him[0])
+	_check(shown.call(him[1], hat) and not (him[0] as Node3D).has_meta("hat_off"), "knocked down or downed: the hat stays on")
+	(him[0] as Node3D).free()
+	# A hood stays, and a sleeper with no hat drawn is left as it is.
+	var hooded: Array = made.call("seed=11 body=female build=middling stature=middling age=grown hair=bound headwear=hood")
+	(hooded[0] as Node3D).set_meta("laid", true)
+	_rig._sleep_hat(hooded[0])
+	var hood_kept: bool = shown.call(hooded[1], "Hood") and not shown.call(hooded[1], bun)
+	var none_taken: bool = (hooded[0] as Node3D).get_meta("hat_off", true) == false
+	(hooded[0] as Node3D).set_meta("laid", false)
+	_rig._sleep_hat(hooded[0])
+	_check(hood_kept and none_taken and shown.call(hooded[1], "Hood") and not (hooded[0] as Node3D).has_meta("hat_off"),
+			"a hood stays on asleep, the bun under it unshown, and nothing put back on waking")
+	(hooded[0] as Node3D).free()
+
+
 func _test_sleeper_on_bed() -> void:
 	print("\n== a sleeper on a drawn plain bed: clear of the headboard, on the mattress (751 amended (8)) ==")
 	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
