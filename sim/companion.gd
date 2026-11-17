@@ -1470,6 +1470,26 @@ static func _quoted(heard: String) -> String:
 	return heard.get_slice("\"", 1) if "\"" in heard else heard
 
 
+## A question that asks nothing of her ("Where is the temple?", "What's that?"), unless it is put as a request.
+const ERRAND_QUESTION := "(?i)^\\s*(where|what|which|who|whose|why|when|how|is|are|was|were|do|does|did|have|has)\\b"
+## A request, put as a question or not ("Can you search here?", "Would you mind stepping aside?", "Please look",
+## "Do you have a bandage?", "Got any arrows?").
+const ERRAND_REQUEST := "(?i)^\\s*(please\\b|(can|could|would|will|won't|can't|shall|should)\\s+(you|we)\\b|why\\s+don't\\s+(you|we)\\b|(do|would)\\s+you\\s+(mind|have)\\b|have\\s+you\\s+(got|any)\\b|got\\s+any\\b|any\\s+chance\\b|how\\s+about\\b|let's\\b|let\\s+us\\b)"
+
+
+## Whether [param heard]'s words could ask her to do one of the things offered her (960, the coordinator's
+## row on transcript 6: asked the way, her [DO: 1] or [DO: 2] stepped her aside or set her searching in one
+## answer in six to eight, on main as on the guide's take). Words only, no model call: a question that asks
+## nothing of her is not a request; any other line, and a request put as a question, may be. No words: as before.
+static func asks_errand(heard: String) -> bool:
+	var words := _quoted(heard).strip_edges()
+	if words.is_empty():
+		return true
+	if RegEx.create_from_string(ERRAND_REQUEST).search(words) != null:
+		return true
+	return not (words.ends_with("?") or RegEx.create_from_string(ERRAND_QUESTION).search(words) != null)
+
+
 ## The names she answers to (796, release's ask): her label, the name shown,
 ## and her node's, should it differ (a quick re-place makes it "Rhea2").
 static func names_of(entity: GridEntity) -> Array[String]:
@@ -6504,12 +6524,18 @@ func _take_result(result: Dictionary) -> void:
 	spoken_to = spoken_to or report
 	# What she was offered to do: [DO: n] to her player's words picks one,
 	# and a promise picks the one it names; a promise of what she cannot do
-	# now is not said.
+	# now is not said. A [DO: n] only when her player's words ask her to do
+	# something (asks_errand, 960): asked the way, her tag neither steps her
+	# aside nor sets her searching. A promise in her own words ("I'll check the
+	# chest.") still picks what it names: said aloud, it is kept.
+	var errand_asked := asks_errand(str(result.get("heard", "")))
 	var offered: Array = _offered.get(serial, []) if asked else []
 	_offered.erase(serial)
 	var chosen := -1
 	var do_text := str(answer.get("do", "")).strip_edges()
-	if not offered.is_empty() and do_text.is_valid_int() and int(do_text) >= 1 and int(do_text) <= offered.size():
+	if asked and not errand_asked and not offered.is_empty() and not do_text.is_empty():
+		voice_counts["do unasked"] = int(voice_counts.get("do unasked", 0)) + 1
+	if errand_asked and not offered.is_empty() and do_text.is_valid_int() and int(do_text) >= 1 and int(do_text) <= offered.size():
 		chosen = int(do_text) - 1
 	elif not do_text.is_empty():
 		entry["do_ignored"] = do_text

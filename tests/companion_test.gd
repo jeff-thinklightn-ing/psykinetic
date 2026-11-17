@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_answer_echo()
 	_test_speaks_only_for_herself()
 	_test_claude_voice()
+	_test_errand_asked()
 	_test_knows_her_town()
 	_test_sees_friends()
 	_test_quiet_after_minor()
@@ -699,6 +700,122 @@ func _test_spoken() -> void:
 
 
 ## Lines from the transcripts of 10-09 to 10-13, each as she said it then.
+func _test_errand_asked() -> void:
+	print("\n== a [DO: n] is taken only when her player's words ask her to do something; asked the way, she stays (960) ==")
+	var asked_rows := {"Step aside.": true, "Search about here.": true, "Can you search here?": true, "Would you mind stepping aside?": true,
+		"Please look around.": true, "Do you have a bandage?": true, "Got any arrows?": true, "Let's look here.": true, "Shall we search?": true,
+		"Where is the temple?": false, "Where can I buy bread?": false, "What's that?": false, "How do I get to the Mughouse?": false,
+		"Is it far": false, "Which way?": false,
+		# The guide's transcript 6, every question (voice's ask: the code's own answer, printed).
+		"Where should we go?": false, "Where's the inn?": false, "Where is the blacksmith?": false, "Where can I find a boat?": false}
+	var wrong: Array[String] = []
+	for words: String in asked_rows:
+		var said := Companion.asks_errand("Jeff just said to you: \"%s\"" % words)
+		print("  asks_errand(\"%s\") = %s" % [words, said])
+		if said != asked_rows[words]:
+			wrong.append(words)
+	_check(wrong.is_empty() and Companion.asks_errand(""), "a request (put as a question or not) may ask; a question that asks nothing of her does not (%s)" % [wrong])
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var mind_was: Variant = pet.mind
+	var mind := CountingMind.new()
+	pet.mind = mind
+	# Her rows to a scratch mind log, so the voice row is read even when an errand's row follows it.
+	var log_path: String = preload("res://tests/test_ports.gd").scratch_path("errand_asked_mind.log")
+	MindLog.flush()
+	if FileAccess.file_exists(log_path):
+		DirAccess.remove_absolute(log_path)
+	var log_was := Net.mind_log_path
+	var log_on_was := MindLog.enabled
+	Net.mind_log_path = log_path
+	MindLog.enabled = true
+	var voice_row := func() -> Dictionary:
+		MindLog.flush()
+		var lines := FileAccess.get_file_as_string(log_path).strip_edges().split("\n")
+		for k in range(lines.size() - 1, -1, -1):
+			var row: Variant = JSON.parse_string(lines[k])
+			if row is Dictionary and str(row.get("kind", "")) == "voice" and str(row.get("companion", "")) == Companion._name_of(pet):
+				return row
+		return {}
+	var ask := func(words: String, do: String) -> Dictionary:
+		mind.voice_answer = {"say": "The temple's north-west of here.", "stance": "", "do": do}
+		pet.errand = {}
+		pet._yield_tile = Vector2i(-1, -1)
+		pet._last_speech_tick = -1000
+		pet._ask_voice("%s just spoke to you." % pet.keeper_name(), "%s just said to you: \"%s\"" % [pet.keeper_name(), words])
+		return MindLog.last.get(Companion._name_of(pet), {})
+	# Her list's numbers here, by verb (the room's offers: a step aside, the chest, the door, a search ...).
+	var number_of := func(verb: String) -> String:
+		var list := pet.can_do()
+		for k in list.size():
+			if str(list[k].get("verb", "")) == verb:
+				return str(k + 1)
+		return ""
+	var aside_n: String = number_of.call("make_way")
+	var search_n: String = number_of.call("search")
+	print("  her list here: %s (a step aside %s, a search %s)" % [pet.can_do().map(func(a: Dictionary) -> String: return str(a.get("words", ""))), aside_n, search_n])
+	_check(aside_n != "" and search_n != "", "her list here offers a step aside and a search (%s, %s)" % [aside_n, search_n])
+	var unasked_was := int(pet.voice_counts.get("do unasked", 0))
+	var stood := pet.tile
+	var dropped: Dictionary = ask.call("Where is the temple?", aside_n)
+	for i in 10:
+		World.step()
+	print("  asked \"Where is the temple?\", her reply [DO: %s] (a step aside): errand %s, on %s before and %s ten ticks after" % [aside_n, pet.errand, stood, pet.tile])
+	_check(pet._yield_tile == Vector2i(-1, -1) and pet.tile == stood and str(dropped.get("do_ignored", "")) == aside_n and not dropped.has("do")
+		and int(pet.voice_counts.get("do unasked", 0)) == unasked_was + 1 and str(dropped.get("say", "")) == "The temple's north-west of here.",
+		"asked the way, [DO: 1] dropped: she does not step aside, her line said, the errand's number alone logged, counted (%s)" % [dropped])
+	var search_dropped: Dictionary = ask.call("Where can I buy bread?", search_n)
+	for i in 10:
+		World.step()
+	print("  asked \"Where can I buy bread?\", her reply [DO: %s] (a search): errand %s, on %s before and %s ten ticks after" % [search_n, pet.errand, stood, pet.tile])
+	_check(pet.errand.is_empty() and pet.tile == stood and str(search_dropped.get("do_ignored", "")) == search_n, "nor set off searching (%s)" % [search_dropped])
+	# Taken: the step aside's errand row is logged after her voice row (begun and "done" at the ask, the step itself on
+	# her next ticks). Read both rows from this ask: the voice row's "do" the step aside, not dropped; the errand row a
+	# step aside begun from it and done; and that she then left her cell. Nothing done reads as none of these.
+	var unasked_before := int(pet.voice_counts.get("do unasked", 0))
+	var stepped := func(words: String) -> Array:
+		_put(pet, stood)
+		for i in 3:
+			World.step()
+		var from_tick := World.tick
+		var row: Dictionary = ask.call(words, aside_n)
+		var voiced: Dictionary = voice_row.call()
+		for i in 5:
+			World.step()
+		var ok := str(row.get("kind", "")) == "errand" and str(row.get("trigger", "")).begins_with("step out of") \
+				and str(row.get("outcome", "")) == "done" and int(row.get("tick", -1)) >= from_tick \
+				and int(voiced.get("tick", -1)) >= from_tick and str(voiced.get("do", "")).begins_with("step out of") \
+				and not voiced.has("do_ignored") and pet.tile != stood and int(pet.voice_counts.get("do unasked", 0)) == unasked_before
+		return [ok, row, voiced.get("do", "-"), pet.tile]
+	var taken: Array = stepped.call("Step aside, please.")
+	_check(taken[0], "asked to step aside: she does, her voice row's do \"%s\", begun from the ask and done, off %s to %s (%s)" % [taken[2], stood, taken[3], taken[1]])
+	var as_question: Array = stepped.call("Can you step out of the way?")
+	_check(as_question[0], "asked as a question: she does, do \"%s\", begun and done, off %s to %s (%s)" % [as_question[2], stood, as_question[3], as_question[1]])
+	# A plain ask whose errand outlasts the ask: her voice row carries "do", her errand row "set off", the search under way.
+	_put(pet, stood)
+	var search_from := World.tick
+	var search_row: Dictionary = ask.call("Search about here.", search_n)
+	var search_voiced: Dictionary = voice_row.call()
+	_check(int(search_voiced.get("tick", -1)) >= search_from and str(search_voiced.get("do", "")).begins_with("search") and not search_voiced.has("do_ignored")
+			and str(search_row.get("outcome", "")) == "set off" and str(pet.errand.get("verb", "")) == "search"
+			and int(pet.voice_counts.get("do unasked", 0)) == unasked_before,
+		"asked to search: her voice row's do \"%s\", her errand set off, under way (%s)" % [search_voiced.get("do", "-"), pet.errand.get("verb", "")])
+	# Put back what these rows changed, for the tests after.
+	pet.errand = {}
+	pet._yield_tile = Vector2i(-1, -1)
+	pet.current_intent = Companion.Intent.FOLLOW
+	pet.intent_target = null
+	MindLog.flush()
+	Net.mind_log_path = log_was
+	MindLog.enabled = log_on_was
+	DirAccess.remove_absolute(log_path)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, stood)
+	pet.mind = mind_was if mind_was != null else ScriptedMind.new()
+
+
 func _test_claude_voice() -> void:
 	print("\n== her voice on the Claude API: off by default, her own mind for all else, every failure falls back to it, the key never logged (decision 363) ==")
 	var owner := _player()

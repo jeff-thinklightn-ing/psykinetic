@@ -61145,3 +61145,29 @@ The digger heard as the kobold it is drawn as: SoundKit.heard_kind(kind) is Mons
 Tests: sound_kit_test _test_digger (the slot, its range DIG_REACH, each take under a second and under DIG_EVERY_S at the jitter's slowest, heard_kind, pitch and goblin, the digger's death, cries, idle and steadying the sneak's); view_test _test_dig_beat (a drawn digger's beat on the test's own clock: none till it has stood 3 s, the first and the next on time, roused, sitting, down and just walked silent, afresh after; a step sets the still clock; World.heard's rows by hand; Sfx.hearing heard the same as World.heard with the client's line at every cell round the digger). Client3D's two new vars (_moved_ms, _dig_next) are VIEW in client3d/room_fields.gd.
 
 Lands off: no level lays a digger until maps places the dens, the package's switch-on, after a joined look; nothing a player hears changes until then. At the switch-on read (the coordinator's term): at the track start (175,235) and a road cell 18 off, the pick's level beside the outdoor bed's (wind, birds, rain at worst, day and night) from the same joined log; if the bed sits over the pick at the track start, raise the slot's volume_db or pull DIG_REACH in (enemy-ai's constant, held equal to the slot's range). Client only, with a shared sim helper no server code calls yet (companions' line comes after); protocol unchanged; no new class_name; no bullet until the package is switched on.
+960 (companions, 2026-11-16; label by decision_number.sh; the coordinator's row on the guide's transcript 6, where
+asked the way to the temple she answered "[DO: 1]" or "[DO: 2]" in one answer in six to eight, on main as on the guide's
+take, and so stepped aside or set off searching the ground): a thing offered her to do (391's list) is taken only when her
+player's words could ask her to do something (Companion.asks_errand); otherwise her [DO: n] is not taken: no errand,
+"do_ignored" in her mind log carrying the errand's number alone, and voice_counts "do unasked" counting it. A promise in
+her own words still picks what it names, as before ("What's in that chest?" answered "I'll check the chest." and she
+opens it): said aloud, a promise is kept, and dropping it would leave her line saying she'd do what she then doesn't (the
+first take dropped both; companion_test's chest row in _test_errands found it). The check reads the words only, never a model call: a
+question that asks nothing of her (ERRAND_QUESTION: it ends in "?" or opens with where, what, which, who, why, when, how,
+is, are, do, does, did, have, has) is no request, unless it is put as one (ERRAND_REQUEST: please, can or could or would or
+will or shall or should you or we, why don't you, do or would you mind, do you have, have you got, got any, any chance, how
+about, let's); any other line may ask, as before. Words she has none of (a moment, no line) are as before. Her prompt
+and its list are unchanged. companion_test _test_errand_asked: the table of asks and questions, each asks_errand answer
+printed; her list's numbers read from can_do() (in the test room a step aside 1, a search 5); asked the way, the step
+aside's and the search's [DO: n] dropped, her line said, her errand none and her cell the same ten ticks on; "Step aside,
+please." and "Can you step out of the way?" taken, read on both rows from the ask (her voice row's "do", from a scratch
+mind log, and her errand row begun and done) and her cell left; "Search about here." taken, her voice row's "do", the
+search set off and under way. The rows put back what they change (her errand, step-aside cell, intent, place, mind and
+the mind log's path). The model, twelve tries each (C:/dev/review/companions/do_960_twelve.md, qwen3:14b as OllamaMind
+asks): "Where is the temple?" carried a [DO] in 10 of 12, all dropped, no errand in any; every [DO] on a plain ask taken
+(27 of 27: "Search about here." 12 of 12, "Can you step out of the way?" 12 of 12, "Step aside." 3 of 12, the model
+tagging only 3 there, as on main). Those twelve ran on 960's tree without 945 amended (2)'s guide, so their where-answers
+are base's ("the temple's under the town", "I've never been to Umbrage"); the guide, stacked on this, replaces them, and
+the file is no picture of the game after the stack. A bare order the model leaves untagged, a second-person stage
+direction shown as her line, and a find told before she has looked are on main as before: a row of their own after this.
+Server only; protocol unchanged.
