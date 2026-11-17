@@ -7,9 +7,6 @@ notes (decision 324).
 
 ## Unreleased
 
-- Towns: in the Mughouse the windows are sky blue by day and deep blue at night, daylight falls pale across the floor by the door and fades through the evening to hearth and candlelight, the lane's cobbles and green ground lie outside its walls, with the door lantern's glow on the step at night, and a candle burns on a table upstairs (946).
-- The temple and the healers' huts are indoors: step inside one and the camera takes its inside view and the rain stays off you, while a ruin with no roof lets the rain in (751 amended (10), 775 amended (2)).
-- The world map draws only the world's own places, one line between any two that join, and an unclaimed place by its name alone (445 amended (3)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
@@ -21,6 +18,12 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.229
+
+- Towns: in the Mughouse the windows are sky blue by day and deep blue at night, daylight falls pale across the floor by the door and fades through the evening to hearth and candlelight, the lane's cobbles and green ground lie outside its walls, with the door lantern's glow on the step at night, and a candle burns on a table upstairs (946).
+- The temple and the healers' huts are indoors: step inside one and the camera takes its inside view and the rain stays off you, while a ruin with no roof lets the rain in (751 amended (10), 775 amended (2)).
+- The world map draws only the world's own places, one line between any two that join, and an unclaimed place by its name alone (445 amended (3)).
 - Towns: at noon a couple of Umbrage's townsfolk spend the hour in the square near its fire, drifting in over a quarter of an hour, and another comes in from the woods to join them for a while (969).
 
 ## v0.1.228
