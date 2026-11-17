@@ -4140,6 +4140,79 @@ func _size_lantern(light: OmniLight3D) -> void:
 	light.light_energy = LANTERN_ENERGY * (DAMP_LANTERN if damp else 1.0)
 
 
+## Where a carried lantern's light stands (451 amended, the coordinator's ruling on the dusk face,
+## 11-16): ahead of the face, LANTERN_AHEAD along the body's drawn facing and LANTERN_OVER over
+## the head's top, so a face takes it. Straight over the head (LANTERN_OVER_LYING, the old place)
+## the face's own plane took none of it: by night the face fell to 35 to 45 % of its noon
+## lightness while the lit crown kept 75 %. The drawn facing is the Body's yaw as last drawn (its
+## turn eased, a standing turn's shuffle), never the entity's: the light never leads the body.
+## Lying (asleep, knocked down, downed) it stands over the head as before. Short of a wall: where
+## the cell ahead is closed to light (lantern_reach), the light stops LANTERN_WALL_GAP inside the
+## carrier's own cell, never in the wall or the room behind it. Only the light moves: the pane
+## at the belt, emit_light and the sim's light (Fields, at the carrier's tile) are as they were.
+const LANTERN_AHEAD := 0.45
+const LANTERN_OVER := 0.3
+const LANTERN_OVER_LYING := 0.6
+const LANTERN_WALL_GAP := 0.15
+func _place_lantern_light(puppet: Node3D, light: OmniLight3D) -> void:
+	var top := float(puppet.get_meta("lantern_top", 0.0))
+	var body := puppet.get_node_or_null("Body") as Node3D
+	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
+	var lying := bool(puppet.get_meta("lying", false)) or bool(puppet.get_meta("downed", false)) \
+			or bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0))
+	var want := Vector3(0.0, top + LANTERN_OVER_LYING, 0.0)
+	if body != null and not lying:
+		var yaw := body.rotation.y
+		var way := Vector2(cos(yaw), -sin(yaw))
+		var over := top + LANTERN_OVER
+		var reach := lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, LANTERN_AHEAD,
+				func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+		want = Vector3(way.x * reach, over, way.y * reach)
+	if not light.position.is_equal_approx(want):
+		light.position = want
+
+
+## Whether light from [param cell] is stopped going [param step] (one cell, orthogonal) at a height
+## of [param at] (the rig's y): a wall or a shut door on the edge (World.edge_blocks_sight, a
+## field's fence open), or the ground of the cell beyond rising past it (a cliff's face).
+func _shuts_light(cell: Vector2i, step: Vector2i, at: float) -> bool:
+	return World.edge_blocks_sight(cell, step) or _tile_position(cell + step).y > at - LANTERN_WALL_GAP
+
+
+## How far along [param way] (a unit vector, the rig's x and z) from [param at] (the rig's frame:
+## cells 1 m, their centres on whole numbers) a carried lantern's light may stand, at most
+## [param most]: [param most], unless it (with LANTERN_WALL_GAP to spare) would pass into a cell
+## that [param shut] (cell, orthogonal step -> bool) closes to light, when it stops LANTERN_WALL_GAP
+## short of leaving the carrier's cell (0 at the least). Into a cell across a corner, either way
+## round the corner closed stops it. The grid's cells only, no ray.
+static func lantern_reach(at: Vector2, way: Vector2, most: float, shut: Callable) -> float:
+	var cell := Vector2i(roundi(at.x), roundi(at.y))
+	var end := at + way * (most + LANTERN_WALL_GAP)
+	var step := Vector2i(roundi(end.x), roundi(end.y)) - cell
+	if step == Vector2i.ZERO:
+		return most
+	var across := Vector2i(signi(step.x), 0)
+	var down := Vector2i(0, signi(step.y))
+	var closed := false
+	if across != Vector2i.ZERO and down != Vector2i.ZERO:
+		closed = bool(shut.call(cell, across)) or bool(shut.call(cell + across, down)) \
+				or bool(shut.call(cell, down)) or bool(shut.call(cell + down, across))
+	else:
+		closed = bool(shut.call(cell, across + down))
+	if not closed:
+		return most
+	var leave := most + LANTERN_WALL_GAP
+	if way.x > 0.0001:
+		leave = minf(leave, (cell.x + 0.5 - at.x) / way.x)
+	elif way.x < -0.0001:
+		leave = minf(leave, (cell.x - 0.5 - at.x) / way.x)
+	if way.y > 0.0001:
+		leave = minf(leave, (cell.y + 0.5 - at.y) / way.y)
+	elif way.y < -0.0001:
+		leave = minf(leave, (cell.y - 0.5 - at.y) / way.y)
+	return clampf(leave - LANTERN_WALL_GAP, 0.0, most)
+
+
 ## The cells' brightness for the soft scatter (580, terrain's side): an L8
 ## image over the mask's cells, full until _shade_floor writes each one,
 ## published as the global "floor_shade" with its rect (origin, size in
@@ -23708,6 +23781,7 @@ func _sync_puppets() -> void:
 					shown = lit and dark >= LANTERN_DAY_LEAST
 				if lantern.visible != shown:
 					lantern.visible = shown
+				_place_lantern_light(puppet, lantern)
 			_glow_lantern(puppet)
 		elif entity is Monster:
 			_sync_named(entity as Monster, puppet)
@@ -29470,9 +29544,11 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		light.light_color = PLAYER_LIGHT
 		_size_lantern(light)
 		_cast_shadows(light)
-		# Above the head: inside the body it would light the body from within
-		# and leave its outside in its own shadow.
-		light.position.y = height + 0.6
+		# Out of the body: inside it, it would light the body from within and leave its outside in
+		# its own shadow. Over the head till the first frame stands it ahead of the face
+		# (_place_lantern_light).
+		light.position.y = height + LANTERN_OVER_LYING
+		puppet.set_meta("lantern_top", height)
 		puppet.add_child(light)
 		# The lantern itself hangs at the belt (decision 451), the light above.
 		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r")

@@ -122,6 +122,7 @@ func _ready() -> void:
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
+		_test_lantern_ahead()
 		_test_heard_over()
 		_test_knight_stands()
 		await _test_forge()
@@ -3289,6 +3290,94 @@ func _test_knight_stands() -> void:
 			"he plays his vigil as the people stand (%s), and never fidgets" % (rig.as_played(rig.base_clip()) if rig != null else "no rig"))
 	if knight != null:
 		World.despawn(knight)
+
+
+## The carried light ahead of the face (451 amended, the coordinator's ruling on the dusk face):
+## along the body's drawn facing, over the head's top, never leading the turn, short of a wall,
+## over the head lying; the sim's light as it was.
+func _test_lantern_ahead() -> void:
+	print("\n== the carried light: ahead of the face, short of a wall, the sim's light unmoved ==")
+	var ahead := Client3D.LANTERN_AHEAD
+	var gap := Client3D.LANTERN_WALL_GAP
+	var never := func(_cell: Vector2i, _step: Vector2i) -> bool: return false
+	var east_wall := func(cell: Vector2i, step: Vector2i) -> bool: return cell == Vector2i.ZERO and step == Vector2i(1, 0)
+	var corner := func(cell: Vector2i, step: Vector2i) -> bool: return cell == Vector2i(1, 0) and step == Vector2i(0, 1)
+	var open := Client3D.lantern_reach(Vector2.ZERO, Vector2(1, 0), ahead, never)
+	var nose := Client3D.lantern_reach(Vector2.ZERO, Vector2(1, 0), ahead, east_wall)
+	var near := Client3D.lantern_reach(Vector2(0.3, 0.0), Vector2(1, 0), ahead, east_wall)
+	var touching := Client3D.lantern_reach(Vector2(0.45, 0.0), Vector2(1, 0), ahead, east_wall)
+	var away := Client3D.lantern_reach(Vector2.ZERO, Vector2(-1, 0), ahead, east_wall)
+	var slant := Vector2(1, 1).normalized()
+	var round_corner := Client3D.lantern_reach(Vector2(0.2, 0.2), slant, ahead, corner)
+	_check(is_equal_approx(open, ahead) and is_equal_approx(away, ahead), "open ground, or the wall behind: the full %.2f m ahead" % ahead)
+	_check(is_equal_approx(nose, 0.5 - gap) and is_equal_approx(near, 0.2 - gap) and touching == 0.0,
+			"a wall ahead: the light stops %.2f m inside the cell (from its middle %.2f, 0.3 m on %.2f, at the wall %.2f)" % [gap, nose, near, touching])
+	_check(absf(round_corner - ((0.5 - 0.2) / slant.x - gap)) < 0.001,
+			"into a cell across a corner, a wall either way round stops it (%.3f)" % round_corner)
+	# In the rig: the player's light along the body's drawn yaw, over the head's top.
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var light := puppet.get_node_or_null("Lantern") as OmniLight3D
+	var body := puppet.get_node_or_null("Body") as Node3D
+	_check(light != null and body != null and puppet.has_meta("lantern_top"), "the player's light, body and head's top")
+	if light == null or body == null:
+		return
+	var top := float(puppet.get_meta("lantern_top"))
+	var turned := body.rotation.y + 1.0
+	body.rotation.y = turned
+	_rig._place_lantern_light(puppet, light)
+	var way := Vector2(cos(turned), -sin(turned))
+	var shut := func(cell: Vector2i, step: Vector2i) -> bool: return _rig._shuts_light(cell, step, puppet.position.y + top + Client3D.LANTERN_OVER)
+	var reach := Client3D.lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, ahead, shut)
+	var want := Vector3(way.x * reach, top + Client3D.LANTERN_OVER, way.y * reach)
+	_check(light.position.is_equal_approx(want), "along the body's drawn yaw, %.2f m ahead, %.2f over the head's top (%s)" % [reach, Client3D.LANTERN_OVER, light.position])
+	# The face's plane takes it: from the eyes (a tenth ahead of the head's axis, 0.12 under its top).
+	var face := Vector3(way.x * 0.1, top - 0.12, way.y * 0.1)
+	var old := Vector3(0.0, top + Client3D.LANTERN_OVER_LYING, 0.0)
+	var takes := (light.position - face).normalized().dot(Vector3(way.x, 0.0, way.y))
+	var took := (old - face).normalized().dot(Vector3(way.x, 0.0, way.y))
+	_check(reach < 0.2 or (takes > 0.5 and took <= 0.0),
+			"the face's plane takes it, %.2f of full on; straight over the head it took none (%.2f)" % [takes, took])
+	# Never leading the turn: a frame draws the light at the yaw the body was drawn at, then turns the body.
+	var before := body.rotation.y
+	_rig._process(0.0)
+	var drawn := Vector2(light.position.x, light.position.z)
+	_check(drawn.length() < 0.01 or absf(angle_difference(atan2(-drawn.y, drawn.x), before)) < 0.01,
+			"it follows the body's drawn yaw (%.2f), not the facing the body is turning to (%.2f)" % [before, body.rotation.y])
+	# Lying: over the head.
+	puppet.set_meta("lying", true)
+	_rig._place_lantern_light(puppet, light)
+	_check(light.position.is_equal_approx(old), "knocked down or asleep: straight over the head, as before")
+	puppet.set_meta("lying", false)
+	_rig._place_lantern_light(puppet, light)
+	# A wall in this room: from a cell beside it, facing it, the light stays inside the cell.
+	var found := false
+	var at_wall := -1.0
+	for cell: Vector2i in _cells_round(player.tile, 8):
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if not found and World.edge_blocks_sight(cell, step):
+				found = true
+				at_wall = Client3D.lantern_reach(Vector2(cell), Vector2(step), ahead,
+						func(c: Vector2i, s: Vector2i) -> bool: return World.edge_blocks_sight(c, s))
+	_check(found and is_equal_approx(at_wall, 0.5 - gap), "facing a wall of this room from its cell's middle: %.2f m ahead, inside the cell" % at_wall)
+	# The sim's light: at the carrier's tile, whatever the drawn light does.
+	# Cells out where the carried light falls off (next to the carrier it fills the cell to 1).
+	var cells := [player.tile + Vector2i(3, 0), player.tile + Vector2i(-4, 0), player.tile + Vector2i(0, 5)]
+	var lit_before := cells.map(func(c: Vector2i) -> float: return World.fields.light_at(World, c, true, false))
+	body.rotation.y += PI
+	_rig._process(0.0)
+	var lit_after := cells.map(func(c: Vector2i) -> float: return World.fields.light_at(World, c, true, false))
+	_check(lit_before == lit_after and lit_after.any(func(v: float) -> bool: return v > 0.0 and v < 1.0), "the sim's light (its sources and carried lights, no sky) the same, the drawn light turned (%s)" % [lit_after])
+
+
+## The cells within [param r] of [param at], nearest rows first.
+func _cells_round(at: Vector2i, r: int) -> Array:
+	var out := []
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
+			out.append(at + Vector2i(dx, dy))
+	return out
 
 
 func _test_hip_lantern() -> void:
