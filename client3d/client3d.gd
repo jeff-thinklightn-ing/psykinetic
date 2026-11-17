@@ -27929,9 +27929,10 @@ const LIE_HEIGHT := {"prop.bed": 0.43, "prop.bed_straw": 0.37, "prop.bedroll": 0
 ## On a drawn plain bed (751 amended (8), pc-character's measure for art-kit's cover): the curled body
 ## this much farther toward the foot, times its scale. Laid SLEEP_MIDDLE back from its head cell alone,
 ## the head and hair of a tall heavy man (1.08) reached the bed's z -1.09, through the headboard's upper
-## board and out behind it, and every sleeper's was in the board; from here the largest head stops short
-## of the board's face (-0.94 of the bed's -1.0 end) and the toes lie well inside the foot posts.
-const SLEEP_BED_BACK := {"prop.bed": 0.15}
+## board and out behind it, and every sleeper's was in the board; from here the largest head, a brimmed
+## hat's brim on a 1.08 sleeper, stops 2 cm short of the board's face (-0.94 of the bed's -1.0 end; a
+## sleeper over about 1.13 would touch it) and the toes lie well inside the foot posts.
+const SLEEP_BED_BACK := {"prop.bed": 0.20}
 func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 	var want := "%s|%s" % [body.tile, body.facing] if body.activity == "sleep" else ""
 	if want == str(puppet.get_meta("bedroll", "")):

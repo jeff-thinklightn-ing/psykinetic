@@ -15127,7 +15127,8 @@ func _test_sleeper() -> void:
 ## board's face (art-kit's -0.94; laid SLEEP_MIDDLE back alone a tall heavy man's head reached
 ## -1.09, out behind the board), nothing past the foot posts (+0.92), and its lowest point within
 ## 2 cm of the mattress's top (0.42; at 0.37 it sank 3 to 5 cm). The largest sleeper, a tall heavy
-## man at 1.08, and a middling woman at 1.0.
+## man at 1.08 in a brimmed hat (the hat's brim reaches farthest toward the head end), and a
+## middling woman at 1.0.
 const BED_BOARD_FACE := -0.94
 const BED_FOOT_POSTS := 0.92
 const BED_MATTRESS := 0.42
@@ -15140,7 +15141,7 @@ func _test_sleeper_on_bed() -> void:
 	var house := {"rect": Rect2i(-621, -621, 3, 4), "beds": [{"cells": [head_cell, head_cell + Vector2i(0, 1)], "head": Vector2i(0, -1), "prop": "prop.bed"}]}
 	_rig._terrain["plot_buildings"] = plots + [house]
 	var to_bed := Transform3D(Basis.IDENTITY, -Vector3(head_cell.x, 0.0, head_cell.y + 0.5))  # The bed's middle, its head -z.
-	for case: Array in [["a tall heavy man", "seed=11 body=male build=heavy stature=tall age=grown hair=cropped beard=full", 1.08],
+	for case: Array in [["a tall heavy man in a brimmed hat", "seed=11 body=male build=heavy stature=tall age=grown hair=cropped beard=full headwear=hat", 1.08],
 			["a middling woman", "seed=11 body=female build=middling stature=middling age=grown hair=bound", 1.0]]:
 		var look := PersonLook.make(str(case[1]))
 		var kind: Dictionary = Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN
@@ -15170,18 +15171,19 @@ func _test_sleeper_on_bed() -> void:
 		look.apply(model)
 		var rig := AnimRig.make(model, lib, 0.0, true, null)
 		rig.loop("Idle", 0.0)
-		var reach := [INF, -INF, INF]  # The least z, the most z, the least y, in the bed's frame.
+		var reach := [INF, -INF, INF, INF]  # The least z, the most z, the least y (the body and hair), the least y of a hat, in the bed's frame.
 		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 		for t: float in [0.0, 1.7, 3.4]:
 			rig.base_at("Sleep_Side", t)  # As the game poses it (AnimRig's tree), not the clip's raw tracks.
 			rig.tree.advance(0.0)
 			for mesh_node: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 				if mesh_node.is_visible_in_tree() and mesh_node.skin != null and mesh_node.get_parent() is Skeleton3D:
-					_bed_reach(mesh_node, to_bed, reach)
+					_bed_reach(mesh_node, to_bed, reach, String(mesh_node.name) in PersonLook.HEADWEAR_PARTS.values())
 		_check(float(reach[0]) >= BED_BOARD_FACE and float(reach[1]) <= BED_FOOT_POSTS,
 			"%s (%.2f): from %.3f (the headboard's face %.2f) to %.3f (the foot posts %.2f) along the bed" % [case[0], size, reach[0], BED_BOARD_FACE, reach[1], BED_FOOT_POSTS])
 		_check(absf(float(reach[2]) - BED_MATTRESS) <= 0.02,
-			"%s: its lowest point %.3f, on the mattress's top (%.2f, within 2 cm)" % [case[0], reach[2], BED_MATTRESS])
+			"%s: its lowest point %.3f, on the mattress's top (%.2f, within 2 cm)%s" % [case[0], reach[2], BED_MATTRESS,
+			"" if is_inf(float(reach[3])) else "; the hat's brim, stiff on a head on its side, to %.3f" % float(reach[3])])
 		puppet.free()
 		resident.free()
 	if had:
@@ -15191,8 +15193,9 @@ func _test_sleeper_on_bed() -> void:
 
 
 ## [param mesh_node]'s vertices skinned on the CPU with its blend shapes, into [param to_frame]:
-## [param reach]'s least z, most z and least y widened to hold them.
-func _bed_reach(mesh_node: MeshInstance3D, to_frame: Transform3D, reach: Array) -> void:
+## [param reach]'s least z, most z and least y widened to hold them ([param worn]: a hat or hood, its
+## least y the fourth, apart from the body's).
+func _bed_reach(mesh_node: MeshInstance3D, to_frame: Transform3D, reach: Array, worn := false) -> void:
 	var skeleton := mesh_node.get_parent() as Skeleton3D
 	var mesh := mesh_node.mesh as ArrayMesh
 	var skin := mesh_node.skin
@@ -15232,7 +15235,10 @@ func _bed_reach(mesh_node: MeshInstance3D, to_frame: Transform3D, reach: Array) 
 					p += (poses[bones[i * per + k]] * shaped[i]) * w
 			reach[0] = minf(float(reach[0]), p.z)
 			reach[1] = maxf(float(reach[1]), p.z)
-			reach[2] = minf(float(reach[2]), p.y)
+			if worn:
+				reach[3] = minf(float(reach[3]), p.y)
+			else:
+				reach[2] = minf(float(reach[2]), p.y)
 
 
 ## Umbrage's townsfolk at their spots (npc's spots contract; the coordinator's Umbrage focus, Jeff:

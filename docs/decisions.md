@@ -44916,15 +44916,23 @@ top 0.42, its head end -0.90): a tall heavy man at 1.08 reached z -1.09, 11 cm o
 middling woman's head and bun -0.985; and LIE_HEIGHT["prop.bed"] 0.37 sank the curled body 3 to 5 cm into the
 mattress. SLEEP_MIDDLE (0.81) was fitted on the bedroll and the strip, where nothing stands at the head end. Now on
 a drawn plain bed (_sync_bedroll's non-solid bed, its prop in SLEEP_BED_BACK) the puppet keeps "bed_back" and _lay
-lays the body SLEEP_BED_BACK["prop.bed"] (0.15) times its scale farther toward the bed's foot, and
-LIE_HEIGHT["prop.bed"] is 0.43, the mattress and a centimetre. The bedroll, the strip's lay and a furnished
-(solid) bed's (SLEEP_HEAD_BACK behind its pillow end) are as they were, their rows unchanged. The name plate goes
-with the moved head (865 amended (8) reads lay_at). view_world_test _test_sleeper_on_bed, the same lay through
-_sync_bedroll and _lay on AnimRig at three times: the tall heavy man from -0.928 to 0.654 along the bed, lowest
-0.422; a middling woman -0.835 to 0.563, lowest 0.411 (each nothing nearer the head than the board's face -0.94,
-nothing past the foot posts' 0.92, the lowest point within 2 cm of the mattress); _test_bedroll_drawn reads the
-bed's height and bed_back from the constants; parts_test _test_plate_laid's plate over the moved head within 0.1 m.
-art-kit's cover (961) is fitted to this lay. Drawing only, protocol unchanged, no new class_name.
+lays the body SLEEP_BED_BACK["prop.bed"] (0.20) times its scale farther toward the bed's foot, and
+LIE_HEIGHT["prop.bed"] is 0.43, the mattress and a centimetre. 0.15 was the first figure (the coordinator's "about
+0.14"): it cleared a bare head by a centimetre, but a brimmed hat's brim, which a sleeper keeps on, still reached
+-0.974 into the board, so 0.20. The margin: a 1.08 sleeper, the largest (tall 1.06 and the 0.02 spread), in a
+brimmed hat reaches -0.920, 2 cm short of the board's face; the hat's reach grows 0.39 m per unit of scale, so a
+sleeper over about 1.13 would touch the board; bare-headed, cropped, bound (the bun), long-haired or hooded, the same
+man stops by -0.885, and a 1.0 woman by -0.785. The toes stop by 0.708, well inside the foot posts (0.92). A known
+leftover: the brim, stiff on a head lying on its side, dips to 0.391, 3 cm into the mattress at the uncovered head
+end; the body and hair lie on it (lowest 0.411 to 0.422). The bedroll, the strip's lay and a furnished (solid) bed's
+(SLEEP_HEAD_BACK behind its pillow end) are as they were, their rows unchanged. The name plate goes with the moved head
+(865 amended (8) reads lay_at). view_world_test _test_sleeper_on_bed, the same lay through _sync_bedroll and _lay on
+AnimRig at three times: the tall heavy man in a brimmed hat from -0.920 to 0.708 along the bed, lowest 0.422 (the
+brim 0.391, reported); a middling woman -0.785 to 0.613, lowest 0.411 (each nothing nearer the head than the board's
+face -0.94, nothing past the foot posts' 0.92, the body's lowest point within 2 cm of the mattress);
+_test_bedroll_drawn and _test_room_beds read the bed's height and bed_back from the constants; parts_test
+_test_plate_laid's plate over the moved head within 0.1 m. art-kit's cover (961) is fitted to this lay. Drawing
+only, protocol unchanged, no new class_name.
 
 ## 749. Spawn safety: the nearest safe cell first
 
