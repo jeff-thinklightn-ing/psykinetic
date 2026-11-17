@@ -135,6 +135,10 @@ func _test_stamp_building() -> void:
 	_check(prompt.contains("building_hut (5 x 5), a building: hut") and prompt.contains("building_house (6 x 8), a building: house")
 			and prompt.contains("well (5 x 5), a building: well"),
 			"Claude is told which prefabs are buildings")
+	# 197 amended (3): the answer says where by what stands near it, never by cell numbers (voice's words).
+	_check(prompt.contains("then say in a sentence or two what you made and where: name something that stands near it, a building, a place such as the square or a camp, or decor such as a well or a lamp, and the side it's on by the compass, never cell numbers, and only things your tools showed you there. The player sees your changes on the map as a ghost"),
+			"the answer is asked to say where by what stands near it, by the compass, never cell numbers")
+	_check(not prompt.contains("what you made; the player sees your changes as a ghost"), "the old closing sentence is gone")
 
 
 func _test_set_building() -> void:

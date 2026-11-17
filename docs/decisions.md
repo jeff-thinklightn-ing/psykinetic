@@ -2418,6 +2418,27 @@ lines). Client and builder's stub only, protocol unchanged, no new class_name, n
 197 amended (1)'s bullet ships on playtest's joined run, which reads the world map before and after a
 live change without a restart.
 
+197 amended (3) (the coordinator's yes, 2026-11-16, on builder's read of the prompt; voice's wording;
+the label from decision_number.sh): builder mode's answer says where by what stands near it, never by
+cell numbers. The player reads only Claude's closing text (BuilderSession._text_of, the "summary");
+the tool results go back to Claude alone. The prompt's one word on that text was "say in a sentence or
+two what you made", and everything Claude reads is in coordinates (the grid, "Spots here: fire sit at
+(3, 4) facing (4, 4)", places, decor, buildings and plots at a cell, every tool result's "(x, y)"), so
+its answer would echo cell numbers to a player who sees the cells already, as the ghost. The first
+paragraph's closing sentence now reads: "Change the area with the tools, then say in a sentence or two
+what you made and where: name something that stands near it, a building, a place such as the square or
+a camp, or decor such as a well or a lamp, and the side it's on by the compass, never cell numbers, and
+only things your tools showed you there. The player sees your changes on the map as a ghost and accepts
+or discards them." Voice's reasons: the examples are kinds, not spots, and "only things your tools
+showed you there" keeps it from naming a well or a smithy the area lacks; the compass, not "behind",
+since the builder's view turns and the game's other guides speak by the compass. No real answer has
+been read: the box's key is refused since 11-13 (Jeff's to mend), and no API call is made from this PC
+for it. When real answers can be had, the first five are read by builder and the coordinator before
+anything is said of them, and voice sees a few (an area with a named building, and bare wilds).
+builder_test: the system prompt carries the sentence, and the old one is gone. The stub is unchanged.
+Server only (the prompt), protocol unchanged, no new class_name, no bullet: nobody can see its effect
+until the key is mended.
+
 ## 198. The world map editor edits level.json, through MapDocs
 
 The node map (`--world-map`, `editor/world_map_view`, Godot's GraphEdit)
