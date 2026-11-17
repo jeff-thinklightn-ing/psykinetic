@@ -972,6 +972,9 @@ const NIGHT_FLOOR_DARKEST := 0.6
 const NIGHT_KEY_2 := {"ambient": Color(0.5, 0.55, 0.72), "ambient_energy": 0.135,
 		"light": Color(0.7, 0.76, 0.95), "energy": 0.2}
 const BODY_LAYER := 1 << 18
+## People's own drawn parts alone (451 amended, the face light: _tag_body), for their FaceLight.
+## Every other light's and camera's mask is all layers, so the bit adds nothing any other reaches.
+const FACE_LAYER := 1 << 17
 const BODY_FILL := Color(0.8, 0.83, 0.92)
 const BODY_FILL_ENERGY := 0.26
 ## How far below the camera's line the fill shines (degrees), so a body's
@@ -4030,12 +4033,19 @@ func _tag_body(node: Node) -> void:
 	if (node as VisualInstance3D).layers == 0:
 		return
 	var up := node.get_parent()
+	var worn := node.name == &"Worn"
 	for i in 16:
 		if up == null or up == self:
 			return
 		if up.has_meta("entity_id"):
 			(node as VisualInstance3D).layers |= BODY_LAYER
+			# A person's (a look: player, companion, townsperson) own drawn part: skinned on its skeleton
+			# (body, head, hair, a hat, clothes) or a worn piece on a socket; not a held thing, the hung
+			# lantern, a bedroll, a label or a creature (451 amended, the face light).
+			if up.has_meta("look") and node is MeshInstance3D and (node.get_parent() is Skeleton3D or worn):
+				(node as VisualInstance3D).layers |= FACE_LAYER
 			return
+		worn = worn or up.name == &"Worn"
 		up = up.get_parent()
 
 
@@ -4142,39 +4152,61 @@ func _size_lantern(light: OmniLight3D) -> void:
 	light.light_energy = LANTERN_ENERGY * (DAMP_LANTERN if damp else 1.0)
 
 
-## Where a carried lantern's light stands (451 amended, the coordinator's ruling on the dusk face,
-## 11-16): ahead of the face, LANTERN_AHEAD along the body's drawn facing and LANTERN_OVER from
-## the head's top (under it: at the eyes' height), so a face takes it. Straight over the head
-## (LANTERN_OVER_LYING, the old place) the face's own plane took none of it: by night the face fell
-## to 35 to 45 % of its noon lightness while the lit crown kept 75 %. A first take 0.3 over the top
-## (facelight_f0fbfd9ea) lifted the face to about 0.7 of noon but lit it from steeply above: a
-## hard line at the nose, the mouth and chin dark, and a brimmed hat's brim shading the whole
-## face; at the eyes' height it lights the face from the front and passes under a brim. The drawn facing is the Body's yaw as last drawn (its
-## turn eased, a standing turn's shuffle), never the entity's: the light never leads the body.
-## Lying (asleep, knocked down, downed) it stands over the head as before. Short of a wall: where
-## the cell ahead is closed to light (lantern_reach), the light stops LANTERN_WALL_GAP inside the
-## carrier's own cell, never in the wall or the room behind it. Only the light moves: the pane
-## at the belt, emit_light and the sim's light (Fields, at the carrier's tile) are as they were.
-const LANTERN_AHEAD := 0.45
-const LANTERN_OVER := -0.15
-const LANTERN_OVER_LYING := 0.6
+## The face light (451 amended, the coordinator's ruling on the dusk face, 11-17, on its third
+## shape): by night a carried lantern's light, straight over the head (the Lantern, where main hangs
+## it: its pool, its shadows and the back of the head as they were), left the face in its own
+## plane's shade: 35 to 45 % of its noon lightness while the lit crown kept 75 %. Moving the
+## lantern ahead failed twice: 0.3 over the head's top it lit the face from steeply above (a hard
+## line at the nose, a brim shading the whole face); at the eyes' height it clipped two thirds of a
+## pale face to white and threw the body's shadow two heights long behind it. So a second light, the
+## FaceLight: weak, shadowless, FACE_LIGHT_AHEAD along the body's drawn facing at FACE_LIGHT_OVER from
+## the head's top (the eyes' height, under a brim), on FACE_LAYER alone, which only people's body,
+## head, hair and worn meshes carry (_tag_body): it lights faces (its carrier's, and another person's
+## within FACE_LIGHT_RANGE) and nothing else, no ground, no wall, no floor past a thin wall. Its
+## energy FACE_LIGHT_ENERGY times the lantern's dark (lantern_dark: none by day in the open, full by
+## night, under a roof or underground), shown while the Lantern is (covered with L, off); lying
+## (asleep, knocked down, downed) it is off. 858's body fill, if night_look_2 is switched on, takes
+## its place: never both (environment's ruling, 451's paragraph). The drawn facing is the Body's yaw
+## as last drawn (its turn eased, a standing turn's shuffle), never the entity's: it never leads the
+## body. Short of a wall all the same, so it never lights a person on a wall's far side: where the
+## cell ahead is closed to light (lantern_reach) it stops LANTERN_WALL_GAP inside its carrier's own
+## cell. The sim's light (Fields, at the carrier's tile), emit_light and the pane are as they were.
+const FACE_LIGHT_AHEAD := 0.45
+const FACE_LIGHT_OVER := -0.15
+const FACE_LIGHT_ENERGY := 0.13
+const FACE_LIGHT_RANGE := 1.5
 const LANTERN_WALL_GAP := 0.15
-func _place_lantern_light(puppet: Node3D, light: OmniLight3D) -> void:
-	var top := float(puppet.get_meta("lantern_top", 0.0))
+## Whether [param puppet]'s face light stands and where (its position set): false lying.
+func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 	var body := puppet.get_node_or_null("Body") as Node3D
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
-	var lying := bool(puppet.get_meta("lying", false)) or bool(puppet.get_meta("downed", false)) \
-			or bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0))
-	var want := Vector3(0.0, top + LANTERN_OVER_LYING, 0.0)
-	if body != null and not lying:
-		var yaw := body.rotation.y
-		var way := Vector2(cos(yaw), -sin(yaw))
-		var over := top + LANTERN_OVER
-		var reach := lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, LANTERN_AHEAD,
-				func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
-		want = Vector3(way.x * reach, over, way.y * reach)
+	if body == null or bool(puppet.get_meta("lying", false)) or bool(puppet.get_meta("downed", false)) \
+			or bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0)):
+		return false
+	var over := float(puppet.get_meta("lantern_top", 0.0)) + FACE_LIGHT_OVER
+	var yaw := body.rotation.y
+	var way := Vector2(cos(yaw), -sin(yaw))
+	var reach := lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, FACE_LIGHT_AHEAD,
+			func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+	var want := Vector3(way.x * reach, over, way.y * reach)
 	if not light.position.is_equal_approx(want):
 		light.position = want
+	return true
+
+
+## [param entity]'s face light this frame, beside its [param lantern] (shown or not as the lantern
+## is): its energy by the lantern's dark at its cell, off by day, lying, covered, or while 858's body
+## fill shows.
+func _light_face(entity: GridEntity, puppet: Node3D, lantern: OmniLight3D) -> void:
+	var face := puppet.get_node_or_null("FaceLight") as OmniLight3D
+	if face == null:
+		return
+	var dark := lantern_dark(World.fields.ambient_at(entity.tile) if World.fields != null else DayNight.light, _outdoor)
+	var shown := lantern.visible and dark >= LANTERN_DAY_LEAST and not (_body_fill != null and _body_fill.visible) \
+			and _place_face_light(puppet, face)
+	face.light_energy = FACE_LIGHT_ENERGY * dark
+	if face.visible != shown:
+		face.visible = shown
 
 
 ## Whether light from [param cell] is stopped going [param step] (one cell, orthogonal) at a height
@@ -23800,7 +23832,7 @@ func _sync_puppets() -> void:
 					shown = lit and dark >= LANTERN_DAY_LEAST
 				if lantern.visible != shown:
 					lantern.visible = shown
-				_place_lantern_light(puppet, lantern)
+				_light_face(entity, puppet, lantern)
 			_glow_lantern(puppet)
 		elif entity is Monster:
 			_sync_named(entity as Monster, puppet)
@@ -29563,12 +29595,22 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		light.light_color = PLAYER_LIGHT
 		_size_lantern(light)
 		_cast_shadows(light)
-		# Out of the body: inside it, it would light the body from within and leave its outside in
-		# its own shadow. Over the head till the first frame stands it ahead of the face
-		# (_place_lantern_light).
-		light.position.y = height + LANTERN_OVER_LYING
-		puppet.set_meta("lantern_top", height)
+		# Above the head: inside the body it would light the body from within
+		# and leave its outside in its own shadow.
+		light.position.y = height + 0.6
 		puppet.add_child(light)
+		# Its face light (451 amended, 11-17): faces alone, ahead of this one's from the first frame.
+		var face := OmniLight3D.new()
+		face.name = "FaceLight"
+		face.light_color = PLAYER_LIGHT
+		face.light_energy = 0.0
+		face.omni_range = FACE_LIGHT_RANGE
+		face.shadow_enabled = false
+		face.light_cull_mask = FACE_LAYER
+		face.visible = false
+		face.position.y = height + FACE_LIGHT_OVER
+		puppet.set_meta("lantern_top", height)
+		puppet.add_child(face)
 		# The lantern itself hangs at the belt (decision 451), the light above.
 		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r")
 		if belt != null:
