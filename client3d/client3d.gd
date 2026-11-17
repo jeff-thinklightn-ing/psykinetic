@@ -4170,12 +4170,55 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## as last drawn (its turn eased, a standing turn's shuffle), never the entity's: it never leads the
 ## body. Short of a wall all the same, so it never lights a person on a wall's far side: where the
 ## cell ahead is closed to light (lantern_reach) it stops LANTERN_WALL_GAP inside its carrier's own
-## cell. The sim's light (Fields, at the carrier's tile), emit_light and the pane are as they were.
+## cell; and, shadowless, it would shine through a wall, so its range is clipped by the grid
+## (face_light_range: the nearest edge closed to light around it, environment's read, 11-17), never
+## under FACE_RANGE_LEAST times its carrier's own face's distance, its energy lifted by as much as the
+## clip takes off that face (omni_window), so the face is lit the same by a wall as in the open. The
+## sim's light (Fields, at the carrier's tile), emit_light and the pane are as they were.
 const FACE_LIGHT_AHEAD := 0.45
 const FACE_LIGHT_OVER := -0.15
 const FACE_LIGHT_ENERGY := 0.13
 const FACE_LIGHT_RANGE := 1.5
 const LANTERN_WALL_GAP := 0.15
+## The carrier's face, from its head's axis and top (the eyes: a tenth ahead, 0.12 under the top).
+const FACE_AHEAD_OF_AXIS := 0.1
+const FACE_UNDER_TOP := 0.12
+## The least range, times the light's distance to its carrier's face (the window there 0.27).
+const FACE_RANGE_LEAST := 1.2
+
+
+## How far [param light_at] (the rig's x and z) a face light may reach: FACE_LIGHT_RANGE, or the
+## distance to the nearest cell edge [param shut] (cell, orthogonal step -> bool) closes to light,
+## each edge tried going out from the light's cell, within two cells of it (every edge nearer than
+## FACE_LIGHT_RANGE); never under [param least] (what reaches its carrier's face).
+static func face_light_range(light_at: Vector2, least: float, shut: Callable) -> float:
+	var home := Vector2i(roundi(light_at.x), roundi(light_at.y))
+	var most := FACE_LIGHT_RANGE
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			var cell := home + Vector2i(dx, dy)
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				# Outward only: away from the light's cell along the step's axis, or across its own row.
+				if (step.x != 0 and dx * step.x < 0) or (step.y != 0 and dy * step.y < 0):
+					continue
+				var off := light_at - Vector2(cell)
+				var gap := absf(off.x - step.x * 0.5) if step.x != 0 else absf(off.y - step.y * 0.5)
+				var along := maxf(0.0, absf(off.y if step.x != 0 else off.x) - 0.5)
+				var d := sqrt(gap * gap + along * along)
+				if d < most and bool(shut.call(cell, step)):
+					most = d
+	return clampf(most, minf(least, FACE_LIGHT_RANGE), FACE_LIGHT_RANGE)
+
+
+## An omni light's falloff window at [param d] in a range of [param r] (Godot's: (1 - (d/r)^4)^2).
+static func omni_window(d: float, r: float) -> float:
+	if r <= 0.0:
+		return 0.0
+	var n := d / r
+	n *= n
+	n *= n
+	n = maxf(1.0 - n, 0.0)
+	return n * n
 ## Whether [param puppet]'s face light stands and where (its position set): false lying.
 func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 	var body := puppet.get_node_or_null("Body") as Node3D
@@ -4191,6 +4234,15 @@ func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 	var want := Vector3(way.x * reach, over, way.y * reach)
 	if not light.position.is_equal_approx(want):
 		light.position = want
+	# Its range clipped short of a wall's far side, its energy lifted so its carrier's face takes the same.
+	var face := Vector3(way.x * FACE_AHEAD_OF_AXIS, over - FACE_LIGHT_OVER - FACE_UNDER_TOP, way.y * FACE_AHEAD_OF_AXIS)
+	var to_face := want.distance_to(face)
+	var at := Vector2(puppet.position.x + want.x, puppet.position.z + want.z)
+	var lit := face_light_range(at, to_face * FACE_RANGE_LEAST,
+			func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+	if not is_equal_approx(light.omni_range, lit):
+		light.omni_range = lit
+	light.set_meta("lift", omni_window(to_face, FACE_LIGHT_RANGE) / maxf(omni_window(to_face, lit), 0.01))
 	return true
 
 
@@ -4204,7 +4256,7 @@ func _light_face(entity: GridEntity, puppet: Node3D, lantern: OmniLight3D) -> vo
 	var dark := lantern_dark(World.fields.ambient_at(entity.tile) if World.fields != null else DayNight.light, _outdoor)
 	var shown := lantern.visible and dark >= LANTERN_DAY_LEAST and not (_body_fill != null and _body_fill.visible) \
 			and _place_face_light(puppet, face)
-	face.light_energy = FACE_LIGHT_ENERGY * dark
+	face.light_energy = FACE_LIGHT_ENERGY * dark * float(face.get_meta("lift", 1.0))
 	if face.visible != shown:
 		face.visible = shown
 
