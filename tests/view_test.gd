@@ -21208,6 +21208,13 @@ func _test_stone_names() -> void:
 	_rig.press_at = _rig._camera.unproject_position(off_point)
 	var press_grid: Vector2 = _rig.mouse_grid()
 	_check(_rig.entity_under_mouse() != knight and press_grid.distance_to(Vector2(off_cell)) < 0.6, "a press on a ground cell off the line behind her picks the ground there (%s)" % [press_grid])
+	# 935 amended (11): the same press with a body looked through (the player's own companion, to find what lies behind her): her chest's point picks her,
+	# with her skipped it picks nothing here (no other body on the ray); skipping some other body leaves her the pick.
+	_rig.press_at = _rig._camera.unproject_position(chest)
+	var skipped: GridEntity = _rig.entity_under_mouse(knight)
+	_check(_rig.entity_under_mouse() == knight and skipped != knight and _rig.entity_under_mouse(player) == knight,
+		"a press on her chest picks her; skipped, not her (%s); another body skipped, still her" % [skipped])
+	_rig.press_at = Vector2(INF, INF)
 	# The point a tour sends for a cell (Client3D.screen_point_of, bot.click's) picks the cell back, on both cameras, flat ground and raised: a bot one cell
 	# off on the high camera would void tours quietly (ui-design's check of 935 amended (9) aimed at its puppet's height, which is a cell off in ortho at 50 degrees).
 	var flat_cell: Vector2i = player.tile + Vector2i(-3, -1)

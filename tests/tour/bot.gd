@@ -327,6 +327,34 @@ func click(at: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
 			await frames(1)
 
 
+## A press at [param point] on the screen (viewport coordinates), as a player's: Main's own press, the point
+## the pick reads (935 amended (9)), whatever lies under it. For a press at a place on a body (body_point), where
+## click(cell) sends a cell's ground point (935 amended (11); ui, in playtest's place on the coordinator's ruling).
+func click_point(point: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
+	_clicked_frame = Engine.get_process_frames()
+	for pressed: bool in [true, false]:
+		var event := InputEventMouseButton.new()
+		event.button_index = button
+		event.pressed = pressed
+		event.position = point
+		event.global_position = point
+		main._unhandled_input(event)
+		if pressed:
+			await frames(1)
+
+
+## Where [param height] metres up [param entity]'s body is on the screen, in viewport coordinates; NaN when it has no
+## puppet in view or is behind the lens.
+func body_point(entity: GridEntity, height := 0.9) -> Vector2:
+	var puppet: Node3D = main._client3d._puppets.get(entity.get_instance_id()) if main._client3d != null else null
+	if puppet == null or not is_instance_valid(puppet):
+		return Vector2(NAN, NAN)
+	var spot := puppet.global_position + Vector3.UP * height
+	if main._client3d._camera.is_position_behind(spot):
+		return Vector2(NAN, NAN)
+	return main._client3d._camera.unproject_position(spot)
+
+
 ## Where cell [param at]'s ground point is on the screen, in viewport coordinates (Camera3D.unproject_position); NaN when it is behind the lens or off
 ## the visible rect.
 func screen_point(at: Vector2i) -> Vector2:

@@ -1660,10 +1660,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
+	# 935 amended (11): the player's own companion under a plain left press, with something behind her that answers a click: that wins.
+	var behind_her := false
+	if click.button_index == MOUSE_BUTTON_LEFT and on_sprite and not Keys.held_in(click, "stand") and not Keys.held_in(click, "signature"):
+		var passed := _behind_her(player, target)
+		if not passed.is_empty():
+			behind_her = true
+			target = passed["target"]
+			tile = passed["tile"]
+			on_sprite = target != null
+			if target == null:
+				target = World.get_entity_at(tile)
+			if target == null:
+				target = remains_at(tile)
 	if click.button_index == MOUSE_BUTTON_LEFT and Net.test_click_log:
 		# 935 amended (8): what the click picked and where the pointer was (the cursor's own, which a test's pick of a cell does not move): a
 		# click that did nothing says why (a person under the press is a talk, the ground a walk).
-		print("[click] press %s, pointer %s, cell %s, %s" % [Vector2i(click.position), Vector2i(get_viewport().get_mouse_position()), tile, ("on a %s (%s)" % [target.get_script().get_global_name(), "under the press" if on_sprite else "on the cell"]) if target != null else "ground"])
+		var picked_words := ("on a %s (%s)" % [target.get_script().get_global_name(), "under the press" if on_sprite else "on the cell"]) if target != null else "ground"
+		print("[click] press %s, pointer %s, cell %s, %s%s" % [Vector2i(click.position), Vector2i(get_viewport().get_mouse_position()), tile, picked_words, ", behind her companion" if behind_her else ""])
 	# Fishing (805 amended (11), "fishing that works"): the float down, a left
 	# click strikes; a left click on water with a rod on you casts there.
 	if click.button_index == MOUSE_BUTTON_LEFT and _fish_click(player, tile, on_sprite):
@@ -1812,6 +1826,15 @@ func _click_with_bow(player: Player) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)
+	var passed := _behind_her(player, target) if on_sprite else {}
+	if not passed.is_empty():  # 935 amended (11): his own companion over something that answers a click.
+		target = passed["target"]
+		tile = passed["tile"]
+		on_sprite = target != null
+		if target == null:
+			target = World.get_entity_at(tile)
+		if target == null:
+			target = remains_at(tile)
 	if opens_on_click(target):
 		_open_pack(player, target)  # 779: as the plain click without a bow.
 	elif target != null and target != player and talks_on_click(target):
@@ -27703,6 +27726,64 @@ func _fish_click(player: Player, tile: Vector2i, on_sprite: bool) -> bool:
 	return true
 
 
+## What each click on a cell answers (896, 608 amended (8), the rack, 935 amended (11)): the guards of _throne_click, _altar_click,
+## _niche_click and _rack_click, so the click and the question "does a click here answer" cannot drift.
+func _throne_here(tile: Vector2i) -> bool:
+	return throne_home and tile != NONE and not throne_at(map_name, tile).is_empty()
+
+
+func _altar_here(player: Player, tile: Vector2i) -> bool:
+	return altar_turn_in and tile != NONE and (bool(player.quest.get("ready", false)) or World.RELIC in player.slots) and knights_altar(map_name).has_point(tile)
+
+
+func _niche_here(tile: Vector2i) -> bool:
+	return Net.controls != "wasd" and tile != NONE and not niche_at(tile).is_empty()
+
+
+func _rack_here(player: Player, tile: Vector2i) -> bool:
+	return Net.controls != "wasd" and tile != NONE and not rack_at(tile).is_empty() and World.count_of(player, RACK_WOOD) > 0
+
+
+## Whether a plain left click on [param tile] (no body on it) answers with more than a walk (935 amended (11)): a throne, the altar, a
+## niche's stone, a rack, a door's cell or a level link's.
+func cell_answers(player: Player, tile: Vector2i) -> bool:
+	if tile == NONE:
+		return false
+	if _throne_here(tile) or _altar_here(player, tile) or _niche_here(tile) or _rack_here(player, tile) or World.is_link_cell(tile):
+		return true
+	for door: Door in World.get_doors():
+		if tile in Terrain.edge_cells(door.key):
+			return true
+	return false
+
+
+## The press that picked the player's own companion with something behind her that answers a click (935 amended (11); the coordinator, from
+## ui-design's niche runs: she follows at his shoulder and is often between him and what he faces): {target, tile} for what wins, {} when she
+## stays picked (nothing behind her answers). [param behind] is the body the same press meets with her looked through (null for none),
+## [param behind_tile] the cell it meets on the ground. Behind her an answer is a chest, cart or counter (opens_on_click), someone who is talked
+## to (a resident, a friend, a peaceable talker), a foe a click attacks (she is no shield), or an ore seam a held tool bites; with no body, a cell
+## that answers (cell_answers). Never for anyone but his own companion picked; the right button, E and a press on a pixel of her clear of all
+## this are untouched.
+func press_behind(player: Player, picked: GridEntity, behind: GridEntity, behind_tile: Vector2i) -> Dictionary:
+	if player == null or picked == null or not _is_own_companion(picked):
+		return {}
+	if behind != null:
+		if opens_on_click(behind) or talks_on_click(behind) or mines_on_click(player, behind) 				or (behind.is_creature() and not is_friend(behind) and World.can_target(player, behind)):
+			return {"target": behind, "tile": behind.tile}
+		return {}
+	if cell_answers(player, behind_tile):
+		return {"target": null, "tile": behind_tile}
+	return {}
+
+
+## [param picked] when it is the player's own companion under the cursor: what [method press_behind] says of the press with her looked
+## through (the same ray with her skipped, the ground cell under it); {} otherwise, and in a headless run (no ray).
+func _behind_her(player: Player, picked: GridEntity) -> Dictionary:
+	if picked == null or not _is_own_companion(picked) or _client3d == null or DisplayServer.get_name() == "headless":
+		return {}
+	return press_behind(player, picked, _client3d.entity_under_mouse(picked), _mouse_tile())
+
+
 ## A left click or E on the draugr's throne at [param tile] (896, "full
 ## circle"): on it, or beside it while another holds it, asked of the server
 ## at once (the sit, or why not); from afar walked onto first and asked on
@@ -27711,7 +27792,7 @@ func _fish_click(player: Player, tile: Vector2i, on_sprite: bool) -> bool:
 ## ordinary walk.
 func _throne_click(player: Player, tile: Vector2i) -> bool:
 	_throne_wanted = NONE
-	if not throne_home or tile == NONE or throne_at(map_name, tile).is_empty():
+	if not _throne_here(tile):
 		return false
 	if player.tile == tile or World.distance(player.tile, tile) <= 1 and World.get_entity_at(tile) != null:
 		World.command(player, "throne", {"at": [tile.x, tile.y]})
@@ -27737,11 +27818,9 @@ var _throne_wanted := NONE
 ## playtest's look_circle on 31e35af1b.)
 func _altar_click(player: Player, tile: Vector2i) -> bool:
 	_altar_wanted = NONE
-	if not altar_turn_in or tile == NONE or not (bool(player.quest.get("ready", false)) or World.RELIC in player.slots):
+	if not _altar_here(player, tile):
 		return false
 	var bier := knights_altar(map_name)
-	if not bier.has_point(tile):
-		return false
 	if _beside_rect(player.tile, bier):
 		World.command(player, "altar", {"at": [tile.x, tile.y]})
 		return true
@@ -27771,11 +27850,9 @@ var _altar_wanted := NONE
 ## the click is the ordinary one.
 func _niche_click(player: Player, tile: Vector2i) -> bool:
 	_niche_wanted = {}
-	if Net.controls == "wasd" or tile == NONE:
+	if not _niche_here(tile):
 		return false
 	var niche := niche_at(tile)
-	if niche.is_empty():
-		return false
 	if player.tile == niche["floor"]:
 		# 608 amended (9): clicked the instant he steps onto it, the route still
 		# holds its arrival step (the walk to the cell's middle): dropped, he leans now.
@@ -27912,11 +27989,9 @@ var rack_gives: Array[String] = []
 ## carries while the rack is short). False when the cell is no rack's, nothing is carried, or under the keys' scheme: the click is the ordinary one.
 func _rack_click(player: Player, tile: Vector2i) -> bool:
 	_rack_wanted = {}
-	if Net.controls == "wasd" or tile == NONE:
+	if not _rack_here(player, tile):
 		return false
 	var rack := rack_at(tile)
-	if rack.is_empty() or World.count_of(player, RACK_WOOD) <= 0:
-		return false
 	if World.distance(player.tile, rack["cell"]) <= RACK_REACH:
 		_rack_give(player, str(rack["hut"]))
 		return true

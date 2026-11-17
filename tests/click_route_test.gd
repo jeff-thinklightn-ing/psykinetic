@@ -46,6 +46,7 @@ func _ready() -> void:
 	add_child(_main)
 	await get_tree().process_frame
 	if not _far():
+		_test_press_behind()
 		_test_doorway()
 		_test_hut_sight()
 		_test_rack_click()
@@ -66,6 +67,72 @@ func _port() -> int:
 ## Whether this is the far scene (FAR_ZONES alone).
 func _far() -> bool:
 	return false
+
+
+## 935 amended (11): the player's own companion picked by a press, with something behind her on the same press that answers a click.
+## Main.press_behind's decision on real bodies and cells (the ray itself is view_test's): the wilds' Chest5, a resident, a foe, the barrow's
+## First Hall niche stone, a door cell and a link cell; her alone, another's companion and a townsperson in front untouched.
+func _test_press_behind() -> void:
+	print("
+== her own companion under the press, something that answers a click behind her: the thing behind wins (935 amended (11)) ==")
+	_check(_main.load_map("wilds"), "the wilds load")
+	var player := _player()
+	if player == null:
+		return
+	var rhea := Companion.new()
+	rhea.keeper_peer = Net.local_id
+	var theirs := Companion.new()
+	theirs.keeper_peer = Net.local_id + 77
+	var chest: GridEntity = World.get_entity_at(Vector2i(198, 201))
+	var resident: GridEntity = Resident.new()
+	var foe: GridEntity
+	for entity: GridEntity in World.get_entities():
+		if entity is Monster and foe == null and entity.spawned:
+			foe = entity
+	_check(chest is Chest and _main.is_friend(rhea) and _main._is_own_companion(rhea) and not _main._is_own_companion(theirs),
+		"a chest to stand behind her, her own companion and another player's told apart")
+	var none := {}
+	_check(_main.press_behind(player, rhea, null, Vector2i(190, 220)) == none and _main.press_behind(player, rhea, null, Main.NONE) == none,
+		"her alone, plain ground behind her: she stays picked (talk to her)")
+	var through: Dictionary = _main.press_behind(player, rhea, chest, chest.tile)
+	_check(through.get("target") == chest and through.get("tile") == chest.tile, "a chest behind her: the chest wins (its pack opens)")
+	if resident != null:
+		_check(_main.press_behind(player, rhea, resident, resident.tile).get("target") == resident, "a resident behind her: he is talked to")
+		_check(_main.press_behind(player, resident, chest, chest.tile) == none and _main.press_behind(player, theirs, chest, chest.tile) == none,
+			"a townsperson or another player's companion picked in front: untouched, they stay picked")
+	if foe != null:
+		var attackable: bool = World.can_target(player, foe) and foe.is_creature() and not _main.is_friend(foe)
+		_check(attackable == (_main.press_behind(player, rhea, foe, foe.tile).get("target") == foe),
+			"a foe behind her wins where a click on it would attack with her not there (%s attackable: %s)" % [foe.name, attackable])
+	_check(_main.press_behind(player, null, chest, chest.tile) == none and _main.press_behind(player, chest, chest, chest.tile) == none,
+		"nothing picked, or something that is no companion picked: untouched")
+	# A door cell and a link cell answer; the barrow's First Hall niche stone answers under the click scheme and not under the keys'.
+	var link_cell := Vector2i(-1, -1)
+	for link: Dictionary in _main.level.get("links", []):
+		link_cell = link["tile"]
+		break
+	_check(link_cell != Vector2i(-1, -1) and _main.cell_answers(player, link_cell) and _main.press_behind(player, rhea, null, link_cell).get("tile") == link_cell,
+		"a way down's (link) cell behind her wins: the cell is walked to")
+	_check(_main.load_map("barrow"), "the barrow loads")
+	player = _player()
+	var stone := Vector2i(27, 12)
+	var controls_was := Net.controls
+	Net.controls = "click"
+	_check(not _main.niche_at(stone).is_empty() and _main.cell_answers(player, stone) and _main.press_behind(player, rhea, null, stone).get("tile") == stone
+			and _main.press_behind(player, rhea, null, stone).get("target") == null,
+		"the First Hall's niche stone behind her: the stone's click wins (its cell, no body)")
+	Net.controls = "wasd"
+	_check(not _main.cell_answers(player, stone) and _main.press_behind(player, rhea, null, stone) == none, "under the keys' scheme the stone is no click: she stays picked")
+	Net.controls = controls_was
+	var door_cell := Vector2i(-1, -1)
+	for door: Door in World.get_doors():
+		door_cell = Terrain.edge_cells(door.key)[0]
+		break
+	_check(door_cell == Vector2i(-1, -1) or (_main.cell_answers(player, door_cell) and _main.press_behind(player, rhea, null, door_cell).get("tile") == door_cell),
+		"a door's cell behind her wins (%s)" % [door_cell])
+	rhea.free()
+	theirs.free()
+	resident.free()
 
 
 ## The healer in his doorway (perf_folk4: Hob on (152, 232) at night, every

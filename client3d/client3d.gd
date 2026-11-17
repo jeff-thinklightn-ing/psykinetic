@@ -6181,9 +6181,10 @@ func _pick() -> Dictionary:
 ## The entity whose puppet is under the cursor, or null. The local player
 ## is looked through, so clicks pass on to what is behind it; a door in
 ## front stops the ray. Where no puppet is hit, a monster within PICK_SLACK
-## of the cursor's ray is the one (the nearest, if more).
-func entity_under_mouse() -> GridEntity:
-	return entity_on_ray(_mouse_ray())
+## of the cursor's ray is the one (the nearest, if more). [param skip] is looked through as the
+## player is (935 amended (11): his own companion, to find what lies behind her).
+func entity_under_mouse(skip: GridEntity = null) -> GridEntity:
+	return entity_on_ray(_mouse_ray(), skip)
 
 
 ## Where cell [param cell]'s ground point is on the screen, in viewport coordinates (the space a press's position and the pointer are read in); NaN when it
@@ -6201,7 +6202,7 @@ func screen_point_of(cell: Vector2i) -> Vector2:
 
 
 ## The entity a ray [param ray] ([origin, direction], as _mouse_ray gives) picks: the cursor's, or a test's from the camera through a ground cell.
-func entity_on_ray(ray: Array[Vector3]) -> GridEntity:
+func entity_on_ray(ray: Array[Vector3], skip: GridEntity = null) -> GridEntity:
 	var own := _local_player()
 	var query := PhysicsRayQueryParameters3D.create(ray[0], ray[0] + ray[1] * CAMERA_DISTANCE * 3.0)
 	query.collide_with_areas = true
@@ -6217,10 +6218,10 @@ func entity_on_ray(ray: Array[Vector3]) -> GridEntity:
 		if not area.has_meta("entity"):
 			return null
 		var entity := instance_from_id(area.get_meta("entity")) as GridEntity
-		if entity != null and entity.spawned and entity != own and entity.holds_cell:  # Not one gone (573 amended (4)).
+		if entity != null and entity.spawned and entity != own and entity.holds_cell and entity != skip:  # Not one gone (573 amended (4)).
 			return entity
 		exclude.append(hit["rid"])
-	return monster_near_ray(ray[0], ray[1])
+	return monster_near_ray(ray[0], ray[1], skip)
 
 
 ## The slack beside a body at [param at] (global), in ground units:
@@ -6237,7 +6238,7 @@ func pick_slack_at(at: Vector3) -> float:
 ## The monster whose body passes within MODEL_RADIUS + pick_slack_at of the
 ## ray from [param origin] along [param direction] (the nearest, as a share
 ## of its own slack), or null.
-func monster_near_ray(origin: Vector3, direction: Vector3) -> GridEntity:
+func monster_near_ray(origin: Vector3, direction: Vector3, skip: GridEntity = null) -> GridEntity:
 	var far := origin + direction * CAMERA_DISTANCE * 3.0
 	var best: GridEntity = null
 	var best_share := 1.0
@@ -6246,7 +6247,7 @@ func monster_near_ray(origin: Vector3, direction: Vector3) -> GridEntity:
 			continue  # Out of the view (and its reach) altogether.
 		var entity := instance_from_id(id) as GridEntity
 		var puppet := _puppets[id]
-		if not entity is Monster or not entity.spawned or not is_instance_valid(puppet) or not puppet.is_visible_in_tree():
+		if not entity is Monster or entity == skip or not entity.spawned or not is_instance_valid(puppet) or not puppet.is_visible_in_tree():
 			continue
 		var feet := puppet.global_position
 		var head := feet + Vector3.UP * float(puppet.get_meta("pick_height", 1.0))
