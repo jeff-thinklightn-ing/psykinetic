@@ -551,7 +551,7 @@ const VOICE_WORLD := """Monsters prowl there, imps and orcs and worse, and they 
 see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
 Wounds do not close on their own; a bandaging kit, used away from danger, mends them.
 Whoever falls can be brought back, but it hurts, and no one wants to fall.
-Directions are spoken as north, south, east and west."""
+Directions are spoken as north, south, east and west. Give a direction only when your Now gives it."""
 const VOICE_RULES := """You are yourself, and you talk the way you always talk. Say what you would say out loud right now: a
 sentence or two, a little more when something moves you.
 Talk about what is around you, what just happened, what today has been like, what you like, and what you would like to do.
@@ -890,6 +890,11 @@ var guide: Guide = null
 ## Main's (decision 945): her first steps with her player (FirstSteps: a
 ## newcomer's chain, her notices of a player at a loss); null for none.
 var first_steps: FirstSteps = null
+## Main's (945 amended (2)): her guide's places for her free talk (FirstSteps.PLACES' kinds her
+## player has not found, nearest first; Main._first_guide), their facts ahead of the place she
+## stands in, within [member guide_share] characters when above 0; [] for none.
+var guide_places: Array[String] = []
+var guide_share := 0
 var guide_routes := Callable()
 var guide_done := Callable()
 var guide_words := Callable()
@@ -4276,7 +4281,7 @@ func _quiet_pick_focus() -> Dictionary:
 		if thing.get("monster", false) or kind in ["stair", "ledge"] or "door" in kind or _quiet_seen.has(kind):
 			continue
 		var paces: int = thing["paces"]
-		var where := "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]
+		var where := "where you stand" if paces == 0 else _far_toward(paces, thing["point"])
 		var relations: Array[String] = thing["relations"]
 		seen_words = "%s, %s%s" % [thing["word"], where, " (" + ", ".join(relations) + ")" if not relations.is_empty() else ""]
 		options.append({"key": "sight", "words": seen_words + ".", "kind": kind, "at": thing["at"]})
@@ -5115,8 +5120,9 @@ func where_world() -> String:
 
 ## Whether a town is here (a store place in this zone's Holdings), and
 ## whether she stands on its ground (decision 400: "It's safer here in
-## town" got "I do not know what town you mean"); "" for none. The town
-## has no name of its own yet (lore's A1), so it is "the town".
+## town" got "I do not know what town you mean"): the store's ground, or
+## the town's bounds (its room, as here_in reads them; 945 amended (2));
+## "" for none. Its name is here_words' to say.
 func town_words() -> String:
 	if World.holdings == null or World.zone == null:
 		return ""
@@ -5124,7 +5130,9 @@ func town_words() -> String:
 		return World.holdings.place(id).get("kind") == "stockpile")
 	if towns.is_empty():
 		return ""
-	if not Stockpile.place_at(World.holdings, World.zone.name, tile).is_empty():
+	var level := _where_level(World.zone.name)
+	if not Stockpile.place_at(World.holdings, World.zone.name, tile).is_empty() \
+			or Level.where_name(level, tile) in (level.get("towns", []) as Array):
 		return " There is a town here, and you are in it."
 	return " There is a town here."
 
@@ -5147,35 +5155,100 @@ func standing_words() -> String:
 
 ## What lore says [param who] knows of the world (decision 381): her own
 ## knower (a companion lore names: Wren, Pip, Nix), else the townsfolk's;
-## agreed facts only, weightiest first, within LORE_CHARS, a rumour as what
-## is said. "" for none.
-static func lore_words(who: String, about := PackedStringArray()) -> String:
-	var knower := who.to_lower() if Lore.knowers().has(who.to_lower()) else "townsfolk"
-	var by_weight := func(a: Dictionary, b: Dictionary) -> bool: return float(a["weight"]) > float(b["weight"])
-	# What is in sight or was asked about first (decision 400: "what is a
-	# stag" fell past the 600 characters), then the rest by weight.
-	var facts: Array[Dictionary] = []
-	if not about.is_empty():
-		facts = Lore.known_by(knower, about, "agreed")
-		facts.sort_custom(by_weight)
-	var rest := Lore.known_by(knower, PackedStringArray(), "agreed")
-	rest.sort_custom(by_weight)
-	var ids := facts.map(func(fact: Dictionary) -> String: return str(fact["id"]))
-	facts.append_array(rest.filter(func(fact: Dictionary) -> bool: return str(fact["id"]) not in ids))
+## agreed facts only, within LORE_CHARS, a rumour as what is said. "" for
+## none. In order (945 amended (2)): what is in sight or was asked about
+## ([param about]; decision 400: "what is a stag" fell past the 600
+## characters), her guide's facts for the places in [param guide]
+## (guide_facts; within [param share] characters when above 0), the place
+## she stands in ([param place]), then the rest. Each tier by weight, a tie
+## in lore's file order (Lore.FILES and each file's own order, as known_by
+## gives them: a stable sort, so where a fact sits in its file is lore's to
+## say); a fact said once.
+static func lore_words(who: String, about := PackedStringArray(), place := PackedStringArray(),
+		guide: Array[String] = [], share := 0) -> String:
+	var knower := lore_knower(who)
 	var said: Array[String] = []
+	var taken := {}
 	var length := 0
-	for fact in facts:
-		var text := Hearsay.said_of(fact)  # A rumour as one, once (289 amended (1), npc's side).
-		if length + text.length() > LORE_CHARS:
-			continue
-		length += text.length() + 1
-		said.append(text)
+	if not about.is_empty():
+		length = _lore_fill(_by_weight(Lore.known_by(knower, about, "agreed")), LORE_CHARS, said, taken, length)
+	if not guide.is_empty():
+		length = _lore_fill(guide_facts(who, guide), length + share if share > 0 else LORE_CHARS, said, taken, length)
+	if not place.is_empty():
+		length = _lore_fill(_by_weight(Lore.known_by(knower, place, "agreed")), LORE_CHARS, said, taken, length)
+	_lore_fill(_by_weight(Lore.known_by(knower, PackedStringArray(), "agreed")), LORE_CHARS, said, taken, length)
 	return "What you know of the world: %s" % " ".join(said) if not said.is_empty() else ""
 
 
-## A zone's shown name ("The Castle"), its own name when it has none.
+## Lore's knower for [param who]: her own (a companion lore names), else the townsfolk's.
+static func lore_knower(who: String) -> String:
+	return who.to_lower() if Lore.knowers().has(who.to_lower()) else "townsfolk"
+
+
+## [param facts] (known_by's) said into [param said] while they fit [param budget] characters
+## (LORE_CHARS at most) from [param length], each fact once ([param taken], by id), a rumour as one
+## (289 amended (1), npc's side); a fact that does not fit is passed over for a shorter one. The
+## length after.
+static func _lore_fill(facts: Array[Dictionary], budget: int, said: Array[String], taken: Dictionary, length: int) -> int:
+	for fact in facts:
+		var id := str(fact["id"])
+		if taken.has(id):
+			continue
+		var text := Hearsay.said_of(fact)
+		if length + text.length() > mini(budget, LORE_CHARS):
+			continue
+		length += text.length() + 1
+		taken[id] = true
+		said.append(text)
+	return length
+
+
+## [param facts] weightiest first, a tie kept in the order given (945 amended (2): sort_custom alone
+## is not stable, so which weight-2 facts fit was not fixed; known_by's order is lore's file order).
+static func _by_weight(facts: Array[Dictionary]) -> Array[Dictionary]:
+	var order := range(facts.size())
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var wa := float(facts[a]["weight"])
+		var wb := float(facts[b]["weight"])
+		return wa > wb or wa == wb and a < b)
+	var out: Array[Dictionary] = []
+	for i: int in order:
+		out.append(facts[i])
+	return out
+
+
+## Her guide's facts (945 amended (2)) for [param places] (FirstSteps.PLACES' kinds, in her order)
+## that [param who] knows: each of the place's lore topics (companion_traits.json first_steps
+## "guide" "topics"), in order: its own entry's facts when the topic is an entry (the temple's, not
+## every fact that says "temple"), else those naming it; only common facts in Jeff's own words (the
+## fact's source, else its entry's: Lore.known_by's "source"), never a rumour, a secret or one of the
+## game's (lore's table, C:/dev/review/lore/companion_guide_places.md); each topic's by weight, in
+## file order.
+static func guide_facts(who: String, places: Array[String]) -> Array[Dictionary]:
+	var knower := lore_knower(who)
+	var topics: Dictionary = FirstSteps.guide_rules().get("topics", {})
+	var out: Array[Dictionary] = []
+	var seen := {}
+	for kind in places:
+		var of: Variant = topics.get(kind, [])
+		for each: Variant in (of as Array if of is Array else [of]):
+			var topic := str(each)
+			if topic.is_empty():
+				continue
+			var own := Lore.entries().has(topic)
+			for fact in _by_weight(Lore.known_by(knower, PackedStringArray([topic]), "agreed")):
+				var id := str(fact["id"])
+				if seen.has(id) or own and not id.begins_with(topic + ".") or fact["hearsay"] or fact["secret"] or fact["memory"] \
+						or str(fact.get("source", "")) != "Jeff":
+					continue
+				seen[id] = true
+				out.append(fact)
+	return out
+
+
 ## What her lore facts should start with (decision 400): the kinds of
-## creature she sees, the things asked about, and this place.
+## creature she sees and the things asked about. The place she stands in
+## comes after her guide's places (place_topics, 945 amended (2)).
 func lore_topics(things: Array[Dictionary]) -> PackedStringArray:
 	var out := PackedStringArray()
 	for thing in things:
@@ -5189,9 +5262,427 @@ func lore_topics(things: Array[Dictionary]) -> PackedStringArray:
 	for id: String in Lore.entries():
 		if id not in out and not said.is_empty() and RegEx.create_from_string("\\b%ss?\\b" % id.replace("_", " ")).search(said) != null:
 			out.append(id)
-	if World.zone != null:
-		out.append(World.zone.name)
 	return out
+
+
+## The place she stands in, as her lore's topic (945 amended (2), the coordinator's ruling (b): a
+## companion in the town square speaks of the town): the name every screen gives her player's spot
+## (where_in: "Umbrage" in the town and in its buildings, the level's own name, "The Wilds", out there), else the zone's own name.
+func place_topics() -> PackedStringArray:
+	var where := where_in(zone, _where_cell())
+	return PackedStringArray([where if not where.is_empty() else zone])
+
+
+## Whether she stands in a town (945 amended (2)): in a town's building, or where where_in names the
+## place of one of the zone's town stores (a "stockpile" place's cell: "Umbrage").
+func stands_in_town() -> bool:
+	var where := where_in(zone, _where_cell())
+	var level := _where_level(zone)
+	return not where.is_empty() and (not str(level.get("town", "")).is_empty() or where in (level.get("towns", []) as Array))
+
+
+## Her player's cell when they are with her in her zone, else hers.
+func _where_cell() -> Vector2i:
+	return keeper.tile if _alive(keeper) and keeper.zone == zone else tile
+
+
+## The name every screen gives [param cell] in [param zone_name] (Level.where_name, decision 665
+## amended), from what know_level kept (no parse in play): in a town's building, its town's name
+## (as town_of_building); else the room's, else the level's; "" for none.
+static func where_in(zone_name: String, cell: Vector2i) -> String:
+	var level := _where_level(zone_name)
+	var id := str(level.get("town", ""))
+	var cut := id.find("/")
+	if cut > 0 and (_zone_where.has(id.left(cut)) or Level.exists(id.left(cut))):
+		var outside := _where_level(id.left(cut))
+		var places: Dictionary = outside.get("places", {})
+		var place: Variant = places.get(id.substr(cut + 1), places.get(id))
+		if place is Dictionary and place.get("cell") is Vector2i:
+			return Level.where_name(outside, place["cell"])
+	return Level.where_name(level, cell)
+
+
+## The kinds of a level's named places her "where you are" line may name (945 amended (2), the
+## coordinator's list): never a stall, a post, the square's fire, the store or another kind.
+const HERE_KINDS: Array[String] = ["temple", "healers_hut", "fishing", "refuge", "woodlot"]
+## In a town, a named place within this many cells is the one she stands by.
+const HERE_BY := 6
+## Whether her player has found the place with Holdings id "area/key" (Main's: their own record,
+## known_places or explored_places, as the guide tier reads it; nothing logged).
+var found_place := Callable()
+
+
+## Where she stands now, in one present-tense sentence, first in her Now: each turn (945 amended
+## (2), the coordinator's design word: "I'm hoping we find a town soon", said in Umbrage's square).
+## here_in on her own cell.
+func here_words() -> String:
+	return here_in(zone, tile, found_place)
+
+
+## Where [param cell] of [param zone_name] is, as the screens name it (Level.where_name), in one
+## sentence:
+## - in a town's bounds (a room holding a town's store): "You are in Umbrage, inside the temple." in
+##   a building there, "You are in Umbrage, by the temple." within HERE_BY of a named place of
+##   HERE_KINDS, else "You are in Umbrage.";
+## - elsewhere in a level with a town: "You are in the Wilds; Umbrage lies a short walk to the
+##   east.", the nearest town by its room, or a named place of HERE_KINDS when [param found] says
+##   her player has found it (finding one is a reward), the distance in words (here_far) and the
+##   direction by World.compass;
+## - in a level with no town (the crypt, the Ossuary, the Mughouse's floors, the hills): its own name,
+##   after the room she is in when the screens name one ("You are in the entrance, in the Crypt of
+##   the Fallen."), or with the town whose building it is ("You are in the Last Light Mughouse, in
+##   Umbrage."); never a place from another level.
+static func here_in(zone_name: String, cell: Vector2i, found := Callable()) -> String:
+	if zone_name.is_empty():
+		return ""
+	var level := _where_level(zone_name)
+	var towns: Array = level.get("towns", [])
+	var name := Level.where_name(level, cell)
+	if name.is_empty():
+		name = place_name(zone_name)
+	if towns.is_empty():
+		var own := str(level.get("display_name", ""))
+		if own.is_empty():
+			own = place_name(zone_name)
+		var town := where_in(zone_name, cell) if not str(level.get("town", "")).is_empty() else ""
+		if not town.is_empty() and town != own:
+			return "You are in %s, in %s." % [_here_mid(own), town]
+		if name != own:
+			return "You are in %s, in %s." % [_here_mid(name), _here_mid(own)]  # A room of it, as the screens say, and the level.
+		return "You are in %s." % _here_mid(own)
+	if name in towns:
+		var building: Dictionary = _zone_buildings.get(zone_name, {}).get(cell, {})
+		if not building.is_empty():
+			return "You are in %s, inside %s." % [name, str(BUILDING_WORDS.get(str(building.get("slot", "")), building_short(building)))]
+		var by := _here_nearest(zone_name, level, cell, false, found)
+		if not by.is_empty() and int(by["far"]) <= HERE_BY:
+			return "You are in %s, by %s." % [name, by["name"]]
+		return "You are in %s." % name
+	var near := _here_nearest(zone_name, level, cell, true, found)
+	if near.is_empty():
+		return "You are in %s." % _here_mid(name)
+	if int(near["far"]) <= HERE_BY:
+		return "You are in %s; %s lies close by." % [_here_mid(name), near["name"]]  # No way said: across a wall it can point wrong (voice's).
+	return "You are in %s; %s lies %s to the %s." % [_here_mid(name), near["name"], here_far(int(near["far"])),
+		World.compass(Vector2(near["at"] - cell))]
+
+
+## The nearest named place to [param cell]: {name, at, far (cells, the larger of across and down)},
+## {} for none. [param away]: a town by its room (its nearest cell) or a found place of HERE_KINDS;
+## else (in a town) any place of HERE_KINDS.
+static func _here_nearest(zone_name: String, level: Dictionary, cell: Vector2i, away: bool, found: Callable) -> Dictionary:
+	var best := {}
+	var towns: Array = level.get("towns", [])
+	if away:
+		for room: Variant in (level.get("rooms", {}) as Dictionary).values():
+			if not room is Dictionary or str(room.get("name", "")) not in towns:
+				continue
+			for rect: Variant in room.get("rects", []):
+				if rect is Rect2i:
+					var at := Vector2i(clampi(cell.x, rect.position.x, rect.end.x - 1), clampi(cell.y, rect.position.y, rect.end.y - 1))
+					best = _here_nearer(best, str(room["name"]), at, cell)
+	var places: Dictionary = level.get("places", {})
+	for key: String in places:
+		var place: Variant = places[key]
+		if not place is Dictionary or str(place.get("kind", "")) not in HERE_KINDS or not place.get("cell") is Vector2i:
+			continue
+		var shown := str(place.get("name", ""))
+		if shown.is_empty() or shown.begins_with("a "):
+			continue
+		if away and not (found.is_valid() and bool(found.call("%s/%s" % [zone_name, key]))):
+			continue
+		best = _here_nearer(best, shown, place["cell"], cell)
+	return best
+
+
+static func _here_nearer(best: Dictionary, name: String, at: Vector2i, cell: Vector2i) -> Dictionary:
+	var far := maxi(absi(at.x - cell.x), absi(at.y - cell.y))
+	return {"name": name, "at": at, "far": far} if best.is_empty() or far < int(best["far"]) else best
+
+
+## A place's distance in words, never a number: "close by", "a short walk", "a fair walk", "a long walk".
+static func here_far(cells: int) -> String:
+	if cells <= HERE_BY:
+		return "close by"
+	if cells <= 25:
+		return "a short walk"
+	if cells <= 70:
+		return "a fair walk"
+	return "a long walk"
+
+
+## [param name] mid-sentence: "The Wilds" as "the Wilds".
+static func _here_mid(name: String) -> String:
+	return "the " + name.substr(4) if name.begins_with("The ") else name
+
+
+## The words a question names a place by, its plain kind (945 amended (2), the coordinator's ruling: a
+## newcomer does not know the names; lore's words, never "bread" or "food": the shop is often empty).
+## A place is also found by its screen name ("the Last Light Mughouse", "Snagfin's Fishin' Hole").
+const WAY_KINDS := {
+	"temple": "temple|priest|shrine|altar",
+	"inn": "inn|tavern|mughouse|ale|beds?|rooms?",
+	"stockpile": "store|shop|buy|sell|trade",
+	"healers_hut": "healer|healer's|hut|medicine man",
+	"fishing": "fish|fishing|fishin'",
+	"woodlot": "woodlot",
+	"refuge": "refuge",
+}
+## The kinds of place in a town she always may point to from inside it (the coordinator's list: the
+## temple, the store; the Mughouse comes by its door); the woodlot and the fishing hole in Umbrage's
+## room only once found.
+const WAY_TOWN_KINDS: Array[String] = ["temple", "stockpile"]
+## The most ways she is given at once, nearest first.
+const WAY_MOST := 3
+## Where to go at all ("Where should we go?", "Which way?"): her ways, nearest first.
+const WAY_GO := "(?i)\\b(where (should|shall|can|could|do|would|might) (we|i) (go|head)|which way|where to)\\b"
+## A question of where to buy something (the coordinator's ruling on voice's read of transcript 4: all 18
+## after answers to "Where can I buy bread?" sent him to a baker who is not in the game): the town's store
+## and its way, and what it sells in the game's own goods, its conditions with it (STORE_STOCK: economy's facts, voice's words).
+const WAY_BUY := "(?i)\\b(buy|buying|purchase|sell|selling|trade|shop|shopping)\\b"
+const STORE_STOCK := ("it sells what the town's makers make and what caravans bring, so its shelf comes and goes: weapons, "
+		+ "shields and bandages, and cooked food such as roast meat, roast perch or a travel ration while the town has a cook and "
+		+ "food to spare, but no bread")
+## The store's shelf as it stands, in her Now on a buying question (the coordinator's ruling on transcript 6: 11 of 12
+## dropped STORE_STOCK's conditions; voice's words): what is on it, closed ("and nothing else": no bread or sword
+## added to it), at most SHELF_MOST kinds, food first ("more besides" opens it, so bread is ruled out there); none
+## of food; bare; shut while the town is threatened (economy: the counter refuses every sale then, 762).
+## STORE_STOCK stands only where no economy runs (a bare scene).
+const SHELF_ON := "on its shelf now: %s"
+const SHELF_CLOSED := ", and nothing else"
+const SHELF_MORE := ", and more besides, but no bread"
+## On a question for bread (SHELF_BREAD_ASKED): said of the shelf, closed or open, bare or with no food (voice;
+## economy: no bread item, but none ruled out, so "has", not "never sells"). Transcript 7: a closed list still
+## drew bread from 5 of 24, "no bread today" put it on another day.
+const SHELF_NO_BREAD := "it has no bread"
+const SHELF_BREAD_ASKED := "(?i)\\b(bread|loaf|loaves|bun|buns|baker|baker's|bakery)\\b"
+const SHELF_NO_FOOD := "; no food today"
+const SHELF_BARE := "its shelf is bare just now"
+const SHELF_SHUT := "it's shut while the town's under threat"
+const SHELF_MOST := 6
+## Things said as "some" at any count in her shelf (voice: "a roast meat" reads as a slip she would copy): a name
+## with no measure of its own. One with a measure ("bunch of herbs", "flask of wine") is counted by it.
+const SHELF_SOME: Array[String] = ["roast"]
+## Voice's leads: a buying question; a where-question naming nothing her Now or lore has.
+const BUY_LEAD := "Answer in your own words: name the store, give its way just as your Now gives it, and tell what's on its shelf as your Now tells it."
+const WAY_NONE := "You know of no such place here. Say in your own words that you don't know of one, and stop there: guess at no place, give no way, and say nothing of what is or isn't anywhere, here included."
+## Words of a place's name that name nothing by themselves.
+const WAY_NAME_SKIP: Array[String] = ["the", "a", "an", "of", "town's", "square's", "north", "south", "east", "west", "old"]
+
+
+## The ways from [param cell] of [param zone_name] to the places she may point her player to, a
+## sentence each, nearest first, WAY_MOST at most (945 amended (2), the coordinator's design on
+## transcript 3, with his two changes; lore's clearance of the Mughouse and the store):
+## - in a town's bounds: its temple, its store ("the town's store") and the building it has an inside
+##   for ("The Last Light Mughouse", by its door), always (WAY_TOWN_KINDS); another place of HERE_KINDS once
+##   [param found] says her player has found it;
+## - elsewhere in a level with a town: the town by its room, and each found place of HERE_KINDS;
+## - a level with no town: none.
+## "The temple lies a short walk to the north-west." (here_far, World.compass on the true cells);
+## "The temple lies close by." within HERE_BY, no way said. When [param heard] names a place by its
+## kind or its name, that place alone; none when that place is not one she may point to (the hut
+## not found yet): WAY_LEAD has her say she does not know the way.
+static func ways_in(zone_name: String, cell: Vector2i, found := Callable(), heard := "") -> Array[String]:
+	var level := _where_level(zone_name)
+	var towns: Array = level.get("towns", [])
+	var said: Array[String] = []
+	if towns.is_empty():
+		return said
+	var in_town := Level.where_name(level, cell) in towns
+	var spots := _way_spots(zone_name, level, cell, in_town, found)
+	var asked := _way_asked(heard, _way_spots(zone_name, level, cell, in_town, Callable(), true))
+	if not asked.is_empty():
+		spots = spots.filter(func(spot: Dictionary) -> bool: return spot["name"] in asked)
+	spots.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["far"]) < int(b["far"]))
+	for spot: Dictionary in spots.slice(0, WAY_MOST):
+		var name: String = spot["name"]
+		name = name.substr(0, 1).to_upper() + name.substr(1)
+		if int(spot["far"]) <= HERE_BY:
+			said.append("%s lies close by." % name)
+		else:
+			said.append("%s lies %s to the %s." % [name, here_far(int(spot["far"])), World.compass(Vector2(spot["at"] - cell))])
+	return said
+
+
+## What a where-to question of [param heard] asks, from [param cell] of [param zone_name] (945 amended
+## (2)): "buy" (where to buy anything: the town's store, store_words), "go" (where to go at all: ways_in),
+## "named" (a place of the level by its kind or a word of its name, one she may point to or not: ways_in,
+## else WAY_LEAD alone and she says she does not know the way), "none" (nothing of the level: WAY_NONE).
+static func way_kind(zone_name: String, cell: Vector2i, heard: String) -> String:
+	if RegEx.create_from_string(WAY_BUY).search(heard) != null:
+		return "buy"
+	if RegEx.create_from_string(WAY_GO).search(heard) != null:
+		return "go"
+	var level := _where_level(zone_name)
+	var in_town := Level.where_name(level, cell) in (level.get("towns", []) as Array)
+	if not _way_asked(heard, _way_spots(zone_name, level, cell, in_town, Callable(), true)).is_empty():
+		return "named"
+	var low := heard.to_lower()
+	var names: Array[String] = []
+	for place: Variant in (level.get("places", {}) as Dictionary).values():
+		if place is Dictionary:
+			names.append(str(place.get("name", "")))
+	for room: Variant in (level.get("rooms", {}) as Dictionary).values():
+		if room is Dictionary:
+			names.append(str(room.get("name", "")))
+	for name in names:
+		for word in name.to_lower().split(" ", false):
+			if word.length() > 2 and word not in WAY_NAME_SKIP and RegEx.create_from_string("\\b%s\\b" % word).search(low) != null:
+				return "named"
+	return "none"
+
+
+## The town's store from [param cell] of [param zone_name], a sentence for her Now (945 amended (2), voice's
+## words): "The town's store lies a short walk to the north; on its shelf now: ...", shelf_words; "" when the
+## level has no town's store.
+static func store_words(zone_name: String, cell: Vector2i, heard := "") -> String:
+	var level := _where_level(zone_name)
+	var towns: Array = level.get("towns", [])
+	var best := {}
+	var places: Dictionary = level.get("places", {})
+	for key: Variant in places:
+		var place: Variant = places[key]
+		var stocked := place is Dictionary and str(place.get("kind", "")) == "stockpile" and place.get("cell") is Vector2i
+		if stocked and Level.where_name(level, place["cell"]) in towns:
+			var spot := _way_spot(str(place.get("name", "")), "stockpile", place["cell"], cell)
+			if best.is_empty() or int(spot["far"]) < int(best["far"]):
+				best = spot
+				best["town"] = "%s/%s" % [zone_name, key]
+	if best.is_empty() or str(best["name"]).is_empty():
+		return ""
+	var name := str(best["name"])
+	name = name.substr(0, 1).to_upper() + name.substr(1)
+	var shelf := shelf_words(str(best["town"]), RegEx.create_from_string(SHELF_BREAD_ASKED).search(heard) != null)
+	if int(best["far"]) <= HERE_BY:
+		return "%s lies close by; %s." % [name, shelf]
+	return "%s lies %s to the %s; %s." % [name, here_far(int(best["far"])), World.compass(Vector2(best["at"] - cell)), shelf]
+
+
+## [param word] (the name of [param id]) for more than one on her shelf: the catalog's own plural, else a name
+## with a measure plural on its measure ("2 bunches of herbs", "2 flasks of wine"), else Main's rule.
+static func _shelf_plural(id: String, word: String) -> String:
+	if not str(Items.def(id).get("plural", "")).is_empty() or " of " not in word:
+		return Main.counted_name(id, word)
+	var measure := word.get_slice(" of ", 0)
+	return Main._plural(measure) + word.substr(measure.length())
+
+
+## What [param town]'s store (its stockpile place, "area/key") has on its shelf this moment, for her Now: the
+## things a player may buy there (Economy.goods' shelf, stockpile.shop: the town's, never a player's), counted
+## ("2 roast perch", "a sword", "some roast meat"), food first, at most SHELF_MOST kinds, closed or "more
+## besides"; "no food today" when none is food; bare when empty; shut while the town is threatened. Read from
+## memory: no level read, no path. [param bread]: the question is for bread; the shelf ends "it has no bread".
+static func shelf_words(town: String, bread := false) -> String:
+	if World.economy == null:
+		return STORE_STOCK
+	if World.towns != null and not World.towns.threatened(town).is_empty():
+		return SHELF_SHUT
+	var counts := {}
+	for uid: int in World.economy.stockpile.shop(town):
+		var id := World.economy.stockpile.book.id_of(uid)
+		if not id.is_empty():
+			counts[id] = int(counts.get(id, 0)) + 1
+	if counts.is_empty():
+		return SHELF_BARE + (", and " + SHELF_NO_BREAD if bread else "")
+	var rows: Array = []
+	for id: String in counts:
+		rows.append({"id": id, "count": counts[id], "food": Items.has_tag(id, "food")})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a["food"] != b["food"]:
+			return a["food"]
+		return a["count"] > b["count"] if a["count"] != b["count"] else str(a["id"]) < str(b["id"]))
+	var fed := rows.any(func(row: Dictionary) -> bool: return row["food"])
+	var words := PackedStringArray()
+	for row: Dictionary in rows.slice(0, SHELF_MOST):
+		var id := str(row["id"])
+		var word := Items.name_of(id)
+		word = word.left(1).to_lower() + word.substr(1)
+		if id in SHELF_SOME:
+			words.append("some " + word)
+		elif int(row["count"]) > 1:
+			words.append("%d %s" % [row["count"], _shelf_plural(id, word)])
+		else:
+			words.append(("an " if word.left(1) in "aeiou" else "a ") + word)
+	var listed := words[0] if words.size() == 1 else ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1]
+	if rows.size() > SHELF_MOST:
+		return SHELF_ON % listed + (", and more besides, but " + SHELF_NO_BREAD if bread else SHELF_MORE) + ("" if fed else SHELF_NO_FOOD)
+	var said := SHELF_ON % listed + SHELF_CLOSED
+	if not fed:
+		return said + SHELF_NO_FOOD + (", and " + SHELF_NO_BREAD if bread else "")
+	return said + ("; " + SHELF_NO_BREAD if bread else "")
+
+
+## The places ways_in may name from [param cell]: [{name, kind, at, far}]. [param every]: each place
+## of its kinds whether or not it may be pointed to (to tell a question naming one apart).
+static func _way_spots(zone_name: String, level: Dictionary, cell: Vector2i, in_town: bool, found: Callable,
+		every := false) -> Array[Dictionary]:
+	var spots: Array[Dictionary] = []
+	var towns: Array = level.get("towns", [])
+	if not in_town or every:
+		for room: Variant in (level.get("rooms", {}) as Dictionary).values():
+			if not room is Dictionary or str(room.get("name", "")) not in towns:
+				continue
+			var best := {}
+			for rect: Variant in room.get("rects", []):
+				if rect is Rect2i:
+					var at := Vector2i(clampi(cell.x, rect.position.x, rect.end.x - 1), clampi(cell.y, rect.position.y, rect.end.y - 1))
+					best = _here_nearer(best, str(room["name"]), at, cell)
+			if not best.is_empty() and not in_town:
+				best["kind"] = "town"
+				spots.append(best)
+	var places: Dictionary = level.get("places", {})
+	for key: String in places:
+		var place: Variant = places[key]
+		if not place is Dictionary or not place.get("cell") is Vector2i:
+			continue
+		var kind := str(place.get("kind", ""))
+		var shown := str(place.get("name", ""))
+		if shown.is_empty() or shown.begins_with("a ") or (kind not in HERE_KINDS and kind != "stockpile"):
+			continue
+		var of_town := Level.where_name(level, place["cell"]) in towns
+		if kind == "stockpile" and not of_town:
+			continue
+		var may := kind in WAY_TOWN_KINDS and of_town and in_town or found.is_valid() and bool(found.call("%s/%s" % [zone_name, key]))
+		if every or may:
+			spots.append(_way_spot(shown, kind, place["cell"], cell))
+	for door: Dictionary in level.get("doors", []):
+		if (in_town or every) and Level.where_name(level, door["at"]) in towns:
+			spots.append(_way_spot(place_name(str(door["inside"])), str(door["use"]), door["at"], cell))
+	return spots
+
+
+static func _way_spot(name: String, kind: String, at: Vector2i, cell: Vector2i) -> Dictionary:
+	return {"name": name, "kind": kind, "at": at, "far": maxi(absi(at.x - cell.x), absi(at.y - cell.y))}
+
+
+## The names of the places [param spots] that [param heard] names, by WAY_KINDS or by the place's own
+## name ("the Mughouse" finds the Last Light Mughouse by its kind words, "Umbrage" the town); [] when it
+## names none (where to go at all).
+static func _way_asked(heard: String, spots: Array[Dictionary]) -> Array[String]:
+	var asked: Array[String] = []
+	if heard.is_empty():
+		return asked
+	var low := heard.to_lower()
+	for spot: Dictionary in spots:
+		var words := str(WAY_KINDS.get(spot["kind"], ""))
+		var own := str(spot["name"]).to_lower().trim_prefix("the ")
+		var named := low.contains(own)
+		if not named and not words.is_empty():
+			named = RegEx.create_from_string("\\b(%s)\\b" % words).search(low) != null
+		if named and str(spot["name"]) not in asked:
+			asked.append(str(spot["name"]))
+	return asked
+
+
+static func _where_level(zone_name: String) -> Dictionary:
+	if not _zone_where.has(zone_name):
+		know_level(zone_name, Level.load_level(zone_name) if Level.exists(zone_name) else {})
+	return _zone_where[zone_name]
+
+
+## Whether [param zone_name]'s level is out of doors (its "outdoor"), from what know_level kept.
+static func zone_outdoor(zone_name: String) -> bool:
+	return _where_level(zone_name).get("outdoor", false) == true
 
 
 static func place_name(zone_name: String) -> String:
@@ -5216,6 +5707,27 @@ static func know_level(zone_name: String, level: Dictionary) -> void:
 		if BUILDING_WORDS.has(str(building.get("slot", ""))) or building.has("kind"):
 			cells[cell] = building
 	_zone_buildings[zone_name] = cells
+	# Where a cell is, as the screens name it (945 amended (2): where_in), and its towns' names.
+	var where := {"rooms": level.get("rooms", {}), "display_name": shown, "town": level.get("town", ""),
+		"places": level.get("places", {}), "outdoor": level.get("outdoor", false) == true}
+	var towns: Array[String] = []
+	for place: Variant in (where["places"] as Dictionary).values():
+		# A town is a named room holding a town store (Umbrage); a level with a store and no room for it
+		# names every cell for itself, and is no town's bounds (resident_test's room).
+		if place is Dictionary and str(place.get("kind", "")) == "stockpile" and place.get("cell") is Vector2i 				and not Level.room_at(where, place["cell"]).is_empty():
+			var name_there := Level.where_name(where, place["cell"])
+			if not name_there.is_empty() and name_there not in towns:
+				towns.append(name_there)
+	where["towns"] = towns
+	# The buildings with a level inside (the inn's shell, the Last Light Mughouse): by their front cell,
+	# for ways_in (945 amended (2)).
+	var doors: Array[Dictionary] = []
+	for building: Variant in buildings:
+		if building is Dictionary and not str(building.get("inside", "")).is_empty() and building.get("rect") is Rect2i:
+			doors.append({"inside": str(building["inside"]), "use": str(building.get("use", "")),
+				"at": Level.front_cell(building["rect"], building.get("facing", Vector2i(0, 1)))})
+	where["doors"] = doors
+	_zone_where[zone_name] = where
 
 
 static func _zone_kind(zone_name: String) -> String:
@@ -5226,6 +5738,8 @@ static func _zone_kind(zone_name: String) -> String:
 
 ## Where she is, for a fact: the level's name ("the castle").
 static var _place_names: Dictionary[String, String] = {}
+## Each level's rooms, display name, town, places, outdoor and towns' names (know_level; where_in).
+static var _zone_where: Dictionary[String, Dictionary] = {}
 
 
 func _place_words() -> String:
@@ -5314,14 +5828,43 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
 	_sky_asked = asks_about_sky(heard)
+	var here := here_words()  # Where she stands, first (945 amended (2)).
+	# "Where are we?" and "Where should we go?" (945 amended (2)): the only compass words in her Now
+	# are the ways to places; her player and what she sees are told in plain words.
+	var where_asked := not here.is_empty() and asks_where(heard)
+	var way_asked := not here.is_empty() and not where_asked and asks_way(heard)
+	_plain_ways = where_asked or way_asked
 	var now: Array[String] = [voice_situation(), others_here(), PLAYERS_UNSEEN]
+	if not here.is_empty():
+		now.push_front(here)
 	if asks_about_items(heard):
 		now.append(carried())
 	# In the last turn, after the question, as a quiet moment's focus is (pair 5:
 	# in Now:, both runs said "It's quiet here, but that doesn't mean it's safe").
-	var place_note := place_words_now() if asks_about_place(heard) else ""
+	# "Where are we?" is answered with where she stands, not taken for the place ask on one thing
+	# there (945 amended (2): it got the crypt stair in Umbrage's square, 0 of 24).
+	var place_note := place_words_now() if asks_about_place(heard) and not _plain_ways else ""
 	var place_ask := ""
-	if not place_note.is_empty():
+	if where_asked:
+		place_note = "%s %s" % [here, WHERE_LEAD]
+	elif way_asked:
+		match way_kind(zone, tile, heard):
+			"buy":
+				var store := store_words(zone, tile, heard)
+				if store.is_empty():
+					place_note = "%s %s" % [here, WAY_NONE]
+				else:
+					now.insert(1, store)  # After where she stands.
+					place_note = "%s %s" % [here, BUY_LEAD]
+			"none":
+				place_note = "%s %s" % [here, WAY_NONE]
+			_:
+				# A way her here line gives already is not said twice (voice's read of transcript 4).
+				var said_here := here.to_lower()
+				var ways := ways_in(zone, tile, found_place, heard).filter(func(way: String) -> bool:
+					return not said_here.contains(way.to_lower().trim_suffix(".")))
+				place_note = " ".join(([here] as Array[String]) + ways + ([WAY_LEAD] as Array[String]))
+	elif not place_note.is_empty():
 		var brief := place_brief(World.zone.name if World.zone != null else "", false)
 		if bool(brief["real"]):
 			place_note = "%s %s" % [brief["text"], PLACE_LEAD]
@@ -5370,7 +5913,7 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing
-	var known := Companion.lore_words(_name_of(self), lore_topics(things))
+	var known := Companion.lore_words(_name_of(self), lore_topics(things), place_topics(), guide_places, guide_share)
 	var system := "%s %s%s%s\n\n%s%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, where_world(),
 		"\n" + known if not known.is_empty() else "", " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
@@ -5378,6 +5921,11 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 		# The A/B's October side (99330a99): card, world, now, four rules.
 		system = "%s %s%s\n\n%s\n\nNow: %s\n\n%s" % [identity(), card, instructed, where_world(), " ".join(now),
 			CAPSULE_RULES % [who, who, who, who]]
+	_plain_ways = false
+	# No way in her Now: the primer's compass sentence is left out, so she is not handed the four
+	# words with nothing to use them on (945 amended (2), the coordinator's note on transcript 3).
+	if not has_compass(" ".join(now) + " " + around + " " + place_note):
+		system = system.replace(VOICE_COMPASS, "")
 	var addressed := addressed_to(heard)
 	var speaker := heard.get_slice(" ", 0)
 	if asked:
@@ -5782,7 +6330,7 @@ func perception_list(things: Variant = null) -> String:
 	var lines: Array[String] = []
 	for thing: Dictionary in (perceived() if things == null else things):
 		var paces: int = thing["paces"]
-		var where := "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]
+		var where := "where you stand" if paces == 0 else _far_toward(paces, thing["point"])
 		var relations: Array[String] = thing["relations"]
 		lines.append("- %s, %s%s" % [thing["word"], where, ": " + ", ".join(relations) if not relations.is_empty() else ""])
 	if lines.is_empty():
@@ -5811,6 +6359,36 @@ const PLACE_WORDS := "(?i)\\b(place|where are we|around here|these (woods|parts|
 
 static func asks_about_place(heard: String) -> bool:
 	return not heard.is_empty() and RegEx.create_from_string(PLACE_WORDS).search(heard) != null
+
+
+## A question of where they are (945 amended (2)): answered from here_words, with WHERE_LEAD, in the
+## last turn after their own line; never the place ask on one thing there.
+const WHERE_WORDS := "(?i)\\b(where are we|where am i|where is this|where('s| is) here|what place is this|what is this place)\\b"
+const WHERE_LEAD := "Answer in your own words, and name where you are somewhere in it."
+
+
+## A question of where to go or where a place is (945 amended (2), the coordinator's design on
+## transcript 3): answered from ways_in, with WAY_LEAD (voice's), in the last turn after their own line.
+const WAY_WORDS := "(?i)\\b(where (should|shall|can|could|do|would|might) (we|i)|which way|where('s| is| are) (the|a|an|some)|how (do|can|would|might) (we|i) get to)\\b"
+const WAY_LEAD := "Answer in your own words. Suggest a place your Now names, and give its way just as your Now gives it, with no street, turn or landmark it doesn't give; for anywhere else, say you don't know the way yet."
+## The primer's compass sentence (in VOICE_WORLD), left out of a turn whose Now gives no way.
+const VOICE_COMPASS := "Directions are spoken as north, south, east and west. "
+const COMPASS_WORDS := "(?i)\\b(north|south|east|west)"
+
+
+## Whether [param heard] asks where to go or where a place is (WAY_WORDS).
+static func asks_way(heard: String) -> bool:
+	return not heard.is_empty() and RegEx.create_from_string(WAY_WORDS).search(heard) != null
+
+
+## Whether [param text] holds a compass word.
+static func has_compass(text: String) -> bool:
+	return RegEx.create_from_string(COMPASS_WORDS).search(text) != null
+
+
+## Whether [param heard] asks where they are (WHERE_WORDS).
+static func asks_where(heard: String) -> bool:
+	return not heard.is_empty() and RegEx.create_from_string(WHERE_WORDS).search(heard) != null
 
 
 ## Where a sight's words stop being its subject: "the lamp in the window" is
@@ -5865,6 +6443,12 @@ func place_words_now() -> String:
 ## question on it (PLACE_ASK); real false, and kind and ask "", with none.
 func place_brief(zone_name: String, new_today := false) -> Dictionary:
 	var name := place_name(zone_name) if not zone_name.is_empty() else ""
+	if zone_name == zone and not zone_name.is_empty():
+		# Where she stands, as here_in names it (945 amended (2)): "Umbrage" in its square, not "the Wilds".
+		var level := _where_level(zone_name)
+		var there := Level.where_name(level, tile)
+		if not there.is_empty():
+			name = there
 	if name.begins_with("The "):
 		name = "the " + name.substr(4)  # "You are in the Barrow", mid-sentence.
 	var head := "You are in %s%s." % [name, ", where you have not been before today" if new_today else ""]
@@ -6310,7 +6894,31 @@ func _direction(point: Vector2) -> String:
 func _paces_toward(point: Vector2) -> String:
 	var offset := point - Vector2(tile)
 	var paces := roundi(maxf(absf(offset.x), absf(offset.y)))
+	if _plain_ways:
+		return plain_far(paces)
 	return "%s to the %s" % [distance_words(paces), World.compass(offset)]
+
+
+## [param paces] off and [param point]'s way: "a few paces to the north" ("a few paces off" on a
+## where-question's turn, _plain_ways).
+func _far_toward(paces: int, point: Vector2) -> String:
+	return plain_far(paces) if _plain_ways else "%s %s" % [distance_words(paces), _direction(point)]
+
+
+## On a where-question's turn (945 amended (2), the coordinator's note: "a few paces to the west",
+## her player's place, the one compass word in the square's Now), the compass words in her Now are
+## only the ways to places: what is near her is told by how far alone.
+var _plain_ways := false
+
+
+## How far, in words with no way: "close beside you", "a few paces off", "some way off", "at the
+## edge of sight".
+static func plain_far(paces: int) -> String:
+	if paces <= 1:
+		return "close beside you"
+	if paces <= 3:
+		return "a few paces off"
+	return distance_words(paces)
 
 
 ## How far, in words, never a number: "close by", "a few paces", "some way
@@ -7900,14 +8508,11 @@ func _say_first_words() -> void:
 ## level's name, its leading "The" lowered mid-line ("the Wilds"). Inside a
 ## town's building, the town (town_of_building; the coordinator's ruling: a
 ## newcomer learns which town they are in, and a bare room label, "Forge",
-## is never said).
+## is never said). From what know_level kept (where_in): no level read in a turn (945 amended (2),
+## perf's find on main: here_name read the level from disk each call, 343 ms at her first words).
 func here_name() -> String:
 	var at: Vector2i = keeper.tile if _alive(keeper) else tile
-	var level := Level.load_level(zone)
-	var where := town_of_building(level)
-	if where.is_empty():
-		where = Level.where_name(level, at)
-	return "the" + where.substr(3) if where.begins_with("The ") else where
+	return _here_mid(where_in(zone, at))
 
 
 ## The town a building's level stands in, by every screen's name for it: its

@@ -10344,6 +10344,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.played.connect(_bond_played.bind(pet))
 	pet.on_road = _on_road
 	pet.in_town = func(cell: Vector2i) -> bool: return not _town_ground(World.zone.name, cell).is_empty()
+	pet.found_place = func(place_id: String) -> bool:  # Her "where you are" line's (945 amended (2)): their own record.
+		var theirs: PlayerRecord = _records.get(pet.keeper_id)
+		return theirs != null and (place_id in theirs.known_places or place_id in theirs.explored_places)
 	pet.player_names = func() -> Array: return _records.values().map(func(record: PlayerRecord) -> String: return record.name)
 	pet.held_camp = func(cell: Vector2i) -> bool: return not held_camp(cell).is_empty()  # 738 amended.
 	if int(record.companion.get("hp", 0)) > 0:
@@ -10748,6 +10751,8 @@ func _observe_roads() -> void:
 ## within FirstSteps "risen_s": player id -> {kind, paid, tick}.
 var _first_steps_rise: Dictionary[String, Dictionary] = {}
 var _first_steps_at := -100000
+## Whether any companion was given her guide's places (945 amended (2)), to clear them once off.
+var _first_guided := false
 ## Her first steps' live state by her player's id (945), kept across her
 ## joins in this server run (a few entries: the players seen); never saved.
 var _first_steps_live: Dictionary[String, FirstSteps] = {}
@@ -10767,7 +10772,14 @@ const FIRST_HEARD := 6
 ## step, a rising's line, or one offer to a player at a loss
 ## (_first_steps_tend). Off with the package (FirstSteps.on()).
 func _first_steps_tick() -> void:
-	if not FirstSteps.on() or World.tick - _first_steps_at < World.TICK_RATE:
+	if not FirstSteps.on():
+		if _first_guided:
+			_first_guided = false
+			for id: String in _companions:
+				if is_instance_valid(_companions[id]):
+					(_companions[id] as Companion).guide_places = []  # Off: her talk as before (945 amended (2)).
+		return
+	if World.tick - _first_steps_at < World.TICK_RATE:
 		return
 	_first_steps_at = World.tick
 	for id: String in _companions:
@@ -10781,6 +10793,8 @@ func _first_steps_tick() -> void:
 			continue
 		_first_steps_sense(pet.first_steps, player, record, pet)
 		_first_steps_tend(pet, player, record)
+		_first_guide(pet, player, record)
+		_first_guided = true
 	for who: String in _first_steps_rise.keys():
 		if World.tick - int(_first_steps_rise[who]["tick"]) > FirstSteps.ticks("risen_s", 30):
 			_first_steps_rise.erase(who)
@@ -10952,7 +10966,6 @@ func _first_unasked(pet: Companion, player: Player, record: PlayerRecord) -> voi
 			or fs.unasked_ticks.size() >= int(FirstSteps.rule("per_hour", 4)):
 		return
 	var day := Townsfolk.day_of(World.steps)
-	var outdoors: bool = Level.load_level(player.zone).get("outdoor", false) == true
 	if fs.hurt_since >= 0 and now - fs.hurt_since >= FirstSteps.ticks("hurt_s", 60) and _first_may(fs, "healer", player):
 		var hut := _first_dest("healer", pet, player, record)
 		if not hut.is_empty() and World.distance(player.tile, hut["cell"]) > FIRST_NEAR:
@@ -10965,14 +10978,7 @@ func _first_unasked(pet: Companion, player: Player, record: PlayerRecord) -> voi
 		if not door.is_empty():
 			_first_offer(pet, player, "bed", "bed", door, false, "", "dusk")
 			return
-	var why_now := ""
-	if now - fs.last_new_tick >= FirstSteps.ticks("nothing_new_s", 240) and fs.cells_since_new >= int(FirstSteps.rule("nothing_new_cells", 60)):
-		why_now = "nothing_new"
-	elif outdoors and _first_circling(fs):
-		why_now = "circling"
-	elif outdoors and fs.still_since >= 0 and now - fs.still_since >= FirstSteps.ticks("stand_s", 90) and player.fishing.is_empty() \
-			and _warm_place([], pet).get("near") != true:
-		why_now = "standing"
+	var why_now := _first_at_loss(fs, player, pet)
 	if why_now.is_empty():
 		return
 	if why_now == "standing":
@@ -10983,6 +10989,90 @@ func _first_unasked(pet: Companion, player: Player, record: PlayerRecord) -> voi
 	for each: Dictionary in _first_choices(pet, player, record, true):
 		_first_offer(pet, player, str(each["first"]), "go." + str(each["first"]), each, false, "", why_now)
 		return
+
+
+## Why [param player] reads as at a loss (945), "" if not: nothing new found for a while
+## ("nothing_new"), out of doors circling ("circling") or standing in the open, not fishing and
+## not by a fire ("standing"). Her unasked offer's reason and her guide's lost (_first_guide).
+func _first_at_loss(fs: FirstSteps, player: Player, pet: Companion) -> String:
+	var now := World.tick
+	if now - fs.last_new_tick >= FirstSteps.ticks("nothing_new_s", 240) and fs.cells_since_new >= int(FirstSteps.rule("nothing_new_cells", 60)):
+		return "nothing_new"
+	if not Companion.zone_outdoor(player.zone):
+		return ""
+	if _first_circling(fs):
+		return "circling"
+	if fs.still_since >= 0 and now - fs.still_since >= FirstSteps.ticks("stand_s", 90) and player.fishing.is_empty() \
+			and _warm_place([], pet).get("near") != true:
+		return "standing"
+	return ""
+
+
+## Her guide's places for her free talk (945 amended (2); Jeff, 11-15: the companion guides the
+## beginner and the lost): in a newcomer's first minutes (her chain running, or "window_s" from her
+## first words) or with her player lost (_first_at_loss and quiet "quiet_s", held till something new
+## is found, a walk starts or they speak to her), the places they have not found come first in her
+## lore (Companion.lore_words' guide tier, no share); the rest of her time in a town, within "share"
+## characters. An offer of hers standing narrows them to its place, and her chain to its step's.
+## Off with the package (_first_steps_tick). Nothing of it is logged.
+func _first_guide(pet: Companion, player: Player, record: PlayerRecord) -> void:
+	var fs := pet.first_steps
+	var now := World.tick
+	var rules := FirstSteps.guide_rules()
+	var why := _first_at_loss(fs, player, pet)
+	if fs.lost_at < 0:
+		if not why.is_empty() and now - pet._keeper_spoke_tick >= FirstSteps.ticks("quiet_s", 30):
+			fs.lost_at = now
+	elif fs.last_new_tick > fs.lost_at or pet._keeper_spoke_tick > fs.lost_at or pet.guide != null and pet.guide.going():
+		fs.lost_at = -1
+	if now - fs.guide_at >= roundi(float(rules.get("every_s", 5)) * World.TICK_RATE):
+		fs.guide_at = now
+		fs.guide_unfound = _first_unfound(pet, player, record)
+	var window := fs.chain_running() or fs.first_words_tick >= 0 \
+		and now - fs.first_words_tick < roundi(float(rules.get("window_s", 600)) * World.TICK_RATE)
+	var places: Array[String] = []
+	var share := 0
+	if window or fs.lost_at >= 0:
+		var kind := str(fs.offer.get("kind", "")) if not fs.offer.is_empty() else fs.next_step() if fs.chain_running() else ""
+		kind = "mughouse" if kind == "bed" else kind
+		if kind.is_empty():
+			places = fs.guide_unfound.duplicate()
+		elif kind in FirstSteps.PLACES:
+			places = [kind]
+	elif pet.stands_in_town():
+		places = fs.guide_unfound.duplicate()
+		share = int(rules.get("share", 200))
+	pet.guide_places = places
+	pet.guide_share = share
+
+
+## The places of FirstSteps.PLACES her player has not found (945 amended (2)), nearest first (those
+## in their zone by distance, then the rest in her order): each one she could lead to (_first_dest),
+## none they have found by their own record (its place in known_places or explored_places, its area
+## in known_areas) or reached on any day (her card's), the barrow's door only after her chain.
+func _first_unfound(pet: Companion, player: Player, record: PlayerRecord) -> Array[String]:
+	var fs := pet.first_steps
+	var near: Array[Array] = []
+	var far: Array[String] = []
+	for kind: String in FirstSteps.PLACES:
+		if not fs.days_at(kind).is_empty() or kind == "barrow" and fs.chain_running():
+			continue
+		var to := _first_dest(kind, pet, player, record)
+		if to.is_empty():
+			continue
+		var key := str(to.get("key", ""))
+		if key in record.known_places or key in record.explored_places or key in record.known_areas:
+			continue
+		if str(to.get("area", "")) == player.zone and to.get("cell") is Vector2i:
+			near.append([World.distance(player.tile, to["cell"]), FirstSteps.PLACES.find(kind), kind])
+		else:
+			far.append(kind)
+	near.sort()
+	var out: Array[String] = []
+	for each: Array in near:
+		out.append(str(each[2]))
+	out.append_array(far)
+	return out
 
 
 ## Whether her player's trail is circling (945): circle_steps or more over

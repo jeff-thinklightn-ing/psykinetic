@@ -102,6 +102,19 @@
 			"known_days": 3,
 			"quiet_s": 30
 		},
+		"guide": {
+			"_note": "945 amended (2): her free talk's lore puts the places her player has not found first, in a newcomer's first window_s (or while her chain runs) and while they read as lost; the rest of her time in a town, within share characters. topics: a place's kind -> its lore topics, in order (an entry id: that entry's own facts; else the facts naming it); only common facts in Jeff's own words (source \"Jeff\", the fact's own else its entry's). The pond's facts are the game's, so it gives none. every_s: how often the unfound places are worked out.",
+			"topics": {
+				"mughouse": ["last_light"],
+				"pond": ["town_pond"],
+				"healer": ["healers_hut", "medicine_man", "healer"],
+				"temple": ["temple", "priest"],
+				"barrow": ["old_mound"]
+			},
+			"window_s": 600,
+			"share": 200,
+			"every_s": 5
+		},
 		"decks": {
 			"offer.mughouse": {
 				"default": [

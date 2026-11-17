@@ -98,9 +98,9 @@ static func use(entry_list: Array, knower_list: Array, form_list := [], thing_li
 
 
 ## What [param knower] knows, in file order: [{id, text, hearsay, memory,
-## secret, kept, where, weight}] (kept: a secret the knower is named in the
+## secret, kept, where, weight, sight, source}] (kept: a secret the knower is named in the
 ## fact's kept_by for, which it acts on and never tells; where: the fact's region
-## ids; weight: its own, else DEFAULT_WEIGHT). [param about], when given, keeps the facts on any of
+## ids; weight: its own, else DEFAULT_WEIGHT; source: the fact's own, else its entry's, "" for neither). [param about], when given, keeps the facts on any of
 ## those topics (_about). [param least] is "agreed" (what code uses) or
 ## "draft" (to preview drafts).
 static func known_by(knower: String, about := PackedStringArray(), least := "agreed", type := "") -> Array[Dictionary]:
@@ -134,7 +134,8 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 						"speaks_as_rumour": known == "rumour" and fact.get("speaks_as_rumour", false) == true,  # Its text already says it is hearsay.
 						"kept": known == "secret" and knower in fact.get("kept_by", []),
 						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT)),
-						"sight": str(fact.get("sight", ""))})  # A thing to point at there (lore's, for place talk).
+						"sight": str(fact.get("sight", "")),  # A thing to point at there (lore's, for place talk).
+						"source": str(fact.get("source", entry.get("source", "")))})  # Whose words (the fact's own, else its entry's: README's rule; "Jeff": his): 945 amended (2)'s guide.
 	return out
 
 

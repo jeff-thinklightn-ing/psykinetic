@@ -13,6 +13,9 @@ const FILES := ["world", "factions", "regions", "materials", "creatures", "peopl
 const TYPES := ["world", "faction", "people", "region", "place", "material", "creature", "person", "weapon", "event"]
 const STATUSES := ["agreed", "draft", "asked"]
 const KNOWN := ["common", "rumour", "secret", "lived"]
+## Whose words a fact or an entry is (docs/lore/README.md "source"; a fact's own wins over its entry's):
+## Companion.guide_facts takes "Jeff" as his own words (945 amended (2)), so a value outside this set is a fault.
+const SOURCES := ["Jeff", "Dire", "roadmap", "game", "lore", "proposal"]
 const RELATIONS := ["in", "holds", "enemy", "feud", "ally", "from", "member", "carries", "took", "held_at"]
 ## The trades whose own lived facts may weigh 3, and the entries that are
 ## Umbrage itself, which may weigh 2 (lore (d), the coordinator's ruling 2026-11-10; the crypt
@@ -129,6 +132,14 @@ func _test_facts() -> void:
 				bad.append(fid)
 	_check(bad.is_empty(), "every fact is well formed %s" % [bad])
 	_check(not ids.is_empty(), "there are facts (%d)" % ids.size())
+	bad = []
+	for id in _entries:
+		if not str(_entries[id].get("source", "")) in SOURCES:
+			bad.append(id)
+		for fact in _entries[id]["facts"]:
+			if fact.has("source") and not str(fact["source"]) in SOURCES:
+				bad.append(fact.get("id"))
+	_check(bad.is_empty(), "every entry's and fact's source is one of %s %s" % [SOURCES, bad])
 
 
 func _test_shared_ids() -> void:

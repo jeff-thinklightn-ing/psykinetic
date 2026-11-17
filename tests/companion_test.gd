@@ -5717,7 +5717,8 @@ func _test_quiet_moment() -> void:
 	# Pair 3: asked of the place, she is told its name (803 amended (6): and one real thing, not the sights).
 	var place_ask := Companion.render(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()))
 	var plain_ask := Companion.render(pet.voice_messages(true, "%s: You all right?" % pet.keeper_name()))
-	_check("You are in " in place_ask and (Companion.PLACE_LEAD in place_ask or Companion.PLACE_LITTLE in place_ask) and not "You are in " in plain_ask,
+	# Her Now: says where she stands every turn (945 amended (2)); the place's brief is the bracketed note.
+	_check("[You are in " in place_ask and (Companion.PLACE_LEAD in place_ask or Companion.PLACE_LITTLE in place_ask) and not "[You are in " in plain_ask,
 			"\"What do you think of this place?\": its name and one thing, or that she knows little; \"You all right?\": not")
 	# Pair 3: her waking is hers ("You slept like the dead", said to her player, after she slept).
 	var woke: Array[String] = []

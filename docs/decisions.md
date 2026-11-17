@@ -60203,6 +60203,202 @@ line, and 917's rule takes over. Her pace is the walk's own (she waits while the
 Logs: "[firststeps] <signal> <place key> <cell> t<tick>", never a name or an id. tests/first_steps_test: on
 the wilds, the package forced on (FirstSteps.forced). Joined proof (four bots on a laptop through
 ui-design's slots) comes before the switch.
+
+945 amended (2): what lore puts in her hand, so her free talk guides (the script's label; lore's
+finding on the queue check: off her decks, with no topic in sight, her 600 characters held the curse,
+the robbers and the dead rising and not one place; the coordinator's rulings on companions' design).
+Two things were found on the way. In Umbrage her "no topic" was the topic "wilds": lore_topics always
+added World.zone.name, and the square stands in the wilds level, which has no display name, so the
+deer, the boar and the abandoned farmstead came ahead of the town she stood in, and the curse only as
+"Umbrage is cursed". And lore_words sorted by weight alone with sort_custom, which is not stable: which
+of the sixteen weight-2 facts fit was not fixed.
+- The order (Companion.lore_words): what is in sight or was asked about (decision 400, unchanged); her
+  guide's facts; the place she stands in; the rest. Each tier by weight, a tie in lore's file order
+  (Companion._by_weight, a stable sort on known_by's order: Lore.FILES, then each file's own order).
+  Where a fact sits in its file is now lore's to say, and lore owns it. At today's weights her set with
+  no topic is town.cursed, curse_why, in_region, threat, farmstead.where, farmstead.abandoned,
+  the_land.deadly (Lore.FILES puts regions before history, so the crypt's weight-2 facts do not fit).
+  Residents' lore_words calls (resident.gd's resting companion, Main's companion offer) take the same
+  stable order.
+- The place she stands in (the coordinator's ruling (b): a companion in the town square speaks of the
+  town): Companion.place_topics, the name every screen gives her player's spot (where_in, Level.where_name
+  from what know_level keeps, no parse in play; in a town's building its town's name): "Umbrage" in the
+  town and the Mughouse, the level's own name ("The Wilds") out in the wilds, which meets the facts that say "the wilds". In the town today: cursed,
+  curse_why, last_light.name, town.name, towerside.where, hollowfell.barrow_gold, crypt.mound, then
+  in_region, temple.in_town. Every place these name is in the build and reachable, and residents hold
+  each (lore's check, 11-16: Towerside is levels/held, linked from the wilds at (130,244); Hollowfell is
+  levels/hollowfell, through the hills at (167,58)); nothing is tagged out. This half is live on landing.
+- Where she stands, told her (the coordinator's design word on voice's read of the transcripts: in Umbrage's
+  square she said "I'm hoping we find a town soon" and answered "Where are we?" with the crypt stair, on
+  every side, base included, because nothing told her she was in it): Companion.here_words, one
+  present-tense sentence first in her Now: each turn, from the world's own plane (Level.where_name, the
+  screens' source, as know_level keeps it), never lore. In a town's bounds (the room holding a town's
+  store): "You are in Umbrage, inside the temple." in a building, "You are in Umbrage, by the temple." within
+  HERE_BY 6 cells of a named place of HERE_KINDS (temple, healers_hut, fishing, refuge, woodlot; never a
+  stall, a post, the square's fire, the store or another kind), else "You are in Umbrage.". Elsewhere in a
+  level with a town: "You are in the Wilds; Umbrage lies a short walk to the east.": the nearest town by its
+  room always, another kind only once her player has found it (Main's found_place: their record's
+  known_places or explored_places, the guide tier's read, nothing logged), since finding one is a reward;
+  the distance in words (here_far: close by, a short walk to 25 cells, a fair walk to 70, a long walk), never
+  a number; the way by World.compass, none for "close by" ("the healer's hut lies close by": across a wall a
+  way can point wrong; voice's). A place is said by the name the screens print (its level.json "name": "the
+  temple", "Snagfin's Fishin' Hole"), never its kind; one with no name, or a name like "a ruined barn", is left out. In a level with no town: its own name, after the room the screens
+  name ("You are in the First Hall, in the Crypt of the Fallen."), or with the town whose building it is
+  ("You are in the Last Light Mughouse, in Umbrage."), never a place from another level. place_brief's head
+  names the same place ("You are in Umbrage." asked of the square, not "the Wilds"), and town_words says "you
+  are in it" in the town's bounds as on the store's ground. "Where are we?" (WHERE_WORDS: where are we, where
+  am I, what place is this and the like) is no longer taken for the place ask on one thing there (803 amended
+  (6)'s, which put "What do you make of the crypt stair?" after it and "Begin with the thing itself": 0 of 24
+  named Umbrage in the batch): after their own line she is given her here line and WHERE_LEAD ("Answer in your
+  own words, and name where you are somewhere in it.", voice's: "in one line" had all 18 open "We're in
+  Umbrage, a town ..."); a question of what they think of the place keeps the place ask. VOICE_WORLD adds
+  "Give a direction only when your Now gives it." (voice's guard, the coordinator's ruling: asked where to go
+  in the square she said "head east, toward the temple", which is west; base invents ways too, but the
+  place topic tied one to a real place). A town's bounds are a named room holding a town store; a level
+  whose store has no room is no town's bounds (its every cell bears the level's name). One sentence, 20 to 70 characters a turn,
+  outside her 600 for lore; nothing taken out. Live on landing for every companion, like the place topic.
+- Her guide's facts (Companion.guide_facts): for each place of FirstSteps.PLACES her player has not
+  found, its lore topics in order (companion_traits.json first_steps "guide" "topics": mughouse
+  last_light; healer healers_hut, medicine_man, then the word "healer"; temple temple, priest; barrow
+  old_mound; pond town_pond); a topic's own entry's facts when it is an entry (crypt.mound says
+  "temple" and is Jeff's, and stays out: it is the crypt's), only common facts in Jeff's own words,
+  never a rumour, a secret or the game's (lore's table, C:/dev/review/lore/companion_guide_places.md).
+  Whose words they are is Lore.known_by's new "source": the fact's own, else its entry's (lore's
+  README rule; so temple.in_town, healers_hut.in_wilds and the two brings_back facts are Jeff's
+  through their entries). The guide tier trusts that key: a fact whose source is mis-set is a lore
+  fault, and lore_test holds the allowed values (lore's row, carried in this take: SOURCES, README's
+  list). Today: last_light.name; healers_hut.in_wilds, medicine_man.brings_back,
+  the_land.brought_back; temple.in_town, temple.charm_blessed, temple.offering, priest.brings_back;
+  old_mound.outside_town, old_mound.spears.
+  The pond gives none (its facts are the game's; they wait for Jeff).
+- When (Main._first_guide, once a second with her first steps): in a newcomer's first minutes (her
+  chain running, or "window_s" 600 from her first words) or with her player lost (Main._first_at_loss,
+  945's own measure factored out of _first_unasked: nothing new 240 s and 60 cells, circling, standing
+  in the open; and quiet "quiet_s" 30; held till something new is found, a walk starts or they speak to
+  her), the unfound places' facts come first, no share. The rest of her time in a town (Companion.stands_in_town:
+  a town's building, or where_in naming a town store's place), within "share" 200 characters, the rest by
+  order as before. An offer of hers standing narrows the places to its place (her bed offer's to the
+  Mughouse), her chain to its step's.
+- Found (Main._first_unfound, every "every_s" 5): read from the player's own record on the server: the
+  place's key in known_places or explored_places (WorldNews: within sight of it), or its area in
+  known_areas, or reached on any day (her card's days); the barrow's door only after her chain; nearest
+  first (in their zone by distance, then the rest in her order). Nothing of it is logged.
+- The town's curse stays: in the town, town.cursed is in her hand under every set of unfound places,
+  with the share or without (first_steps_test checks all 32), and with the share curse_why too.
+- What she must not do is kept by what she is given: places only from FirstSteps.PLACES that _first_dest
+  finds; facts only agreed and Jeff's own; no prompt words added (no "now" line naming the nearest place
+  until the transcripts show she never brings one up); VOICE_RULES' "no players, levels, points or rules
+  of play" stands. The decks, the offers and "ask me where to" are untouched; her free talk never makes an
+  offer.
+- Switch: the guide tier and the share ride 945's package, off with it (_first_steps_tick clears them); the
+  stable order and the place topic are live on landing. Before it queues: a transcript batch before and
+  after on this PC's Ollama (the switch forced on for the guide half, off for the place-alone half), read
+  by voice.
+- tests/first_steps_test _test_guide_lore: the three pinned sets (no topic, "Umbrage", "The Wilds") for Wren
+  and a seeded companion, the same each time; the square "Umbrage" and a town, out in the wilds "The Wilds",
+  the Mughouse "Umbrage"; the guide's facts and their sources, crypt.mound out of the temple's, none for
+  the pond; the curse in all 32 sets; the window's places with no share and her lore leading with the
+  nearest's; the nearest found dropping out; an offer narrowing to its place; past the window the share;
+  lost and quiet, the places first; spoken to, the share again; out of town none; off none.
+  _test_here: her line in the square (first in her Now:, the town in her world, place_brief's head; "Where
+  are we?" given the here line and WHERE_LEAD, "What do you think of this place?" the place ask), by
+  and inside the temple, never the crypt stair; by the healer's hut unfound the town, found the hut; far
+  off in words; the crypt, the Mughouse and the hills by their own names.
+- True ways on a where-question (the coordinator's design after transcript 3, his two changes; lore's
+  clearance of the Mughouse and the store 11-16; voice's lead): "Where should we go?", "Where is the
+  temple?", "Where's the inn?", "How do I get to ...?" (WAY_WORDS; "Where are we?" stays WHERE_WORDS')
+  get her here line, the ways and WAY_LEAD ("Answer in your own words. Suggest a place your Now names, and
+  give its way just as your Now gives it, with no street, turn or landmark it doesn't give; for anywhere
+  else, say you don't know the way yet.", voice's, its landmark clause after transcript 4's "past the old
+  well and the crooked tree"), in the
+  last turn after their line. Companion.ways_in: a sentence a place, nearest first, WAY_MOST 3 at most,
+  "The temple lies a short walk to the north-west." (here_far, World.compass on the true cells), "The
+  temple lies close by." within HERE_BY, no way said. In a town's bounds: its temple, its store ("the
+  town's store", the stockpile place in a town room) and the building it has an inside for ("The Last
+  Light Mughouse", by its front cell; know_level keeps "doors"), always; another place of HERE_KINDS only
+  once Main's found_place says her player found it. Elsewhere in a level with a town: the town by its room
+  and each found place. A level with no town: none. A question naming a place by its plain kind (WAY_KINDS:
+  "the inn", "the tavern", "the mughouse", "the store", "buy", "the temple", ...) or its screen name gets
+  that place's way alone, and none when it is not one she may point to (the hut not found: no way, though
+  she may say plainly there is a hut out in the wilds, healers_hut.in_wilds being Jeff's common fact).
+  What the question asks (way_kind): where to go at all (WAY_GO: the ways); a place of the level by its
+  kind or a word of its name (its way, else WAY_LEAD alone); where to buy anything (WAY_BUY, the
+  coordinator's ruling on voice's read of transcript 4, all 18 after answers to "Where can I buy bread?"
+  sending him to a baker the game has not got): store_words in her Now after where she stands, "The town's
+  store lies a short walk to the north; on its shelf now: 2 roast perch, some roast meat, 2 bandaging kits
+  and a sword, and nothing else." (shelf_words: the town's shelf as it stands, the one Economy.goods lists
+  and a player buys from, stockpile.shop of the town's store, its makers' goods, caravans' and what players
+  sold it, never a player's own, read from memory with no level read or path (economy's confirmation);
+  counted, food first, "some" for a mass noun at any count (SHELF_SOME: "a roast meat" read as a slip she
+  would copy), closed with "and nothing else" so no bread or sword is added to it, at most SHELF_MOST (6)
+  kinds and then ", and more besides, but no bread", the list being open there; "; no food today" when none
+  is food; "its shelf is bare just now" when empty; "it's shut while the town's under threat" while it is,
+  the counter refusing every sale then (economy, 762); no price, a maker's own and the counter's differing;
+  voice's words; on a question for bread (SHELF_BREAD_ASKED: bread, a loaf, a bun, a baker), the shelf ends
+  "; it has no bread" (", and it has no bread" after "no food today" or a bare shelf, "but it has no bread"
+  after "more besides"): transcript 7, the shelf closed by "and nothing else", still drew bread from 5 of 24
+  and "no bread today" put it on another day; economy: no bread item, but none ruled out, so not "never". The
+  coordinator's rulings: on transcript 5, where "you don't know
+  what it has" lost to the model in 18 of 18, give her the true thing to say, not doubt of it; on
+  transcript 6, where eleven of twelve dropped the conditions of a sentence of what the store sells in
+  general, give her the state, not conditions. STORE_STOCK, economy's general facts in voice's words,
+  stands only where no economy runs), from the wilds too, and BUY_LEAD ("Answer in your own words: name the
+  store, give its way just as your Now gives it, and tell what's on its shelf as your Now tells it.",
+  voice's, with no "only", so the shelf is told and not held back: six of 24 in transcript 7 said "I don't
+  know if they sell bread" and left it out); nothing her
+  level has ("Where is the blacksmith?", "Where can I find a boat?", "Where can I get bread?"): WAY_NONE
+  ("You know of no such place here. Say in your own words that you don't know of one, and stop there:
+  guess at no place, give no way, and say nothing of what is or isn't anywhere, here included.", voice's,
+  after transcript 5's invented forge and "no river, no lake" where lore has the river; "here", so it stays true where one is added elsewhere). A way her here line gives is not given again. On such a turn, and on "Where are we?", her player and what she sees are told by how far alone
+  (_plain_ways: "a few paces off", "close beside you"), so the ways are the only compass words in her Now
+  (the coordinator's note: "a few paces to the west" was the one in the square's); and on any turn whose
+  Now and note give no way, VOICE_COMPASS ("Directions are spoken as north, south, east and west.") is
+  left out of her prompt, so she is not handed the four words with nothing to use them on. The guard
+  stays.
+- No level read in her turn (perf's find on main, the coordinator's ask): here_name, her first words'
+  place, read the level from disk each call (343 ms at her first words on a probe boot); it is where_in
+  now, from what know_level kept, and where_in asks the kept copy before Level.exists. The here line, the
+  ways, place_brief's head and town_words read only that copy; a level not yet handed her is read once.
+  Level.loads (perf's 853 amended (21), carried here byte for byte) counts it: first_steps_test _test_ways,
+  her turns in the wilds, her first words' place and the crypt's and the Mughouse's lines read no level.
+- Transcript 3 (this PC's Ollama, qwen3:14b, six tries a case; C:/dev/review/companions/guide_945am2_transcript3.md):
+  "Where are we?" in Umbrage's square named Umbrage 0/6 on main, 6/6 on each side after; in the crypt the level
+  6/6; never hoping to find a town while in one. Its header said "Where should we go?" in the square gave a
+  compass word 0/6 on every side: false, the tally's regex had its \b eaten into backspaces by a heredoc. By
+  eye (voice's read, the coordinator's grep): 2/6 on main, 2/6 off, 2/6 on, 1/6 share, among them "heading
+  east, toward the temple" (it is west) and "head east toward the town" standing in it; in the wilds "west,
+  toward the healer's hut" (south, not found). VOICE_WORLD's guard was in every after side's prompt (the
+  square's at character 1102 of 4485) and did not hold, so the queue was stopped and the true ways above
+  folded in.
+- Transcripts 4 to 6 (the same model and PC; C:/dev/review/companions/guide_945am2_transcript4.md to 6.md, each
+  with its counts and table built from the page last, by guide_table.py and guide_reading.py, and read by eye by
+  voice, the coordinator and companions): 4 found the true ways given and still a baker sent for bread in all 18
+  after answers; 5 gave the store its way and found "you don't know what it has" lost to the model in 18 of 18,
+  a smoking forge invented, "no river, no lake" where lore has the river; 6, twelve tries a question on every
+  side, base too, is the measure (the coordinator's ruling). Its off side, live at landing: no wrong way in 96
+  answers, every compass word her Now's; the coordinator's bar of a place or landmark stated as fact that her
+  Now or lore did not give at most once in twelve of any question and three across all was not met: seven, two
+  questions over their one (the temple's "past the old well and the broken fence" and "just past the crooked
+  tree where the road bends"; the store called "the Umbrage Store"; "There's no water here" twice; "I know the
+  way to the healer's hut" with it not found; "They have bandages" of the hut). It lands anyway, on the
+  coordinator's word: each stands beside a true way or none, none sends a player anywhere false, and every
+  question is far better than base on the same count (a baker in 8 or more of 12, "the temple is dug beneath
+  the crypt", "there's no inn here"). The bar stays the target of the rows after (the landmarks, the true water,
+  the hut's way while unfound). Her "I've been here a while" and "never been" lines are counted on their own,
+  not against it (where a companion is from is Jeff's to say). After it, the store's shelf live
+  (Companion.shelf_words, economy's stockpile.shop): transcript 7, the same "Where can I buy bread?" twelve with
+  food on the shelf and twelve without, gave the store's way in 24 of 24 and named no item off the shelf, but bread
+  in 5 of 24, one flatly false ("I saw some fresh bread on its shelf"). Her Now's store line on a bread question then
+  ends "it has no bread" (economy: the game has no bread item, recipe or baker; "never" is a promise of the future;
+  the coordinator's ruling, voice's words). Transcript 8, the same 24 (C:/dev/review/companions/
+  guide_945am2_transcript8.md): the way 24 of 24, no item off the shelf, none flatly false, no bread offered, seen or
+  kept in the back; "no food" said in 7 of 12 with none on the shelf, the other 5 telling an empty shelf (voice
+  accepts them). Five hint at bread elsewhere ("try another town"), naming no place: voice's "and you know of nowhere
+  that sells any" goes with the switch-on batch. The tripwire: first_steps_test fails if levels/items.json gains an
+  item whose id or name has "bread", naming SHELF_NO_BREAD, so the line is true while the test passes. The buy lead
+  raised her [DO: n] on this ask to 11 of 24 (1 in 24 on base), so this lands on 960 (a [DO: n] taken only when asked).
+  Server only,
+  protocol unchanged, no new class_name.
 ## 940. A town's people heard idle: a cleared throat, a sniff, a shifted foot
 
 (sound; the label from tools/decision_number.sh; the coordinator's approval 11-15 after sound's look at

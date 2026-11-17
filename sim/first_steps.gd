@@ -78,11 +78,23 @@ var no_where: Dictionary = {}
 var pond: Dictionary = {}
 ## A rising, from Main._on_returned: {kind, paid, tick}; {} for none.
 var rise: Dictionary = {}
+## Her guide for her free talk (945 amended (2), Main._first_guide): since when her player has read
+## as lost (-1 not), and the places they have not found, nearest first, worked out at guide_at.
+var lost_at := -1
+var guide_unfound: Array[String] = []
+var guide_at := -100000
 
 
 static func table() -> Dictionary:
 	var t: Variant = CompanionCard.tables().get("first_steps", {})
 	return t if t is Dictionary else {}
+
+
+## The guide's rules for her free talk (945 amended (2)): "topics" (a place's kind -> its lore
+## topic), "window_s", "share" and "every_s".
+static func guide_rules() -> Dictionary:
+	var g: Variant = table().get("guide", {})
+	return g if g is Dictionary else {}
 
 
 ## Whether the package is switched on.
