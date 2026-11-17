@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3049)
+## Lines in the code (3062)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1361,7 +1361,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (627)
+### other (sim) (640)
 
 | | Line | Where |
 |---|---|---|
@@ -1714,7 +1714,20 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | town %s: %s; residents %d (%s); visitors %d; room %d of %d; buildings %s; gone %s; sought %s; %s | `sim/towns.gd` boot_line() |
 |  | can build %s no (at its top level) | `sim/towns.gd` can_build_words() |
 |  | can build %s %s (xp %d of %d) | `sim/towns.gd` can_build_words() |
-|  | day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s | `sim/towns.gd` day_line() |
+|  | day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s%s | `sim/towns.gd` day_line() |
+|  | not ordered (a build in hand) | `sim/towns.gd` repairs_words() |
+|  | not ordered yet | `sim/towns.gd` repairs_words() |
+|  | being worked %d%% | `sim/towns.gd` repairs_words() |
+|  | waits a %s (none) | `sim/towns.gd` repairs_words() |
+|  | behind (short %s) | `sim/towns.gd` repairs_words() |
+|  | waits its wood (short %s) | `sim/towns.gd` repairs_words() |
+|  | waits its materials (short %s) | `sim/towns.gd` repairs_words() |
+|  | waits a %s (the %s busy) | `sim/towns.gd` repairs_words() |
+|  | being mended %d%% | `sim/towns.gd` hut_day_words() |
+|  | no keeper, one comes today | `sim/towns.gd` hut_day_words() |
+|  | no keeper, one comes in %d day%s | `sim/towns.gd` hut_day_words() |
+|  | the keeper can't buy its supplies (%s) | `sim/towns.gd` hut_day_words() |
+| L | the healer's hut %s: %s; %s | `sim/towns.gd` hut_day_words() |
 |  | +%d experience: %s | `sim/towns.gd` add_xp() |
 |  | %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
 |  | %s the %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
