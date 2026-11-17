@@ -15410,9 +15410,41 @@ func _test_townsfolk_spots() -> void:
 			"a long sit: the other sitting idles now and then, never its own (%s; took %s); sat asides seated, stood ones standing"
 			% [own, taken.keys()])
 	puppet.set_meta("work", "")
+	puppet.remove_meta("moved_at")
 	var stepped_back := _rig._work_enter(puppet, rig, {}, 0.0, now, 1.0)
 	_check(stepped_back and rig.base_clip() == tend["exit"] and int(puppet.get_meta("unseat_until")) > now,
 			"its word ended: steps back from the counter (%s)" % rig.base_clip())
+	# 869 amended (3) (the coordinator's ruling on ui-design's fidget2_57fcc7d0f: Rolf fidgeted 1.13 s into his 1.17 s
+	# Counter_Low_Exit): a get-up's end counts as a stop, its fidget FIDGET_SETTLE after it; the counter's, a kneel's
+	# (another work's exit), the sleeper's; and a keeper stepping straight back in is not held by it.
+	var got_up := {}
+	var exit_ms := int(rig.length(str(tend["exit"])) * 1000.0)
+	got_up["counter"] = int(puppet.get_meta("moved_at", -1)) - AnimRig.now_msec() - exit_ms
+	var unsettled := not Client3D._settled(puppet)
+	puppet.set_meta("work", "tend")
+	puppet.set_meta("busy_until", 0)
+	var back_in := _rig._work_enter(puppet, rig, tend, 0.0, now, 1.0) and rig.base_clip() == str(tend["enter"])
+	puppet.set_meta("work", "")
+	puppet.remove_meta("moved_at")
+	puppet.set_meta("entered", "bandage")
+	_rig._work_enter(puppet, rig, {}, 0.0, now, 1.0)
+	var knelt_up := rig.base_clip()
+	got_up["kneel"] = int(puppet.get_meta("moved_at", -1)) - AnimRig.now_msec() - int(rig.length(Client3D.KNEEL_UP) * 1000.0)
+	puppet.remove_meta("moved_at")
+	puppet.set_meta("laid", true)
+	_rig._lying_down(puppet, rig, {}, 0.0, now, 1.0)
+	var slept_up := rig.base_clip()
+	got_up["sleep"] = int(puppet.get_meta("moved_at", -1)) - AnimRig.now_msec() - int(rig.length(Client3D.CLIP_SLEEP_UP) * 1000.0)
+	puppet.remove_meta("laid")
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("unseat_until", 0)
+	puppet.set_meta("rise_until", 0)
+	puppet.set_meta("rising_until", 0)
+	puppet.remove_meta("moved_at")
+	_check(got_up.values().all(func(off: int) -> bool: return absi(off) <= 50) and unsettled and back_in
+			and knelt_up == Client3D.KNEEL_UP and slept_up == Client3D.CLIP_SLEEP_UP,
+			"a get-up's end counts as a stop, its fidget FIDGET_SETTLE after (moved_at less its end, ms: %s; %s, %s); stepped straight back in, the counter at once (%s)"
+			% [got_up, knelt_up, slept_up, rig.base_clip() if not back_in else str(tend["enter"])])
 	# Where its hands rest: the market stall's top 0.88 m, its keeper's edge behind the counter.
 	var low := 9.0
 	var high := -9.0

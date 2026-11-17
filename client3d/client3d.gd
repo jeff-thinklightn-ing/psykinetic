@@ -1662,7 +1662,8 @@ const FIDGET_SECONDS_MAX := 25.0
 ## No fidget sooner than this (s) after the body last moved (the coordinator's ruling on ui-design's hops, 11-16:
 ## a fidget's time, on the wall clock, came due during a two-cell hop and Fidget_Shoulders played straight out of
 ## the jog, no Idle between, the next hop starting out of it). "moved_at", on the rigs' clock, from the frame it
-## last moved; a body that has not moved fidgets as before.
+## last moved; a body that has not moved fidgets as before. A get-up's end counts as a move's (869 amended (3),
+## _settle_after): a work's "exit", the seat's SEAT_UP, the sleeper's CLIP_SLEEP_UP.
 const FIDGET_SETTLE := 1.5
 const FIDGET_CALM_SECONDS := 4.0
 const TIRED_BELOW := 0.34
@@ -28649,6 +28650,14 @@ static func _settled(puppet: Node3D) -> bool:
 	return not puppet.has_meta("moved_at") or AnimRig.now_msec() - int(puppet.get_meta("moved_at")) >= int(FIDGET_SETTLE * 1000.0)
 
 
+## A get-up (a work's "exit", SEAT_UP, CLIP_SLEEP_UP) [param lasts] ms from now counts as a move ending as it ends
+## (869 amended (3), the coordinator's ruling on ui-design's fidget2_57fcc7d0f: Rolf's Fidget_* began 1.13 s into
+## his 1.17 s Counter_Low_Exit, three times, straight out of it with no Idle between): "moved_at" at its end, so
+## its fidget waits FIDGET_SETTLE after it. Only a fidget reads it: a work stepped back into is not held.
+static func _settle_after(puppet: Node3D, lasts: int) -> void:
+	puppet.set_meta("moved_at", maxi(int(puppet.get_meta("moved_at", 0)), AnimRig.now_msec() + lasts))
+
+
 ## Its gait for [param speed] (m/s, the quick read), looped at the stride's rate: chosen and paced by
 ## [param smooth] (the speed smoothed over GAIT_SMOOTH; [param speed] when not given), a change
 ## between gaits only once wanted GAIT_DWELL on end or a burst up past GAIT_BURST (869).
@@ -28797,7 +28806,9 @@ func _seat(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, now: in
 	if sat and not work.has("seat"):
 		puppet.set_meta("sat", false)
 		if rig.has(SEAT_UP) and speed <= WALKING:
-			var until := now + int(rig.once(SEAT_UP, tempo) * 1000.0)
+			var lasts := int(rig.once(SEAT_UP, tempo) * 1000.0)
+			var until := now + lasts
+			_settle_after(puppet, lasts)
 			puppet.set_meta("busy_until", until)
 			puppet.set_meta("unseat_until", until)
 			return true
@@ -28823,7 +28834,9 @@ func _work_enter(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 		puppet.set_meta("entered", "")
 		var exit := str(ACTIVITIES.get(entered, {}).get("exit", ""))
 		if exit != "" and rig.has(exit) and speed <= WALKING:
-			var until := now + int(rig.once(exit, tempo) * 1000.0)
+			var lasts := int(rig.once(exit, tempo) * 1000.0)
+			var until := now + lasts
+			_settle_after(puppet, lasts)
 			puppet.set_meta("busy_until", until)
 			if exit == KNEEL_UP:
 				# Got up from its knees where it knelt (877 amended (1)): not drawn over a seat as
@@ -28896,7 +28909,9 @@ func _lying_down(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 	if laid and not work.has("down"):
 		puppet.set_meta("laid", false)
 		if rig.has(CLIP_SLEEP_UP):
-			var until := now + int(rig.once(CLIP_SLEEP_UP, tempo) * 1000.0)
+			var lasts := int(rig.once(CLIP_SLEEP_UP, tempo) * 1000.0)
+			var until := now + lasts
+			_settle_after(puppet, lasts)
 			puppet.set_meta("busy_until", until)
 			puppet.set_meta("rising_until", until)
 			return true
