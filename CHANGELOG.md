@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: in the Mughouse the windows are sky blue by day and deep blue at night, daylight falls pale across the floor by the door and fades through the evening to hearth and candlelight, the lane's cobbles and green ground lie outside its walls, with the door lantern's glow on the step at night, and a candle burns on a table upstairs (946).
 - Towns: every stair in the Mughouse, from the common room up to the attic, is a wooden flight with rails; upstairs, the attic stair stands beside the way down, candle stands light the stairs, and the way down glows with the light of the room below (589 amended (3), 589 amended (4)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
