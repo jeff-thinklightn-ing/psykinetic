@@ -47,9 +47,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3085)
+## Lines in the code (3134)
 
-### companions (Pip, Wren, Nix) (671)
+### companions (Pip, Wren, Nix) (720)
 
 | | Line | Where |
 |---|---|---|
@@ -223,6 +223,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You are %s. You travel with %s by choice. | `sim/companion.gd` identity() |
 |  | %s just said: "%s" | `sim/companion.gd` overheard() |
 |  | %s spoke near you. | `sim/companion.gd` overheard() |
+|  | (?i)^\\s*(where\|what\|which\|who\|whose\|why\|when\|how\|is\|are\|was\|were\|do\|does\|did\|have\|has)\\b | `sim/companion.gd` ERRAND_QUESTION |
+|  | (?i)^\\s*(please\\b\|(can\|could\|would\|will\|won't\|can't\|shall\|should)\\s+(you\|we)\\b\|why\\s+don't\\s+(you\|we)\\b\|(do\|would)\\s+you\\s+(mind\|have)\\b\|have\\s+you\\s+(got\|any)\\b\|got\\s+any\\b\|any\\s+chance\\b\|how\\s+about\\b\|let's\\b\|let\\s+us\\b) | `sim/companion.gd` ERRAND_REQUEST |
 |  | (?i)\\b%s\\b | `sim/companion.gd` _named() |
 |  | where you stand | `sim/companion.gd` knowledge_of() |
 |  | %s is %s%s. | `sim/companion.gd` knowledge_of() |
@@ -454,6 +456,45 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You know that town well. | `sim/companion.gd` standing_words() |
 |  | What you know of the world: %s | `sim/companion.gd` lore_words() |
 |  | \\b%ss?\\b | `sim/companion.gd` lore_topics() |
+|  | You are in %s, in %s. | `sim/companion.gd` here_in() |
+|  | You are in %s, in %s. | `sim/companion.gd` here_in() |
+|  | You are in %s. | `sim/companion.gd` here_in() |
+|  | You are in %s, inside %s. | `sim/companion.gd` here_in() |
+|  | You are in %s, by %s. | `sim/companion.gd` here_in() |
+|  | You are in %s. | `sim/companion.gd` here_in() |
+|  | You are in %s. | `sim/companion.gd` here_in() |
+|  | You are in %s; %s lies close by. | `sim/companion.gd` here_in() |
+|  | You are in %s; %s lies %s to the %s. | `sim/companion.gd` here_in() |
+|  | a short walk | `sim/companion.gd` here_far() |
+|  | a fair walk | `sim/companion.gd` here_far() |
+|  | a long walk | `sim/companion.gd` here_far() |
+|  | temple\|priest\|shrine\|altar | `sim/companion.gd` _here_mid() |
+|  | inn\|tavern\|mughouse\|ale\|beds?\|rooms? | `sim/companion.gd` _here_mid() |
+|  | store\|shop\|buy\|sell\|trade | `sim/companion.gd` _here_mid() |
+|  | healer\|healer's\|hut\|medicine man | `sim/companion.gd` _here_mid() |
+|  | fish\|fishing\|fishin' | `sim/companion.gd` _here_mid() |
+|  | (?i)\\b(where (should\|shall\|can\|could\|do\|would\|might) (we\|i) (go\|head)\|which way\|where to)\\b | `sim/companion.gd` WAY_GO |
+|  | (?i)\\b(buy\|buying\|purchase\|sell\|selling\|trade\|shop\|shopping)\\b | `sim/companion.gd` WAY_BUY |
+|  | it sells what the town's makers make and what caravans bring, so its shelf comes and goes: weapons, | `sim/companion.gd` STORE_STOCK |
+|  | shields and bandages, and cooked food such as roast meat, roast perch or a travel ration while the town has a cook and | `sim/companion.gd` _here_mid() |
+|  | food to spare, but no bread | `sim/companion.gd` _here_mid() |
+|  | on its shelf now: %s | `sim/companion.gd` SHELF_ON |
+|  | , and nothing else | `sim/companion.gd` SHELF_CLOSED |
+|  | , and more besides, but no bread | `sim/companion.gd` SHELF_MORE |
+|  | it has no bread | `sim/companion.gd` SHELF_NO_BREAD |
+|  | (?i)\\b(bread\|loaf\|loaves\|bun\|buns\|baker\|baker's\|bakery)\\b | `sim/companion.gd` SHELF_BREAD_ASKED |
+|  | ; no food today | `sim/companion.gd` SHELF_NO_FOOD |
+|  | its shelf is bare just now | `sim/companion.gd` SHELF_BARE |
+|  | it's shut while the town's under threat | `sim/companion.gd` SHELF_SHUT |
+|  | Answer in your own words: name the store, give its way just as your Now gives it, and tell what's on its shelf as your Now tells it. | `sim/companion.gd` BUY_LEAD |
+|  | You know of no such place here. Say in your own words that you don't know of one, and stop there: guess at no place, give no way, and say nothing of what is or isn't anywhere, here included. | `sim/companion.gd` WAY_NONE |
+|  | %s lies close by. | `sim/companion.gd` ways_in() |
+|  | %s lies %s to the %s. | `sim/companion.gd` ways_in() |
+|  | \\b%s\\b | `sim/companion.gd` way_kind() |
+|  | %s lies close by; %s. | `sim/companion.gd` store_words() |
+|  | %s lies %s to the %s; %s. | `sim/companion.gd` store_words() |
+|  | , and more besides, but | `sim/companion.gd` shelf_words() |
+|  | \\b(%s)\\b | `sim/companion.gd` _way_asked() |
 |  | %s %s %s%s | `sim/companion.gd` stance_prompt() |
 |  | While %s is away you stay in this town and work as its %s. | `sim/companion.gd` voice_messages() |
 |  | You have already mentioned: %s. | `sim/companion.gd` voice_messages() |
@@ -526,6 +567,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | - %s, %s%s | `sim/companion.gd` perception_list() |
 |  | Around you, what you can see, nearest first: | `sim/companion.gd` perception_list() |
 |  | (?i)\\b(place\|where are we\|around here\|these (woods\|parts\|lands?)\|this (land\|wood\|forest\|town\|cave\|spot))\\b | `sim/companion.gd` PLACE_WORDS |
+|  | (?i)\\b(where are we\|where am i\|where is this\|where('s\| is) here\|what place is this\|what is this place)\\b | `sim/companion.gd` WHERE_WORDS |
+|  | Answer in your own words, and name where you are somewhere in it. | `sim/companion.gd` WHERE_LEAD |
+|  | (?i)\\b(where (should\|shall\|can\|could\|do\|would\|might) (we\|i)\|which way\|where('s\| is\| are) (the\|a\|an\|some)\|how (do\|can\|would\|might) (we\|i) get to)\\b | `sim/companion.gd` WAY_WORDS |
+|  | Answer in your own words. Suggest a place your Now names, and give its way just as your Now gives it, with no street, turn or landmark it doesn't give; for anywhere else, say you don't know the way yet. | `sim/companion.gd` WAY_LEAD |
+|  | Directions are spoken as north, south, east and west. | `sim/companion.gd` VOICE_COMPASS |
+|  | (?i)\\b(north\|south\|east\|west) | `sim/companion.gd` COMPASS_WORDS |
 |  | (?i)\\b%s(s\|es\|'s)?\\b | `sim/companion.gd` names_sight() |
 |  | %s %s %s | `sim/companion.gd` place_words_now() |
 |  | You are in %s%s. | `sim/companion.gd` place_brief() |
@@ -554,6 +601,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | ? out of sight | `sim/companion.gd` perception_grid() |
 |  | A map of what you can see, you at the centre, north at the top, one character a pace: %s Key: %s. | `sim/companion.gd` perception_grid() |
 |  | %s to the %s | `sim/companion.gd` _paces_toward() |
+|  | close beside you | `sim/companion.gd` plain_far() |
+|  | a few paces off | `sim/companion.gd` plain_far() |
 |  | a few paces | `sim/companion.gd` distance_words() |
 |  | some way off | `sim/companion.gd` distance_words() |
 |  | at the edge of sight | `sim/companion.gd` distance_words() |
