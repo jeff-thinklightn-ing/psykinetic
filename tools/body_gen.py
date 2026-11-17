@@ -352,8 +352,8 @@ class Part:
 		self.closed = False
 		# Left as built by densify (a small part: a finger, a toe, a rivet).
 		self.sparse = False
-		# The hair cap's hairline, where it meets the bare face ([(ring, point), (ring, point)] segments, hair()):
-		# each corner's distance from it written into the "hairline" UV layer (write_hairline). None: no hairline.
+		# The hair cap's hairline as it is seen (seen_hairline's segments, hair()): each corner's distance from it
+		# written into the "hairline" UV layer (write_hairline). None: no hairline.
 		self.hairline = None
 
 	def add(self, points: list) -> "Part":
@@ -449,8 +449,8 @@ class Part:
 
 def write_hairline(mesh, rings: list, hairline) -> None:
 	"""A human part's two UV layers, in this order: "UVMap" (tools/body_build.py's palette swatch, written there)
-	and "hairline" (the shading row's darker root, ROOTLABEL): on a hair cap ([hairline] its segments,
-	Part.hairline) each corner's distance in metres from the nearest, u, and v 1; on every other part (0, 0), no
+	and "hairline" (the shading row's darker root, ROOTLABEL): on a hair cap ([hairline], seen_hairline's) each
+	corner's distance in metres from the nearest of its segments, u (0 under the skin), and v 1; on every other part (0, 0), no
 	root (a beard, a brow, the bun, the fall, the tail, a hood, the body). The game reads it as UV2
 	(human_body.gdshader); it keeps the import's light baking off UV2. glTF turns v over (1 - v), so (u, 1 - v)
 	here. Both filled outright: a new layer comes unwrapped face by face, and the export splits every vertex
@@ -462,7 +462,9 @@ def write_hairline(mesh, rings: list, hairline) -> None:
 	if not hairline:
 		return
 	from mathutils.geometry import intersect_point_line
-	segs = [(rings[a[0]][a[1]], rings[b[0]][b[1]]) for a, b in hairline]
+	at_end = lambda e: rings[e[0]][e[1]].lerp(rings[e[2]][e[3]], e[4])
+	segs = [(at_end(a), at_end(b)) for a, b in hairline["segs"]]
+	n = len(rings[0])
 
 	def far(p: Vector) -> float:
 		best = 1e9
@@ -472,7 +474,9 @@ def write_hairline(mesh, rings: list, hairline) -> None:
 			best = min(best, (p - q).length)
 		return best
 
-	at = [far(v.co) for v in mesh.vertices]
+	# A point under the skin (hidden) at 0: the line crosses the cap's quads between their corners, and so the hair just
+	# over it shades from near 0, not from the distance of the nearest corner (1 to 3 cm on this cap).
+	at = [0.0 if divmod(v.index, n) in hairline["under"] else far(v.co) for v in mesh.vertices]
 	for loop in mesh.loops:
 		layer.data[loop.index].uv = (at[loop.vertex_index], 0.0)
 
@@ -1316,14 +1320,55 @@ def hair(J: dict, nape: bool) -> Part:
 				pts[i] = pts[i] + Z * (0.19 - z) + (-FRONT) * 0.02
 		p.add(pts)
 	clear_of_head(p, J)
-	# Its hairline (write_hairline): the lowest ring all round (the nape, behind the ears, up each temple), and
-	# over the brow the raised front points of every ring below the forehead, across and between those rings.
-	n = len(p.rings[0])
-	raised = [k for k, r in enumerate(rings) if r[0] < 0.19]
-	p.hairline = [((0, i), (0, (i + 1) % n)) for i in range(n)]
-	p.hairline += [((k, i), (k, i + 1)) for k in raised[1:] for i in (2, 3)]
-	p.hairline += [((k, i), (k + 1, i)) for k in raised if k + 1 in raised for i in (2, 3, 4)]
+	p.hairline = seen_hairline(p, J)
 	return p
+
+
+def seen_hairline(p: Part, J: dict) -> dict:
+	"""The hair cap [p]'s hairline as it is seen, for write_hairline: {"segs": its segments, each end (ring, point, ring,
+	point, t) (the first point toward the second by t), "under": the (ring, point)s under the skin}. The line is where
+	the cap comes out of the head under it, and its lowest ring where that stands clear of the head (the open edge at
+	the nape and behind the ears). The cap's front points are tucked into the
+	forehead on purpose (hair()), so its own lowest ring there is under the skin; the line a face shows is where the cap
+	crosses the head (head_rings, the same MORPH): each point's depth along the ray from the head's middle (as
+	clear_of_head reads it), and on each quad of the cap the edges whose ends lie either side of the skin joined."""
+	under = Part("under_hair", "Skin")
+	for r in head_rings(J):
+		under.add(r)
+	tree = _bvh([under])
+	bone = J["Head"]
+	mid = Vector((bone.x, bone.y + 0.012, bone.z + 0.11))
+
+	def depth(q: Vector) -> float:
+		rel = q - mid
+		hit = tree.ray_cast(mid, rel.normalized(), 0.6)
+		return 1.0 if hit[0] is None else rel.length - (hit[0] - mid).length
+
+	n = len(p.rings[0])
+	d = [[depth(q) for q in r] for r in p.rings]
+	segs = []
+	for i in range(n):
+		j = (i + 1) % n
+		if d[0][i] > 0.0 and d[0][j] > 0.0:
+			segs.append(((0, i, 0, i, 0.0), (0, j, 0, j, 0.0)))
+	for k in range(len(p.rings) - 1):
+		for i in range(n):
+			j = (i + 1) % n
+			corners = [(k, i), (k, j), (k + 1, j), (k + 1, i)]
+			cross = []
+			for a in range(4):
+				(ka, ia), (kb, ib) = corners[a], corners[(a + 1) % 4]
+				da, db = d[ka][ia], d[kb][ib]
+				if (da > 0.0) != (db > 0.0):
+					cross.append((ka, ia, kb, ib, da / (da - db)))
+			for c in range(0, len(cross) - 1, 2):
+				segs.append((cross[c], cross[c + 1]))
+	if not segs:
+		raise SystemExit("hair %s: no hairline found (the cap never meets the head)" % p.name)
+	print("hairline %s: %d segments (%d where the cap comes out of the head), %d of %d points under the skin" % (
+		p.name, len(segs), sum(1 for a, b in segs if a[0] != a[2] or a[1] != a[3]), sum(1 for r in d for x in r if x <= 0.0),
+		sum(len(r) for r in d)))
+	return {"segs": segs, "under": {(k, i) for k, r in enumerate(d) for i, x in enumerate(r) if x <= 0.0}}
 
 
 ## The least the hair cap stands off the head it is worn over, along the ray from the head's middle.

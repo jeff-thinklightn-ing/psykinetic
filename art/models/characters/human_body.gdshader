@@ -19,10 +19,11 @@ instance uniform vec4 dye : source_color = vec4(0.0);
 // reads as hair against a face of its own hue. UV2 is the mesh's "hairline" layer (tools/body_gen.py's
 // write_hairline): x the distance in metres from the cap's hairline, y 1 on a hair cap and 0 on everything
 // else (a beard, a brow, the bun, the fall, the body), so only the cap darkens. At the line the hair is
-// ROOT_DARK of its colour, back to its own by ROOT_BAND; hair lighter than the face darkens less (by its
-// light over the face's, to ROOT_PALE of it at PALE_SPAN over), so a pale crown keeps its distance.
-const float ROOT_BAND = 0.03;
-const float ROOT_DARK = 0.55;
+// ROOT_DARK of its colour, back to its own by ROOT_BAND (the cap's lower half, short of its crown, about 14.5 cm
+// from the line; at 3 cm it did not show, the cap's quads coarser than the band); hair lighter than the face
+// darkens less (by its light over the face's, to ROOT_PALE of it at PALE_SPAN over), so a pale crown keeps its distance.
+const float ROOT_BAND = 0.09;
+const float ROOT_DARK = 0.5;
 const float ROOT_PALE = 0.3;
 const float PALE_SPAN = 1.0;
 
