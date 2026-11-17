@@ -1992,20 +1992,21 @@ func _test_world_map() -> void:
 		for j in range(i + 1, names.size()):
 			if (boxes[names[i]] as Rect2).intersects(boxes[names[j]]):
 				apart = false
-	_check(apart, "no two areas' boxes overlap")
+	_check(apart, "no two areas' boxes overlap (world cells, from the plane)")
+	_check(not boxes.has("sample") and not boxes.has("practice") and not boxes.has("mine_look") and not boxes.has("bear_yard"),
+		"no box for a dev level or the sample (test_room only where the player stands: %s)" % [boxes.has("test_room")])
+	var layout: Dictionary = panel.layout
 	var hidden_ways := panel.world.ways.filter(func(way: Dictionary) -> bool: return bool(way.get("hidden", false)))
-	_check(not hidden_ways.is_empty() and panel.ways_drawn().size() == panel.world.ways.size() - hidden_ways.size()
-		and panel.ways_drawn().all(func(way: Dictionary) -> bool: return not bool(way.get("hidden", false))),
-		"a hidden link (the barrow's, 608) is drawn nowhere on the known world (589 amended; %d hidden of %d)" % [hidden_ways.size(), panel.world.ways.size()])
-	_check(WorldMapPanel.end_mark({"kind": "edge"}) == "" and WorldMapPanel.end_mark({"kind": "link", "cue": "down", "closed": false, "hidden": false}) == "mouth"
-		and WorldMapPanel.end_mark({"kind": "link", "cue": "up", "closed": false, "hidden": false}) == "ring"
-		and WorldMapPanel.end_mark({"kind": "link", "cue": "sealed", "closed": true, "hidden": false}) == "sealed"
-		and WorldMapPanel.end_mark({"kind": "link", "cue": "none", "closed": true, "hidden": false}) == "sealed"
-		and WorldMapPanel.end_mark({"kind": "link", "cue": "arch", "closed": false, "hidden": false}) == "dot",
-		"a link's end mark on the known world by its cue: a dark mouth down, a light ring up, dim when sealed, the dot otherwise (589, ui's side)")
-	_check(panel.ways_drawn().any(func(way: Dictionary) -> bool: return WorldMapPanel.end_mark(way) == "mouth"),
-		"the barrow's way down ends in a mouth")
-	# Jeff's reports closed by ui-design's look (11-17): no box for a test level, one line to a way, no holder for nobody.
+	var mouths := WorldMapModel.mouths(layout, panel.world.ways, {}, "wilds", ["wilds", "castle", "foothills", "hills", "forest", "held"])
+	var leaked := 0
+	for mouth: Dictionary in mouths:
+		for way: Dictionary in panel.world.ways:
+			if (bool(way.get("hidden", false)) or bool(way.get("closed", false))) and str(way["from"]) == str(mouth["area"]) and str(way["to"]) == str(mouth["level"]) 					and WorldMapModel.mouth_cell(layout, str(way["from"]), way) == mouth["at"]:
+				leaked += 1
+	_check(not hidden_ways.is_empty() and leaked == 0,
+		"a hidden or closed way has no ring, chip or stub (608; %d hidden of %d ways; %d mouths drawn)" % [hidden_ways.size(), panel.world.ways.size(), mouths.size()])
+	_test_world_map_model()
+	# Jeff's reports closed by ui-design's look (11-17): no box for a test level, no holder for nobody.
 	var own_was := panel.own_area
 	panel.own_area = "castle"
 	_check(panel.area_shown("castle") and panel.area_shown("wilds") and not panel.area_shown("test_room") and not panel.area_shown("sample")
@@ -2014,25 +2015,6 @@ func _test_world_map() -> void:
 	panel.own_area = "test_room"
 	_check(panel.area_shown("test_room") and not panel.area_shown("sample"), "where the player stands in one, it is drawn")
 	panel.own_area = own_was
-	var lines := WorldMapPanel.one_line_ways(panel.ways_drawn())
-	var pairs := {}
-	var twice := false
-	for line: Dictionary in lines:
-		var pair := [str(line["a"]), str(line["b"])]
-		pair.sort()
-		twice = twice or pairs.has(pair)
-		pairs[pair] = line
-	var barrow_wilds: Dictionary = pairs.get(["barrow", "wilds"], {})
-	_check(not twice and lines.size() < panel.ways_drawn().size() and not barrow_wilds.is_empty()
-			and barrow_wilds["marks"].get("wilds") == "ring" and barrow_wilds["marks"].get("barrow") == "mouth",
-		"one line to a pair of areas (%d lines for %d ways); the barrow and the wilds' four ways: a ring at the wilds, a mouth at the barrow" % [lines.size(), panel.ways_drawn().size()])
-	var sealed_pair := WorldMapPanel.one_line_ways([{"from": "a", "to": "b", "kind": "link", "cue": "sealed", "closed": true},
-		{"from": "b", "to": "a", "kind": "link", "cue": "sealed", "closed": true}] as Array[Dictionary])
-	var open_pair := WorldMapPanel.one_line_ways([{"from": "a", "to": "b", "kind": "link", "cue": "sealed", "closed": true},
-		{"from": "b", "to": "a", "kind": "link", "cue": "none", "closed": false}, {"from": "a", "to": "b", "kind": "edge"}] as Array[Dictionary])
-	_check(sealed_pair.size() == 1 and sealed_pair[0]["sealed"] and not sealed_pair[0]["edge"] and open_pair.size() == 1 and not open_pair[0]["sealed"]
-			and open_pair[0]["edge"] and open_pair[0]["marks"] == {"b": "sealed", "a": "dot"},
-		"a pair of sealed ways draws dim; any open way or an edge makes it plain; each end keeps its one mark")
 	_check(not WorldMapPanel.holder_named(["nobody", 1]) and not WorldMapPanel.holder_named(null) and WorldMapPanel.holder_named(["goblins", 3]),
 		"an unclaimed place names no holder")
 	_check(panel.own_area == World.zone.name, "the player's area is the zone (%s)" % panel.own_area)
@@ -2042,14 +2024,10 @@ func _test_world_map() -> void:
 		"party": [{"name": "Wren", "area": "castle", "kind": "companion"}]}, [{"name": "Tam", "area": panel.own_area, "kind": "player"}])
 	_check(panel.holdings.has("wilds/camp") and panel.known_areas.has("wilds") and panel.party.size() == 2,
 		"maps' world_state read: holdings, known, the party here and elsewhere")
-	# 804 amended (13): each known area's places found under its name, kept live by a Wayfaring gain.
-	panel.set_world_state({"explored": {"wilds": [7, 23], "castle": [0, 0]}}, [])
-	_check(panel.found_words("wilds") == "7 of 23 places found" and panel.found_words("castle") == "" and panel.found_words("barrow") == "",
-		"the places found under an area's name in voice's words; none where there is nothing to find or nothing told")
 	var explored_was: Variant = _main.world_state.get("explored")
 	_main._on_message("reward", {"track": "explore", "amount": 1, "of": "the shieling", "words": "the shieling", "bar": {"have": 8, "need": 23}})
-	_check(_main.world_state.get("explored", {}).get(_main.zone_name_here()) == [8, 23] and panel.found_words(_main.zone_name_here()) == "8 of 23 places found",
-		"a Wayfaring gain's bar moves the count of the area the player stands in (%s)" % [_main.world_state.get("explored")])
+	_check(_main.world_state.get("explored", {}).get(_main.zone_name_here()) == [8, 23],
+		"a Wayfaring gain's bar still moves the count of the area the player stands in, kept though the map no longer writes it (%s)" % [_main.world_state.get("explored")])
 	_main._on_message("reward", {"track": "deed", "amount": 1, "of": "x", "bar": {"have": 1, "need": 2}})
 	_check(_main.world_state.get("explored", {}).get(_main.zone_name_here()) == [8, 23], "another track's bar leaves it be")
 	if explored_was == null:
@@ -2111,6 +2089,137 @@ func _test_world_map() -> void:
 	await get_tree().process_frame
 	_check(not _main.minimap.big and button.visible, "closed: the button back")
 	_check(Keys.DEFAULTS["world_map"] == KEY_J and Keys.WORDS.has("world_map"), "its key, J, among the Controls")
+	await _test_world_map_window()
+
+
+## WorldMapModel on a made-up plane: which areas are drawn, the rings at the mouths of ways down, the
+## chips of known levels, the "?" stubs, the bars on shared edges, the fit and the folded labels.
+func _test_world_map_model() -> void:
+	print("== the world map's model: areas, rings, chips, stubs, bars, the fit, the folded labels (968) ==")
+	var door := func(zone: String, via: Array) -> Dictionary:
+		return {"zone": zone, "cell": Vector2i(10, 10), "at": Vector2i(10, 10), "via": via, "hidden": false, "closed": false}
+	var layout := {"zones": {"a": {"rect": Rect2i(0, 0, 100, 80)}, "b": {"rect": Rect2i(102, 0, 60, 80)}, "c": {"rect": Rect2i(0, 82, 100, 40)}},
+		"doors": {"crypt": [door.call("a", [])], "deep": [door.call("a", ["crypt"])]}}
+	var ways: Array[Dictionary] = [
+		{"from": "a", "to": "b", "kind": "edge", "side": "east"},
+		{"from": "a", "to": "x", "kind": "edge", "side": "north"},
+		{"from": "a", "to": "crypt", "kind": "link", "at": Vector2i(10, 10), "cue": "down", "closed": false, "hidden": false},
+		{"from": "a", "to": "cave", "kind": "link", "at": Vector2i(50, 5), "cue": "arch", "closed": false, "hidden": false},
+		{"from": "a", "to": "hid", "kind": "link", "at": Vector2i(60, 5), "cue": "down", "closed": true, "hidden": true},
+		{"from": "a", "to": "plain", "kind": "link", "at": Vector2i(70, 5), "cue": "none", "closed": false, "hidden": false}]
+	var known := {"a": true, "b": true, "crypt": true, "deep": true}
+	var areas := WorldMapModel.shown(layout, known, "a", [])
+	_check(areas == ["a", "b"], "the areas drawn are the known ones on the plane (%s: c is not known)" % [areas])
+	_check(WorldMapModel.shown(layout, known, "a", ["b"]) == ["a"] and WorldMapModel.shown(layout, known, "b", ["b"]) == ["a", "b"],
+		"a test level only where the player stands")
+	var mouths := WorldMapModel.mouths(layout, ways, known, "a", areas)
+	_check(mouths.size() == 2 and mouths[0]["level"] == "crypt" and mouths[0]["known"] and mouths[1]["level"] == "cave" and not mouths[1]["known"]
+			and mouths[0]["at"] == Vector2(10.5, 10.5),
+		"a ring at each way down or out a player sees; none for a hidden, closed or unseen (cue none) way (%s)" % [mouths])
+	var chips := WorldMapModel.chips(layout, mouths, known)
+	_check(chips.size() == 2 and chips[0] == {"level": "crypt", "at": Vector2(10.5, 10.5), "depth": 0} and chips[1]["level"] == "deep" and chips[1]["depth"] == 1,
+		"a chip for each known level below, the one under it beneath")
+	var stubs := WorldMapModel.stubs(layout, ways, mouths, known, "a", areas)
+	_check(stubs.size() == 2 and stubs[0] == {"at": Vector2(50, 0), "dir": Vector2(0, -1), "kind": "edge"} and stubs[1]["kind"] == "link" and stubs[1]["dir"] == Vector2(0, -1),
+		"a question mark out of a side whose neighbour is unknown and below a mouth whose level is (%s)" % [stubs])
+	var bars := WorldMapModel.bars(layout, areas)
+	_check(bars.size() == 1 and bars[0]["at"] == Vector2(101, 40) and bars[0]["vertical"],
+		"a bar on the edge two known areas share, at the middle of it")
+	var bounds := WorldMapModel.bounds([WorldMapModel.box_of(layout, "a"), WorldMapModel.box_of(layout, "b")])
+	_check(bounds == Rect2(0, 0, 162, 80) and is_equal_approx(WorldMapModel.fit_scale(bounds, Vector2(1662, 880), 150.0), 580.0 / 80.0)
+			and WorldMapModel.fit_scale(Rect2(0, 0, 10, 10), Vector2(1000, 1000), 0.0) == 100.0,
+		"the fit: the boxes' union in the room less the margin, with no cap (one small area fills it)")
+	var name_of := func(_ids: Array, _at: Vector2) -> String: return "Town"
+	var measure := func(_words: String) -> Vector2: return Vector2(50, 20)
+	var labels: Array[Dictionary] = [{"id": "p", "at": Vector2(100, 100), "size": Vector2(80, 20)}, {"id": "q", "at": Vector2(130, 100), "size": Vector2(80, 20)},
+		{"id": "r", "at": Vector2(600, 300), "size": Vector2(80, 20)}]
+	var groups := WorldMapModel.fold(labels, [] as Array[Rect2], 10.0, name_of, measure)
+	_check(groups.size() == 2 and groups[0]["folded"] and groups[0]["ids"] == ["p", "q"] and groups[0]["name"] == "Town" and groups[0]["rect"] == Rect2(125, 90, 50, 20)
+			and not groups[1]["folded"] and groups[1]["ids"] == ["r"],
+		"two labels that would overlap fold into one under the town's name; a clear one stands")
+	var beside := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(105, 85, 100, 30)] as Array[Rect2], 10.0, name_of, measure)
+	var shut := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(-500, -500, 2000, 2000)] as Array[Rect2], 10.0, name_of, measure)
+	_check(beside.size() == 1 and beside[0]["rect"] == Rect2(10, 90, 80, 20) and shut.is_empty(),
+		"a label keeps off a chip or the you mark: the other side of its ring, or none at all")
+
+
+## The window itself, on a panel of its own (Main's is refreshed each tick): the picture form of the
+## player's area and the box form of another, each with the five things 551, 555, 504, 353 and the
+## holdings left on it, the rows' ring slot, the HUD's labels hidden while it is open.
+func _test_world_map_window() -> void:
+	print("== the world map window: the picture and the boxes, what stayed on both (968) ==")
+	var panel := WorldMapPanel.new()
+	add_child(panel)
+	panel._ensure_world()
+	var cells: Vector2i = panel.world.areas["wilds"]["size"]
+	panel.picture = ImageTexture.create_from_image(Image.create(cells.x, cells.y, false, Image.FORMAT_RGBA8))
+	panel.picture_cells = cells
+	var ids := panel.known_place_ids("wilds")
+	_check(ids.size() >= 3, "the wilds have places to draw (%d)" % ids.size())
+	var wren := {"name": "Wren", "area": "wilds", "kind": "companion", "mood": "", "why": "she likes you"}
+	var route := {"id": "t", "from_area": "wilds", "to_area": "castle", "areas": ["wilds", "castle"], "caravans": [{"area": "wilds", "fraction": 0.05}]}
+	panel.set_world_state({"guide": {"companion": "Wren", "places": [ids[0]], "areas": ["castle"]}, "holdings": {ids[1]: ["goblins", 3]}, "trade": [route]}, [wren])
+	panel.notes = {"wilds": "3 in town are on the dole.", "castle": "A quiet week."}
+	panel.own_area = "wilds"
+	panel.own_cell = Vector2i(cells.x / 2, cells.y / 2)
+	panel.open()
+	for i in 3:
+		await get_tree().process_frame
+	var canvas: Control = panel._canvas
+	var wilds_rect: Rect2 = panel._screen_rect(WorldMapModel.box_of(panel.layout, "wilds"))
+	_check(canvas.size.x > 1000.0 and wilds_rect.size.x > 100.0, "the window has its room and the wilds' box a size (%s, %s)" % [canvas.size, wilds_rect.size])
+	_check(panel.get_theme_constant(&"window_width", &"KnownWorld") == 3280 and panel._window.size.x == 3280.0,
+		"the window is the theme's width (%s)" % [panel._window.size])
+	# The picture form: the player's area is the picture, its places ringed and labelled, the party and the read-out under it.
+	var places_on := 0
+	for group: Dictionary in panel._groups:
+		places_on += (group["ids"] as Array).size()
+	_check(places_on >= 2 and places_on <= ids.size(), "the picture labels its places, folded where they overlap (%d of %d in %d labels)" % [places_on, ids.size(), panel._groups.size()])
+	_check(panel._party_rows.has("wilds") and (panel._party_rows["wilds"]["rect"] as Rect2).position.y > wilds_rect.end.y,
+		"the party's line is under the picture, with the bond's reason on hover")
+	_check(str(panel.place_look(ids[1], Color.WHITE)["words"]).ends_with(", the Blood Rot")
+			and panel.place_look(ids[0], Color.WHITE)["words"] == str(panel.world.areas["wilds"]["places"][ids[0].get_slice("/", 1)]["name"]),
+		"a held place names its holder after it, an unheld one nothing")
+	var line := panel.trade_line(route)
+	var dot: Vector2 = panel._caravan_point(line, route["caravans"][0])
+	_check(line.size() == 2 and not wilds_rect.grow(-1.0).has_point(dot) and wilds_rect.grow(1.0).has_point(dot),
+		"a caravan in the picture's area sits at the picture's edge, on its route, not across the picture")
+	# A click on the label of a place she knows the way to opens the ask box; a click elsewhere shuts it.
+	var group_with: Dictionary = {}
+	for group: Dictionary in panel._groups:
+		if ids[0] in group["ids"]:
+			group_with = group
+	_check(not group_with.is_empty(), "the place she knows the way to is on a label")
+	if not group_with.is_empty() and not bool(group_with["folded"]):
+		panel._clicked((group_with["rect"] as Rect2).get_center())
+		_check(panel.ask_pending() == ids[0], "a click on its label: the ask box")
+		panel._clicked(Vector2(2.0, 2.0))
+		_check(panel.ask_pending() == "", "a click elsewhere: gone")
+	# The box form: another area is a box with its name and rows.
+	panel.own_area = "castle"
+	panel._model_dirty = true
+	panel._redraw()
+	for i in 3:
+		await get_tree().process_frame
+	_check(panel._groups.is_empty() and panel._rows.has("wilds") and panel._rows.has(ids[0]) and panel._rows.has(ids[1]),
+		"the wilds as a box: its name and a row for each place, no picture labels")
+	var slot_left: float = (panel._rows[ids[0]] as Rect2).position.x
+	_check(is_equal_approx((panel._rows[ids[1]] as Rect2).position.x, slot_left) and (panel._rows["wilds"] as Rect2).position.x == slot_left,
+		"the rows start at one left edge, the ring's slot kept (22 wide, 14 to the name)")
+	panel._clicked((panel._rows[ids[0]] as Rect2).get_center())
+	_check(panel.ask_pending() == ids[0], "a click on a row she knows the way to: the ask box beside it")
+	panel._clicked((panel._rows[ids[1]] as Rect2).get_center())
+	_check(panel.ask_pending() == "", "a click on one she does not: none")
+	_check(panel._party_rows.has("wilds") and (panel._party_rows["wilds"]["rect"] as Rect2).end.y <= panel._screen_rect(WorldMapModel.box_of(panel.layout, "wilds")).end.y + 1.0,
+		"the party's line at the foot of the box")
+	# The HUD's labels give way to the map while Main's is open.
+	_main.open_world_map()
+	_check(is_zero_approx(_main.compass.modulate.a) and is_zero_approx(_main.minimap.modulate.a) and (_main.name_plates == null or is_zero_approx(_main.name_plates.modulate.a)),
+		"while the world map is open the compass, the corner map and the name plates are hidden")
+	_main.world_map_panel.close()
+	_check(is_equal_approx(_main.compass.modulate.a, 1.0) and is_equal_approx(_main.minimap.modulate.a, 1.0) and (_main.name_plates == null or is_equal_approx(_main.name_plates.modulate.a, 1.0)),
+		"and back when it closes")
+	panel.queue_free()
 
 
 func _test_access() -> void:

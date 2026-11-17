@@ -8160,8 +8160,8 @@ func _test_thicket_mouth() -> void:
 func _test_mine_mouth() -> void:
 	print("
 == mine mouth: a timbered adit in a hill of rock, the dark beyond ==")
-	_check("mine" in Level.CUES and WorldMapPanel.end_mark({"cue": "mine"}) == "mouth" and "mine" in Minimap.GLYPH_CUES,
-			"a link cue, marked on the maps as a way down")
+	_check("mine" in Level.CUES and "mine" not in WorldMapModel.HIDDEN_CUES and "mine" in Minimap.GLYPH_CUES,
+			"a link cue, marked on the maps as a way down (a ring at its mouth on the known world, 968)")
 	var sample := Level.load_level("sample")
 	var terrain: Dictionary = sample["terrain"].duplicate()
 	terrain["outdoor"] = true

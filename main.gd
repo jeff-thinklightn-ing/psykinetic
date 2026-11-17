@@ -18991,6 +18991,8 @@ func _build_talk() -> void:
 	counter_told.connect(_on_counter_told)
 	world_map_panel = WorldMapPanel.new()
 	world_map_panel.guide_asked.connect(_ask_guide)  # The map's "ask her to lead you there" (551).
+	world_map_panel.visibility_changed.connect(_world_map_hud)  # 968: the HUD's labels give way to it.
+	world_map_panel.where_name = func(cell: Vector2i) -> String: return Level.where_name(level, cell)  # A folded label's town.
 	$HUD.add_child(world_map_panel)
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_world_map)
@@ -26602,6 +26604,9 @@ func _refresh_world_map() -> void:
 	world_map_panel.led = {"by": player.led_by if player != null else "", "to": led_to_of(player)}  # 551, ui's side.
 	world_map_panel.notes = town_notes
 	world_map_panel.towns = town_states  # 624: a town's row opens its sheet.
+	# 968: the player's area as the corner map draws it (one pixel a cell).
+	world_map_panel.picture = minimap.texture if minimap != null else null
+	world_map_panel.picture_cells = minimap.cells if minimap != null else Vector2i.ZERO
 	var here: Array[Dictionary] = []
 	for entity in World.get_entities():
 		if entity is Player and entity != player and entity.spawned:
@@ -26612,6 +26617,15 @@ func _refresh_world_map() -> void:
 				"mood": bond_shown(str(entity.bond_step)), "why": reason_short(str(entity.bond_why))})
 	var state: Variant = get("world_state")
 	world_map_panel.set_world_state(state if state is Dictionary else {}, here)
+
+
+## While the world map is open the world's place labels, the name plates, the compass and the corner
+## map are hidden (the coordinator's ruling, 11-17, decision 968); back when it closes.
+func _world_map_hud() -> void:
+	var open := world_map_panel != null and world_map_panel.visible
+	for item: CanvasItem in [compass, minimap, name_plates]:
+		if item != null:
+			item.modulate.a = 0.0 if open else 1.0
 
 
 ## The map's ask (551, ui's side): the "guide" command for [param to], a
@@ -30352,7 +30366,7 @@ func _run_test_show(player: Player) -> void:
 				open_world_map()
 				if world_map_panel != null and world_map_panel.trade.is_empty() and world_map_panel.world != null:
 					# A test wagon (decision 515) from this area to another the map knows, hovered.
-					var areas: Array = world_map_panel.positions.keys()
+					var areas: Array = world_map_panel.boxes().keys()
 					var own := world_map_panel.own_area
 					var other := ""
 					for area_name: String in areas:

@@ -297,8 +297,8 @@ func _test_world_map_window() -> void:
 	_check(panel.place_words("wilds/square_fire") == "the square's fire",
 		"before the next open the HUD's words read the graph as built (no level read each frame)")
 	panel.open()
-	_check(panel.world != first and panel.place_words("wilds/square_fire") == "Chapel Green" and panel.boxes().has("wilds"),
-		"the wilds changed live: the next open builds again and reads Chapel Green, the wilds' box laid out (%s)" % panel.place_words("wilds/square_fire"))
+	_check(panel.world != first and panel.place_words("wilds/square_fire") == "Chapel Green" and panel.layout["zones"].has("wilds"),
+		"the wilds changed live: the next open builds again and reads Chapel Green, the wilds' place on the plane read (%s)" % panel.place_words("wilds/square_fire"))
 	panel.close()
 	Level.unregister("wilds")
 	panel.open()
