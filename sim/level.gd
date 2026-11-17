@@ -1242,6 +1242,10 @@ static func _interior_from(level: Dictionary, config: Dictionary, warnings: Arra
 	var floor := {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor[cell] = true
+	# Its windows as maps marks them (946): "windows_marked" whenever the key
+	# is there, even empty (Client3D draws no spacing rule's then).
+	level["terrain"]["windows_marked"] = config.has("windows")
+	level["terrain"]["windows"] = windows_from(config, floor, warnings)
 	var beds: Array[Dictionary] = []
 	var given: Variant = config.get("beds", [])
 	for entry: Variant in given if given is Array else []:
@@ -1258,6 +1262,38 @@ static func _interior_from(level: Dictionary, config: Dictionary, warnings: Arra
 	# The view's copy (948): Client3D draws them and lays a sleeper on one.
 	# It changes no floor, walk or solid.
 	level["terrain"]["beds"] = beds
+
+
+## level.json's "windows" (946, daylight indoors; maps marks them, the
+## shape of a room's doors): [{"cells": [[x, y], ...], "side": "north" |
+## "south" | "east" | "west"}], each cell a floor cell against the outer
+## wall on that side, a window on each. As the wall edges (Terrain keys)
+## between each cell and the next one that way; a cell off the floor or a
+## side not one of the four is said in [param warnings] and left out.
+static func windows_from(config: Dictionary, floor: Dictionary, warnings: Array[String]) -> Array[Vector3i]:
+	var ways := {"north": Vector2i(0, -1), "south": Vector2i(0, 1), "east": Vector2i(1, 0), "west": Vector2i(-1, 0)}
+	var found: Array[Vector3i] = []
+	var listed: Variant = config.get("windows", [])
+	if not listed is Array:
+		warnings.append("\"windows\" in level.json is not a list")
+		return found
+	for entry: Variant in listed:
+		if not entry is Dictionary or not ways.has(str((entry as Dictionary).get("side", ""))) or not (entry as Dictionary).get("cells") is Array:
+			warnings.append("a window %s is not {cells, side}: left out" % [entry])
+			continue
+		var way: Vector2i = ways[str(entry["side"])]
+		for given: Variant in entry["cells"]:
+			if not given is Array or (given as Array).size() != 2:
+				warnings.append("a window cell %s is not [x, y]: left out" % [given])
+				continue
+			var cell := Vector2i(int(given[0]), int(given[1]))
+			if not floor.has(cell):
+				warnings.append("the window at %s is not on floor: left out" % [cell])
+				continue
+			var key := Terrain.edge_key(cell, way)
+			if not key in found:
+				found.append(key)
+	return found
 
 
 ## A building's floors, ground first ([param level_name]'s "storeys", else
