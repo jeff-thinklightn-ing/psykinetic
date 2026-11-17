@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3134)
+## Lines in the code (3139)
 
 ### companions (Pip, Wren, Nix) (720)
 
@@ -1031,7 +1031,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s\|rose\|%d | `sim/named_mind.gd` rose_news() |
 |  | %s\|%s\|%d | `sim/named_mind.gd` emote() |
 
-### other (client3d) (83)
+### other (client3d) (88)
 
 | | Line | Where |
 |---|---|---|
@@ -1058,6 +1058,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | shader_type spatial; render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled; uniform vec4 tint : source_color; void fragment() { \tfloat d = clamp(length(UV - vec2(0.5)) * 2.0, 0.0, 1.0); \tfloat a = 1.0 - d * d; \tALBEDO = tint.rgb * a * a * tint.a; } | `client3d/client3d.gd` AURA_DISC_SHADER |
 |  | #c8d8f0 | `client3d/client3d.gd` KNIGHT_GLOW |
 |  | stencil_mode read, compare_greater, 1; | `client3d/client3d.gd` THROUGH_CLEAR_STENCIL |
+|  | a leap from hiding: drawn at the hit's news (390 amended (4)) | `client3d/client3d.gd` _sockets() |
+|  | a boss's move: its winding draws the blow (_on_winding) | `client3d/client3d.gd` _sockets() |
+|  | a boss's move: its winding draws the blow (_on_winding) | `client3d/client3d.gd` _sockets() |
+|  | a boss's move: its winding draws the blow (_on_winding) | `client3d/client3d.gd` _sockets() |
+|  | the old grey's told bite (780 amended (38)): a creature's, its own view draws it; no person bites | `client3d/client3d.gd` _sockets() |
 |  | depth_draw_never; | `client3d/client3d.gd` setup() |
 |  | depth_draw_never, depth_test_disabled; | `client3d/client3d.gd` setup() |
 |  | stencil_mode read, compare_not_equal, 1; | `client3d/client3d.gd` setup() |
