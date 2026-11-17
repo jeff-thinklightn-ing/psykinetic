@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- By night, out of doors and in the crypt, the lantern at your hip lights your face, and your companion's lights theirs (451 amended (10)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).

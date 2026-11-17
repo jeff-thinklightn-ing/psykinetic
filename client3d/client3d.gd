@@ -972,6 +972,9 @@ const NIGHT_FLOOR_DARKEST := 0.6
 const NIGHT_KEY_2 := {"ambient": Color(0.5, 0.55, 0.72), "ambient_energy": 0.135,
 		"light": Color(0.7, 0.76, 0.95), "energy": 0.2}
 const BODY_LAYER := 1 << 18
+## People's own drawn parts alone (451 amended, the face light: _tag_body), for their FaceLight.
+## Every other light's and camera's mask is all layers, so the bit adds nothing any other reaches.
+const FACE_LAYER := 1 << 17
 const BODY_FILL := Color(0.8, 0.83, 0.92)
 const BODY_FILL_ENERGY := 0.26
 ## How far below the camera's line the fill shines (degrees), so a body's
@@ -3762,6 +3765,8 @@ var _enclosed_dirty := true
 ## built, a wall felled): only the spaces beside them are worked out again.
 var _enclosed_changed: Array[Vector3i] = []
 var _floor_lookup: Dictionary[Vector2i, bool] = {}
+## The view's floor and water cells, for a carried light's room (_shuts_light; built when first read).
+var _light_open: Dictionary[Vector2i, bool] = {}
 var _inside_rect := Rect2i()
 ## Town id -> {kind: {state, level}}, as Main was told (set_town).
 var town_states := {}
@@ -4075,12 +4080,19 @@ func _tag_body(node: Node) -> void:
 	if (node as VisualInstance3D).layers == 0:
 		return
 	var up := node.get_parent()
+	var worn := node.name == &"Worn"
 	for i in 16:
 		if up == null or up == self:
 			return
 		if up.has_meta("entity_id"):
 			(node as VisualInstance3D).layers |= BODY_LAYER
+			# A person's (a look: player, companion, townsperson) own drawn part: skinned on its skeleton
+			# (body, head, hair, a hat, clothes) or a worn piece on a socket; not a held thing, the hung
+			# lantern, a bedroll, a label or a creature (451 amended, the face light).
+			if up.has_meta("look") and node is MeshInstance3D and (node.get_parent() is Skeleton3D or worn):
+				(node as VisualInstance3D).layers |= FACE_LAYER
 			return
+		worn = worn or up.name == &"Worn"
 		up = up.get_parent()
 
 
@@ -4185,6 +4197,232 @@ func _size_lantern(light: OmniLight3D) -> void:
 	var damp := bool(_terrain.get("damp", false))
 	light.omni_range = PLAYER_LIGHT_RANGE * Fields.carried_reach(damp) / float(Fields.CARRIED_REACH)
 	light.light_energy = LANTERN_ENERGY * (DAMP_LANTERN if damp else 1.0)
+
+
+## The face light (451 amended, the coordinator's ruling on the dusk face, 11-17, on its third
+## shape): by night a carried lantern's light, straight over the head (the Lantern, where main hangs
+## it: its pool, its shadows and the back of the head as they were), left the face in its own
+## plane's shade: 35 to 45 % of its noon lightness while the lit crown kept 75 %. Moving the
+## lantern ahead failed twice: 0.3 over the head's top it lit the face from steeply above (a hard
+## line at the nose, a brim shading the whole face); at the eyes' height it clipped two thirds of a
+## pale face to white and threw the body's shadow two heights long behind it. So a second light, the
+## FaceLight: weak, shadowless, FACE_LIGHT_AHEAD along the body's drawn facing at FACE_LIGHT_OVER from
+## the head's top (the eyes' height, under a brim), on FACE_LAYER alone, which only people's body,
+## head, hair and worn meshes carry (_tag_body): it lights faces (its carrier's, and another person's
+## within FACE_LIGHT_RANGE) and nothing else, no ground, no wall, no floor past a thin wall. Its
+## energy FACE_LIGHT_ENERGY times the carried lantern's dark at its carrier's cell (_lantern_dark_at:
+## out of doors none by day in the open, full by night; in an inside lit by the clock less by as much of
+## the day as reaches that floor, 451 amended (9); full underground or in a room without), shown while the Lantern is (covered with L, off); lying
+## (asleep, knocked down, downed) it is off. 858's body fill, if night_look_2 is switched on, takes
+## its place: never both (environment's ruling, 451's paragraph). The drawn facing is the Body's yaw
+## as last drawn (its turn eased, a standing turn's shuffle), never the entity's: it never leads the
+## body. Short of a wall all the same, so it never lights a person on a wall's far side: where the
+## cell ahead is closed to light (lantern_reach) it stops LANTERN_WALL_GAP inside its carrier's own
+## cell; and, shadowless, it would shine through a wall, so its range is clipped by the grid
+## (face_light_range: the nearest edge closed to light around it, environment's read, 11-17), never
+## under FACE_RANGE_LEAST times its carrier's own face's distance, its energy lifted (face_lift) by as
+## much as the clip and the light's nearer stand take off that face, so the face is lit the same by a
+## wall as in the open. The
+## sim's light (Fields, at the carrier's tile), emit_light and the pane are as they were.
+const FACE_LIGHT_AHEAD := 0.45
+const FACE_LIGHT_OVER := -0.15
+## 0.13 left the pale faces under their crowns at night (the third look, 11-17); 0.30 clipped the palest
+## (the fourth); the coordinator's bar, the highest at which skin 1 clips nowhere: 0.18 by the sweep of 0.14,
+## 0.18, 0.22, 0.26 (facelight5c: skin 1 nose to the crypt wall clips at 0.22, 5.1%; at 0.18 the faces at
+## play zoom 0.84 and 0.79 of noon, skin 8 at the nearest 0.57). A look sets it by ArtKit's feel
+## "client3d.face_light_energy" (set_feel), a look's and a test's knob only.
+const FACE_LIGHT_ENERGY := 0.18
+## Its specular: none, a fill's (Godot's 0.5 put a glint on a pale nose). Feel "client3d.face_light_specular".
+const FACE_LIGHT_SPECULAR := 0.0
+## The point its lift is solved for, ahead of the head's axis: the nose's tip, the face's nearest to the light,
+## so by a wall the nose takes its open light and the cheek a little less (at the eyes, 0.1, the nose went
+## over). Feel "client3d.face_lift_ahead".
+const FACE_LIFT_AHEAD := 0.13
+const FACE_LIGHT_RANGE := 1.5
+const LANTERN_WALL_GAP := 0.15
+## The carrier's face, from its head's axis and top (the eyes: a tenth ahead, 0.12 under the top).
+const FACE_AHEAD_OF_AXIS := 0.1
+const FACE_UNDER_TOP := 0.12
+## The least range, times the light's distance to its carrier's face (the window there 0.64: at 1.2 it
+## was 0.27, and the lift that made it up lit the nose, nearer the light, past the cheek to white).
+const FACE_RANGE_LEAST := 1.5
+## How long a carrier's face light keeps its range while it stands still (s).
+const FACE_RANGE_AGAIN := 0.5
+
+
+## How far [param light_at] (the rig's x and z) a face light may reach: FACE_LIGHT_RANGE, or the
+## distance to the nearest cell edge [param shut] (cell, orthogonal step -> bool) closes to light,
+## each edge tried going out from the light's cell, within two cells of it (every edge nearer than
+## FACE_LIGHT_RANGE); never under [param least] (what reaches its carrier's face).
+static func face_light_range(light_at: Vector2, least: float, shut: Callable) -> float:
+	var home := Vector2i(roundi(light_at.x), roundi(light_at.y))
+	var most := FACE_LIGHT_RANGE
+	# Nearest rings first (Chebyshev 0, 1, 2), so a near wall cuts `most` and the farther edges skip
+	# their _shuts_light on `d < most`; a ring whose nearest edge is past `most` is not tried at all.
+	for ring in 3:
+		if ring - 1 >= most:
+			break
+		for cell_off: Vector2i in _RING_CELLS[ring]:
+			var dx := cell_off.x
+			var dy := cell_off.y
+			var cell := home + cell_off
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				# Outward only: away from the light's cell along the step's axis, or across its own row.
+				if (step.x != 0 and dx * step.x < 0) or (step.y != 0 and dy * step.y < 0):
+					continue
+				var off := light_at - Vector2(cell)
+				var gap := absf(off.x - step.x * 0.5) if step.x != 0 else absf(off.y - step.y * 0.5)
+				var along := maxf(0.0, absf(off.y if step.x != 0 else off.x) - 0.5)
+				var d := sqrt(gap * gap + along * along)
+				if d < most and bool(shut.call(cell, step)):
+					most = d
+	return clampf(most, minf(least, FACE_LIGHT_RANGE), FACE_LIGHT_RANGE)
+
+
+## The cells of each Chebyshev ring round a cell, 0 to 2 (face_light_range).
+const _RING_CELLS := [
+	[Vector2i(0, 0)],
+	[Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)],
+	[Vector2i(-2, -2), Vector2i(-1, -2), Vector2i(0, -2), Vector2i(1, -2), Vector2i(2, -2), Vector2i(-2, -1), Vector2i(2, -1), Vector2i(-2, 0),
+		Vector2i(2, 0), Vector2i(-2, 1), Vector2i(2, 1), Vector2i(-2, 2), Vector2i(-1, 2), Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2)],
+]
+
+
+## An omni light's falloff window at [param d] in a range of [param r] (Godot's: (1 - (d/r)^4)^2).
+static func omni_window(d: float, r: float) -> float:
+	if r <= 0.0:
+		return 0.0
+	var n := d / r
+	n *= n
+	n *= n
+	n = maxf(1.0 - n, 0.0)
+	return n * n
+
+
+## The face light's distance in the open to a point of its carrier's face [param ahead] of the head's axis
+## (the eyes FACE_AHEAD_OF_AXIS, the nose FACE_LIFT_AHEAD) and FACE_UNDER_TOP under its top: the light
+## FACE_LIGHT_AHEAD ahead, FACE_LIGHT_OVER from the top.
+static func face_open_distance(ahead := FACE_AHEAD_OF_AXIS) -> float:
+	return Vector2(FACE_LIGHT_AHEAD - ahead, FACE_LIGHT_OVER + FACE_UNDER_TOP).length()
+
+
+## What a face light [param to_face] from its carrier's face, in a range of [param lit] with a falloff of
+## [param attenuation] (Godot's: its window times distance^-attenuation), is lifted by so the face takes
+## what it takes in the open (face_open_distance, FACE_LIGHT_RANGE): by a wall the light stands nearer
+## the face and its window is cut, and both count (the window alone overshot about 1.4x, the third look).
+## [param ahead]: the point's place ahead of the head's axis, its open distance face_open_distance's.
+static func face_lift(to_face: float, lit: float, attenuation: float, ahead := FACE_AHEAD_OF_AXIS) -> float:
+	var open := face_open_distance(ahead)
+	var here := omni_window(to_face, lit) * pow(maxf(to_face, 0.0001), -attenuation)
+	return omni_window(open, FACE_LIGHT_RANGE) * pow(open, -attenuation) / maxf(here, 0.0001)
+
+
+## Whether [param puppet]'s face light stands and where (its position set): false lying.
+func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
+	var body := puppet.get_node_or_null("Body") as Node3D
+	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
+	if body == null or bool(puppet.get_meta("lying", false)) or bool(puppet.get_meta("downed", false)) \
+			or bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0)):
+		return false
+	var over := float(puppet.get_meta("lantern_top", 0.0)) + FACE_LIGHT_OVER
+	var yaw := body.rotation.y
+	var way := Vector2(cos(yaw), -sin(yaw))
+	var reach := lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, FACE_LIGHT_AHEAD,
+			func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+	var want := Vector3(way.x * reach, over, way.y * reach)
+	if not light.position.is_equal_approx(want):
+		light.position = want
+	# Its range clipped short of a wall's far side, its energy lifted so its carrier's face takes the same.
+	var face := Vector3(way.x * FACE_AHEAD_OF_AXIS, over - FACE_LIGHT_OVER - FACE_UNDER_TOP, way.y * FACE_AHEAD_OF_AXIS)
+	var to_face := want.distance_to(face)
+	# Found again only when the light has moved, or every FACE_RANGE_AGAIN (a door near a carrier at rest
+	# shut or opened); a room's rebuild makes its puppets anew (environment's ask on its cost).
+	var where := puppet.position + want
+	var now := Time.get_ticks_msec()
+	var lit := light.omni_range
+	if not where.is_equal_approx(light.get_meta("range_at", Vector3.INF)) or now >= int(light.get_meta("range_until", 0)):
+		lit = face_light_range(Vector2(where.x, where.z), to_face * FACE_RANGE_LEAST,
+				func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+		light.set_meta("range_at", where)
+		light.set_meta("range_until", now + int(FACE_RANGE_AGAIN * 1000.0))
+	if not is_equal_approx(light.omni_range, lit):
+		light.omni_range = lit
+	var lift_ahead := ArtKit.feel("client3d.face_lift_ahead", FACE_LIFT_AHEAD)
+	var lift_point := Vector3(way.x * lift_ahead, face.y, way.y * lift_ahead)
+	light.set_meta("lift", face_lift(want.distance_to(lift_point), lit, light.omni_attenuation, lift_ahead))
+	return true
+
+
+## [param entity]'s face light this frame, beside its [param lantern] (shown or not as the lantern
+## is): its energy by the lantern's dark at its cell (_lantern_dark_at, one rule for both), off by day,
+## lying, covered, or while 858's body fill shows.
+func _light_face(entity: GridEntity, puppet: Node3D, lantern: OmniLight3D) -> void:
+	var face := puppet.get_node_or_null("FaceLight") as OmniLight3D
+	if face == null:
+		return
+	var dark := _lantern_dark_at(entity.tile)
+	var shown := lantern.visible and dark >= LANTERN_DAY_LEAST and not (_body_fill != null and _body_fill.visible) \
+			and _place_face_light(puppet, face)
+	face.light_energy = ArtKit.feel("client3d.face_light_energy", FACE_LIGHT_ENERGY) * dark * float(face.get_meta("lift", 1.0))
+	var glint := ArtKit.feel("client3d.face_light_specular", FACE_LIGHT_SPECULAR)
+	if face.light_specular != glint:
+		face.light_specular = glint
+	if face.visible != shown:
+		face.visible = shown
+
+
+## Whether light from [param cell] is stopped going [param step] (one cell, orthogonal) at a height
+## of [param at] (the rig's y): a wall or a shut door on the edge (World.edge_blocks_sight, a
+## field's fence open), the ground of the cell beyond rising past it (a cliff's face), or, in a
+## room or underground, a cell beyond that is neither floor nor water (the void past a room's
+## outer wall, a cave's rock: there the wall is the floor's end, not always an edge's;
+## environment's read of the first build).
+func _shuts_light(cell: Vector2i, step: Vector2i, at: float) -> bool:
+	var beyond := cell + step
+	return World.edge_blocks_sight(cell, step) or _tile_position(beyond).y > at - LANTERN_WALL_GAP \
+			or not _outdoor and not _lets_light_over(beyond)
+
+
+## Whether [param cell] is this view's floor or water (its terrain's, as _height reads it).
+func _lets_light_over(cell: Vector2i) -> bool:
+	if _light_open.is_empty():
+		for open: Vector2i in _terrain.get("floor", []) + _terrain.get("water", []):
+			_light_open[open] = true
+	return _light_open.has(cell)
+
+
+## How far along [param way] (a unit vector, the rig's x and z) from [param at] (the rig's frame:
+## cells 1 m, their centres on whole numbers) a carried lantern's light may stand, at most
+## [param most]: [param most], unless it (with LANTERN_WALL_GAP to spare) would pass into a cell
+## that [param shut] (cell, orthogonal step -> bool) closes to light, when it stops LANTERN_WALL_GAP
+## short of leaving the carrier's cell (0 at the least). Into a cell across a corner, either way
+## round the corner closed stops it. The grid's cells only, no ray.
+static func lantern_reach(at: Vector2, way: Vector2, most: float, shut: Callable) -> float:
+	var cell := Vector2i(roundi(at.x), roundi(at.y))
+	var end := at + way * (most + LANTERN_WALL_GAP)
+	var step := Vector2i(roundi(end.x), roundi(end.y)) - cell
+	if step == Vector2i.ZERO:
+		return most
+	var across := Vector2i(signi(step.x), 0)
+	var down := Vector2i(0, signi(step.y))
+	var closed := false
+	if across != Vector2i.ZERO and down != Vector2i.ZERO:
+		closed = bool(shut.call(cell, across)) or bool(shut.call(cell + across, down)) \
+				or bool(shut.call(cell, down)) or bool(shut.call(cell + down, across))
+	else:
+		closed = bool(shut.call(cell, across + down))
+	if not closed:
+		return most
+	var leave := most + LANTERN_WALL_GAP
+	if way.x > 0.0001:
+		leave = minf(leave, (cell.x + 0.5 - at.x) / way.x)
+	elif way.x < -0.0001:
+		leave = minf(leave, (cell.x - 0.5 - at.x) / way.x)
+	if way.y > 0.0001:
+		leave = minf(leave, (cell.y + 0.5 - at.y) / way.y)
+	elif way.y < -0.0001:
+		leave = minf(leave, (cell.y - 0.5 - at.y) / way.y)
+	return clampf(leave - LANTERN_WALL_GAP, 0.0, most)
 
 
 ## The cells' brightness for the soft scatter (580, terrain's side): an L8
@@ -8131,6 +8369,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_roofs_off.clear()
 	_enclosed_dirty = true
 	_floor_lookup.clear()
+	_light_open.clear()
 	_runs.clear()
 	_water_bodies.clear()
 	_stream_ribbons.clear()
@@ -23920,6 +24159,7 @@ func _sync_puppets() -> void:
 					shown = lit and dark >= LANTERN_DAY_LEAST
 				if lantern.visible != shown:
 					lantern.visible = shown
+				_light_face(entity, puppet, lantern)
 			_glow_lantern(puppet)
 		elif entity is Monster:
 			_sync_named(entity as Monster, puppet)
@@ -29775,6 +30015,19 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# and leave its outside in its own shadow.
 		light.position.y = height + 0.6
 		puppet.add_child(light)
+		# Its face light (451 amended, 11-17): faces alone, ahead of this one's from the first frame.
+		var face := OmniLight3D.new()
+		face.name = "FaceLight"
+		face.light_color = PLAYER_LIGHT
+		face.light_energy = 0.0
+		face.omni_range = FACE_LIGHT_RANGE
+		face.shadow_enabled = false
+		face.light_specular = FACE_LIGHT_SPECULAR
+		face.light_cull_mask = FACE_LAYER
+		face.visible = false
+		face.position.y = height + FACE_LIGHT_OVER
+		puppet.set_meta("lantern_top", height)
+		puppet.add_child(face)
 		# The lantern itself hangs at the belt (decision 451), the light above.
 		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r")
 		if belt != null:

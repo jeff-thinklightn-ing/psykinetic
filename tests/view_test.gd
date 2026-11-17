@@ -122,6 +122,7 @@ func _ready() -> void:
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
+		_test_face_light()
 		_test_heard_over()
 		_test_knight_stands()
 		await _test_forge()
@@ -3311,6 +3312,343 @@ func _test_knight_stands() -> void:
 			"he plays his vigil as the people stand (%s), and never fidgets" % (rig.as_played(rig.base_clip()) if rig != null else "no rig"))
 	if knight != null:
 		World.despawn(knight)
+
+
+## The face light (451 amended, the coordinator's ruling on the dusk face, its third shape): the Lantern
+## where main hangs it, nothing of it moved; a FaceLight beside it, shadowless, on FACE_LAYER alone,
+## ahead of the face along the body's drawn facing (never leading the turn), short of a wall, off lying,
+## covered, by day and while 858's body fill shows; only people's own drawn parts carry the layer, and
+## no other light or camera reaches anything more or less for it; the sim's light as it was.
+func _test_face_light() -> void:
+	print("\n== the face light: the lantern as it hung, a light on faces alone ahead of the face ==")
+	var ahead := Client3D.FACE_LIGHT_AHEAD
+	var gap := Client3D.LANTERN_WALL_GAP
+	var never := func(_cell: Vector2i, _step: Vector2i) -> bool: return false
+	var east_wall := func(cell: Vector2i, step: Vector2i) -> bool: return cell == Vector2i.ZERO and step == Vector2i(1, 0)
+	var corner := func(cell: Vector2i, step: Vector2i) -> bool: return cell == Vector2i(1, 0) and step == Vector2i(0, 1)
+	var open := Client3D.lantern_reach(Vector2.ZERO, Vector2(1, 0), ahead, never)
+	var nose := Client3D.lantern_reach(Vector2.ZERO, Vector2(1, 0), ahead, east_wall)
+	var near := Client3D.lantern_reach(Vector2(0.3, 0.0), Vector2(1, 0), ahead, east_wall)
+	var touching := Client3D.lantern_reach(Vector2(0.45, 0.0), Vector2(1, 0), ahead, east_wall)
+	var away := Client3D.lantern_reach(Vector2.ZERO, Vector2(-1, 0), ahead, east_wall)
+	var slant := Vector2(1, 1).normalized()
+	var round_corner := Client3D.lantern_reach(Vector2(0.2, 0.2), slant, ahead, corner)
+	_check(is_equal_approx(open, ahead) and is_equal_approx(away, ahead), "open ground, or the wall behind: the full %.2f m ahead" % ahead)
+	_check(is_equal_approx(nose, 0.5 - gap) and is_equal_approx(near, 0.2 - gap) and touching == 0.0,
+			"a wall ahead: the light stops %.2f m inside the cell (from its middle %.2f, 0.3 m on %.2f, at the wall %.2f)" % [gap, nose, near, touching])
+	_check(absf(round_corner - ((0.5 - 0.2) / slant.x - gap)) < 0.001,
+			"into a cell across a corner, a wall either way round stops it (%.3f)" % round_corner)
+	var player := _player()
+	var pet := _companion()
+	var light_was := DayNight.light
+	var outdoor_was: bool = _rig._outdoor
+	var look_was := Client3D.night_look_2
+	var lit_was := player.emit_light
+	DayNight.light = DayNight.NIGHT
+	_rig._outdoor = true
+	player.emit_light = Player.LANTERN
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
+	var light := puppet.get_node_or_null("FaceLight") as OmniLight3D
+	var body := puppet.get_node_or_null("Body") as Node3D
+	_check(lantern != null and light != null and body != null and puppet.has_meta("lantern_top"), "the player's lantern, face light, body and head's top")
+	if lantern == null or light == null or body == null:
+		return
+	var top := float(puppet.get_meta("lantern_top"))
+	# The lantern: where main hangs it, its own mask, its shadows, its energy by the dark.
+	var hung := Vector3(0.0, top + 0.6, 0.0)
+	var lantern_rows := []
+	var plain_light := OmniLight3D.new()
+	var all_layers := plain_light.light_cull_mask  # A light's own mask, as main leaves the lantern's.
+	plain_light.free()
+	for turn: float in [0.0, 1.0, PI]:
+		body.rotation.y += turn
+		_rig._process(0.0)
+		lantern_rows.append([lantern.position, lantern.light_cull_mask, lantern.shadow_enabled, lantern.light_energy])
+	_check(lantern_rows.all(func(r: Array) -> bool: return (r[0] as Vector3).is_equal_approx(hung) and int(r[1]) == all_layers and bool(r[2]) \
+			and is_equal_approx(float(r[3]), _rig._lantern_lit_energy() * _rig._lantern_dark_at(player.tile))),
+			"the lantern as main hangs it: over the head at %s, every layer, its shadows, its energy by the dark, however the body turns (%s)" % [hung, lantern_rows])
+	_check(not light.shadow_enabled and light.light_cull_mask == Client3D.FACE_LAYER and light.omni_range > 0.0 and light.omni_range <= Client3D.FACE_LIGHT_RANGE,
+			"the face light: no shadows, on FACE_LAYER alone (%d), %.2f m (FACE_LIGHT_RANGE %.1f at the most)" % [light.light_cull_mask, light.omni_range, Client3D.FACE_LIGHT_RANGE])
+	# By night: on, at FACE_LIGHT_ENERGY, along the body's drawn yaw at the eyes' height.
+	var turned := body.rotation.y + 1.0
+	body.rotation.y = turned
+	_rig._light_face(player, puppet, lantern)
+	var way := Vector2(cos(turned), -sin(turned))
+	var over := top + Client3D.FACE_LIGHT_OVER
+	var shut := func(cell: Vector2i, step: Vector2i) -> bool: return _rig._shuts_light(cell, step, puppet.position.y + over)
+	var reach := Client3D.lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, ahead, shut)
+	var want := Vector3(way.x * reach, over, way.y * reach)
+	var night_dark := _rig._lantern_dark_at(player.tile)
+	var lift := float(light.get_meta("lift", 1.0))
+	_check(light.visible and is_equal_approx(light.light_energy, Client3D.FACE_LIGHT_ENERGY * night_dark * lift) and light.position.is_equal_approx(want),
+			"by night: on at %.3f (FACE_LIGHT_ENERGY times its cell's dark, %.2f), along the body's drawn yaw, %.2f m ahead, %+.2f from the head's top (%s)" % [
+			light.light_energy, night_dark, reach, Client3D.FACE_LIGHT_OVER, light.position])
+	# The face's plane takes it: from the eyes (a tenth ahead of the head's axis, 0.12 under its top).
+	var face := Vector3(way.x * 0.1, top - 0.12, way.y * 0.1)
+	var takes := (light.position - face).normalized().dot(Vector3(way.x, 0.0, way.y))
+	var took := (hung - face).normalized().dot(Vector3(way.x, 0.0, way.y))
+	_check(reach < 0.2 or (takes > 0.5 and took <= 0.0),
+			"the face's plane takes it, %.2f of full on; the lantern straight over the head gives it none (%.2f)" % [takes, took])
+	# Never leading the turn: a frame draws the light at the yaw the body was drawn at, then turns the body.
+	var before := body.rotation.y
+	_rig._process(0.0)
+	var drawn := Vector2(light.position.x, light.position.z)
+	_check(drawn.length() < 0.01 or absf(angle_difference(atan2(-drawn.y, drawn.x), before)) < 0.01,
+			"it follows the body's drawn yaw (%.2f), not the facing the body is turning to (%.2f)" % [before, body.rotation.y])
+	# Off lying, covered, by day in the open; on under a roof by day.
+	puppet.set_meta("lying", true)
+	_rig._light_face(player, puppet, lantern)
+	var lying_off := not light.visible
+	puppet.set_meta("lying", false)
+	player.emit_light = 0.0
+	_rig._process(0.0)
+	var covered_off := not light.visible and not lantern.visible
+	player.emit_light = Player.LANTERN
+	DayNight.light = 1.0
+	_rig._process(0.0)
+	# By day its cell's dark (this walled room's sky is part shut), an open noon's none.
+	var dark_noon := Client3D.lantern_dark(World.fields.ambient_at(player.tile), true)
+	var noon_off := is_equal_approx(light.light_energy, Client3D.FACE_LIGHT_ENERGY * dark_noon * float(light.get_meta("lift", 1.0))) \
+			and light.visible == (dark_noon >= Client3D.LANTERN_DAY_LEAST) and is_zero_approx(Client3D.lantern_dark(1.0, true))
+	_rig._outdoor = false
+	_rig._process(0.0)
+	var roof_on := light.visible and is_equal_approx(light.light_energy, Client3D.FACE_LIGHT_ENERGY * float(light.get_meta("lift", 1.0)))
+	_check(lying_off and covered_off and noon_off and roof_on,
+			"off lying (%s), covered with L (%s); by day as its cell's dark, none at an open noon (%s); under a roof by day on, as the lantern (%s)" % [lying_off, covered_off, noon_off, roof_on])
+	# 858's body fill takes its place: never both.
+	# 858's own placing (_place_body_fill, which _update_sky calls out of doors) at night, then the face light.
+	var both := {}
+	var daylight_was: float = _rig._look_daylight
+	for case: Array in [["night_look_2, out of doors, 21:00", true, true, 0.0], ["night_look_2, indoors", true, false, 0.0],
+			["off, out of doors", false, true, 0.0], ["night_look_2, out of doors, noon", true, true, 1.0]]:
+		Client3D.night_look_2 = bool(case[1])
+		_rig._outdoor = bool(case[2])
+		_rig._look_daylight = float(case[3])
+		DayNight.light = DayNight.NIGHT if float(case[3]) == 0.0 else 1.0
+		_rig._place_body_fill()
+		_rig._light_face(player, puppet, lantern)
+		both[case[0]] = [_rig._body_fill.visible, light.visible]
+	_rig._look_daylight = daylight_was
+	_rig._body_fill.visible = false
+	var noon_face := Client3D.lantern_dark(World.fields.ambient_at(player.tile), true) >= Client3D.LANTERN_DAY_LEAST
+	_check(both["night_look_2, out of doors, 21:00"] == [true, false] and both["night_look_2, indoors"] == [false, true] \
+			and both["off, out of doors"] == [false, true] and both["night_look_2, out of doors, noon"] == [false, noon_face],
+			"858's body fill and the face light never both: [fill, face] %s (at noon the face as its cell's dark, this walled room's: %s)" % [both, noon_face])
+	Client3D.night_look_2 = look_was
+	_rig._outdoor = true
+	_rig._process(0.0)
+	# Who carries FACE_LAYER: a person's skinned parts and worn pieces; not its held things, its lantern, a creature.
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var own := skeleton.get_children().filter(func(n: Node) -> bool: return n is MeshInstance3D)
+	var belt := (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r") as Node3D
+	var lamp := belt.get_node_or_null("LanternBody") if belt != null else null
+	var lamp_meshes: Array = lamp.find_children("*", "MeshInstance3D", true, false) if lamp != null else []
+	_check(not own.is_empty() and own.all(func(m: MeshInstance3D) -> bool: return m.layers & Client3D.FACE_LAYER and m.layers & 1)
+			and not lamp_meshes.is_empty() and lamp_meshes.all(func(m: MeshInstance3D) -> bool: return not m.layers & Client3D.FACE_LAYER),
+			"the player's own %d skinned parts on FACE_LAYER, their own layer kept; the hung lantern's %d meshes not" % [own.size(), lamp_meshes.size()])
+	var strays := []
+	var tagged := []
+	for node: Node in get_tree().root.find_children("*", "GeometryInstance3D", true, false):
+		if not (node as VisualInstance3D).layers & Client3D.FACE_LAYER:
+			continue
+		tagged.append(node)
+		var up := node.get_parent()
+		var worn := node.name == &"Worn"
+		var person := false
+		while up != null:
+			if up.has_meta("entity_id"):
+				person = up.has_meta("look")
+				break
+			worn = worn or up.name == &"Worn"
+			up = up.get_parent()
+		if not (node is MeshInstance3D and person and (node.get_parent() is Skeleton3D or worn)):
+			strays.append(node.get_path())
+	_check(not tagged.is_empty() and strays.is_empty(), "only people's own drawn parts carry FACE_LAYER (%d; others %s)" % [tagged.size(), strays])
+	# Every other light and camera reaches each of those as it did without the bit.
+	var differ := []
+	var masks := []
+	for node: Node in get_tree().root.find_children("*", "Node3D", true, false):
+		if node is Light3D and node.name != &"FaceLight":
+			masks.append([node.get_path(), (node as Light3D).light_cull_mask])
+		elif node is Camera3D:
+			masks.append([node.get_path(), (node as Camera3D).cull_mask])
+		elif node is Decal:
+			masks.append([node.get_path(), (node as Decal).cull_mask])
+		elif node is ReflectionProbe:
+			masks.append([node.get_path(), (node as ReflectionProbe).cull_mask])
+	for pair: Array in masks:
+		var mask := int(pair[1])
+		for mesh: Node in tagged:
+			var layers := (mesh as VisualInstance3D).layers
+			if (mask & layers != 0) != (mask & (layers & ~Client3D.FACE_LAYER) != 0):
+				differ.append("%s on %s" % [pair[0], mesh.get_path()])
+	_check(masks.size() > 1 and differ.is_empty(), "every other light and camera (%d) reaches people's parts as without the bit (%s)" % [masks.size(), differ])
+	# A wall in this room: from a cell beside it, facing it, the light stays inside the cell.
+	var found := false
+	var at_wall := -1.0
+	for cell: Vector2i in _cells_round(player.tile, 8):
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if not found and World.edge_blocks_sight(cell, step):
+				found = true
+				at_wall = Client3D.lantern_reach(Vector2(cell), Vector2(step), ahead,
+						func(c: Vector2i, s: Vector2i) -> bool: return World.edge_blocks_sight(c, s))
+	_check(found and is_equal_approx(at_wall, 0.5 - gap), "facing a wall of this room from its cell's middle: %.2f m ahead, inside the cell" % at_wall)
+	# Shadowless, it would shine through a wall: its range clipped by the grid (environment's read, 11-17).
+	var range_open := Client3D.face_light_range(Vector2(0.35, 0.0), 0.3, never)
+	var range_nose := Client3D.face_light_range(Vector2(0.35, 0.0), 0.3, east_wall)
+	var range_far := Client3D.face_light_range(Vector2(-0.35, 0.0), 0.3, east_wall)
+	_check(is_equal_approx(range_open, Client3D.FACE_LIGHT_RANGE) and is_equal_approx(range_nose, 0.3) and is_equal_approx(range_far, 0.85)
+			and is_equal_approx(Client3D.omni_window(0.0, 1.0), 1.0) and is_zero_approx(Client3D.omni_window(1.0, 1.0)),
+			"its range: open %.2f; nose to a wall 0.15 off, its least (0.3); the wall 0.85 behind it, 0.85 (%.2f, %.2f)" % [range_open, range_nose, range_far])
+	# In this room, the player's own light: nose to a wall, and along one, against a head where a person
+	# across it would stand (its cell's middle, and 0.3 m past the wall), the open floor's range beside.
+	var place_was := puppet.position
+	var yaw_was := body.rotation.y
+	var face_y := top - Client3D.FACE_UNDER_TOP
+	var rows := {}
+	var clear := true
+	for cell: Vector2i in _cells_round(player.tile, 8):
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if not World.edge_blocks_sight(cell, step) or rows.size() >= 2:
+				continue
+			var side := Vector2i(-step.y, step.x)
+			var walks := not _rig._shuts_light(cell, side, _rig._tile_position(cell).y + top) and not World.edge_blocks_sight(cell + side, step)
+			for kind: String in ["nose to it", "walking along it"]:
+				if rows.has(kind) or (kind == "walking along it" and not walks):
+					continue
+				var faced := step if kind == "nose to it" else side
+				puppet.position = _rig._tile_position(cell)
+				body.rotation.y = atan2(-float(faced.y), float(faced.x))
+				if not _rig._place_face_light(puppet, light):
+					continue
+				var at := puppet.position + light.position
+				var heads := []
+				# Past it: its cell's middle, 0.3 m (0.45 from a light nose to the wall) and 0.25 (0.40, the margin).
+				for past: float in [0.5, 0.3, 0.25]:
+					var head := Vector3(cell.x + step.x * (0.5 + past), puppet.position.y + face_y, cell.y + step.y * (0.5 + past))
+					heads.append(at.distance_to(head))
+					if kind == "walking along it":
+						heads.append(at.distance_to(head + Vector3(side.x, 0.0, side.y)))
+				var opened := Client3D.face_light_range(Vector2(at.x, at.z), 0.0, never)
+				var lift_here := float(light.get_meta("lift", 1.0))
+				var tip := Client3D.FACE_LIFT_AHEAD
+				var to_face := light.position.distance_to(Vector3(faced.x * tip, face_y, faced.y * tip))
+				var falls := light.omni_attenuation
+				var open_d := Client3D.face_open_distance(tip)
+				var same := absf(Client3D.omni_window(to_face, light.omni_range) * pow(to_face, -falls) * lift_here
+						- Client3D.omni_window(open_d, Client3D.FACE_LIGHT_RANGE) * pow(open_d, -falls)) < 0.001
+				rows[kind] = [cell, step, light.omni_range, heads, opened, same]
+				clear = clear and same and heads.all(func(d: float) -> bool: return d > light.omni_range and d < opened)
+	# The lift: none in the open; nose to a wall it makes up the window and the nearer stand both, solved for
+	# the nose's tip (FACE_LIFT_AHEAD): the nose takes what it takes in the open, the eyes a little less.
+	var nose_at := Client3D.FACE_LIFT_AHEAD
+	var open_lift := Client3D.face_lift(Client3D.face_open_distance(nose_at), Client3D.FACE_LIGHT_RANGE, 1.0, nose_at)
+	var eyes_d := Vector2(0.5 - gap - Client3D.FACE_AHEAD_OF_AXIS, Client3D.FACE_LIGHT_OVER + Client3D.FACE_UNDER_TOP).length()
+	var nose_d := Vector2(0.5 - gap - nose_at, Client3D.FACE_LIGHT_OVER + Client3D.FACE_UNDER_TOP).length()
+	var wall_range := eyes_d * Client3D.FACE_RANGE_LEAST
+	var wall_lift := Client3D.face_lift(nose_d, wall_range, 1.0, nose_at)
+	var takes_at := func(d: float, r: float) -> float: return Client3D.omni_window(d, r) / d
+	var nose_share: float = takes_at.call(nose_d, wall_range) * wall_lift / takes_at.call(Client3D.face_open_distance(nose_at), Client3D.FACE_LIGHT_RANGE)
+	var eyes_share: float = takes_at.call(eyes_d, wall_range) * wall_lift / takes_at.call(Client3D.face_open_distance(), Client3D.FACE_LIGHT_RANGE)
+	_check(is_equal_approx(open_lift, 1.0) and absf(nose_share - 1.0) < 0.0001 and eyes_share > 0.7 and eyes_share < 1.0,
+			"the lift: 1 in the open (%.3f); nose to a wall (the nose's tip %.3f m off, the eyes %.3f, its range %.3f) %.3f: the nose takes %.3f of its open light, the eyes %.3f" % [
+			open_lift, nose_d, eyes_d, wall_range, wall_lift, nose_share, eyes_share])
+	# The face light is a fill: no glint (FACE_LIGHT_SPECULAR), its energy and specular the feel's when a look sets them.
+	_check(is_equal_approx(light.light_specular, Client3D.FACE_LIGHT_SPECULAR), "the face light's specular %.2f (FACE_LIGHT_SPECULAR)" % light.light_specular)
+	# Its range kept while the light stands still (found again only once it moves, or after FACE_RANGE_AGAIN).
+	var kept_until := int(light.get_meta("range_until", 0))
+	_rig._place_face_light(puppet, light)
+	var kept := int(light.get_meta("range_until", 0)) == kept_until
+	puppet.position += Vector3(0.1, 0.0, 0.0)
+	_rig._place_face_light(puppet, light)
+	var found_again := (light.get_meta("range_at", Vector3.INF) as Vector3).is_equal_approx(puppet.position + light.position)
+	_check(kept and found_again, "its range kept while the light stands still (%s), found again once it moves (%s)" % [kept, found_again])
+	puppet.position = place_was
+	body.rotation.y = yaw_was
+	_rig._process(0.0)
+	_check(rows.size() == 2 and clear,
+			"across a wall it lights no one: nose to it and walking along it, each head past the wall (its cell's middle, 0.3 m past it) beyond its range, inside the open floor's; its own face lit the same ([cell, wall, range, heads, open range, own face the same] %s)" % [rows])
+	# The sim's light: at the carrier's tile, whatever the drawn light does.
+	# Cells out where the carried light falls off (next to the carrier it fills the cell to 1).
+	var cells := [player.tile + Vector2i(3, 0), player.tile + Vector2i(-4, 0), player.tile + Vector2i(0, 5)]
+	var lit_before := cells.map(func(c: Vector2i) -> float: return World.fields.light_at(World, c, true, false))
+	body.rotation.y += PI
+	_rig._process(0.0)
+	var lit_after := cells.map(func(c: Vector2i) -> float: return World.fields.light_at(World, c, true, false))
+	_check(lit_before == lit_after and lit_after.any(func(v: float) -> bool: return v > 0.0 and v < 1.0), "the sim's light (its sources and carried lights, no sky) the same, the drawn light turned (%s)" % [lit_after])
+	if pet != null:
+		var hers: Node3D = _rig._puppets[pet.get_instance_id()]
+		var her_face := hers.get_node_or_null("FaceLight") as OmniLight3D
+		_check(her_face != null and her_face.light_cull_mask == Client3D.FACE_LAYER and not her_face.shadow_enabled, "the companion's face light the same")
+	# Its dark, the carried lantern's (_lantern_dark_at; 451 amended (9)): an inside the clock lights by how
+	# much of the day reaches that floor (inside_lantern_dark, ambient_share); any other room or underground
+	# full; out of doors by the open's day.
+	var floors := {}
+	for level: String in ["umbrage_tavern", "umbrage_tavern_up", "umbrage_tavern_attic"]:
+		var share := Client3D.ambient_share(Level.load_level(level)["terrain"])
+		floors[level] = [snappedf(Client3D.inside_lantern_dark(1.0, share), 0.001), Client3D.inside_lantern_dark(DayNight.NIGHT, share)]
+	var crypt_noon := Client3D.lantern_dark(1.0, false)
+	_check(floors["umbrage_tavern"][0] < 0.2 and floors["umbrage_tavern_attic"][0] > 0.8
+			and floors["umbrage_tavern_up"][0] > floors["umbrage_tavern"][0] and floors["umbrage_tavern_up"][0] < floors["umbrage_tavern_attic"][0]
+			and floors.values().all(func(r: Array) -> bool: return is_equal_approx(float(r[1]), 1.0)) and is_equal_approx(crypt_noon, 1.0)
+			and is_zero_approx(Client3D.lantern_dark(1.0, true)) and is_equal_approx(Client3D.lantern_dark(DayNight.NIGHT, true), 1.0),
+			"its dark: the Mughouse [noon, night] %s; a room the clock doesn't light, underground, at noon %.2f; an open noon none, its night full" % [floors, crypt_noon])
+	# Drawn so: an inside the clock lights at noon, the face light and the lantern by the one dark.
+	var interior_was: Variant = _rig._terrain.get("interior", null)
+	_rig._terrain["interior"] = true
+	_rig._outdoor = false
+	DayNight.light = 1.0
+	_rig._process(0.0)
+	var want_dark := Client3D.inside_lantern_dark(1.0, Client3D.ambient_share(_rig._terrain))
+	var one_dark := is_equal_approx(_rig._lantern_dark_at(player.tile), want_dark) \
+			and is_equal_approx(lantern.light_energy, _rig._lantern_lit_energy() * want_dark)
+	_check(one_dark and is_equal_approx(light.light_energy, Client3D.FACE_LIGHT_ENERGY * want_dark * float(light.get_meta("lift", 1.0)))
+			and light.visible == (want_dark >= Client3D.LANTERN_DAY_LEAST),
+			"an inside at noon: the face light at %.3f and the lantern at %.3f, by the one dark %.3f (%s)" % [light.light_energy, lantern.light_energy, want_dark, one_dark])
+	if interior_was == null:
+		_rig._terrain.erase("interior")
+	else:
+		_rig._terrain["interior"] = interior_was
+	DayNight.light = light_was
+	_rig._outdoor = outdoor_was
+	player.emit_light = lit_was
+	_rig._process(0.0)
+
+	# The floor's end with no wall on its edge (a room's void, a cave's rock): shut in a room or
+	# underground, open out of doors. On the Mughouse's upstairs room, the view's own terrain.
+	var room := Level.load_level("umbrage_tavern_up")
+	_rig.rebuild(room["terrain"], room["spawn_points"].values()[0])
+	var open_cells: Dictionary = {}
+	for cell: Vector2i in room["terrain"].get("floor", []) + room["terrain"].get("water", []):
+		open_cells[cell] = true
+	var end := Vector2i(-1, -1)
+	var toward := Vector2i.ZERO
+	for cell: Vector2i in room["terrain"].get("floor", []):
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if toward == Vector2i.ZERO and not open_cells.has(cell + step) and open_cells.has(cell - step) \
+					and not World.edge_blocks_sight(cell, step) and not World.edge_blocks_sight(cell, -step):
+				end = cell
+				toward = step
+	var high := 99.0
+	_rig._outdoor = false
+	var shut_inside: bool = toward != Vector2i.ZERO and _rig._shuts_light(end, toward, high)
+	var open_behind: bool = toward != Vector2i.ZERO and not _rig._shuts_light(end, -toward, high)
+	_rig._outdoor = true
+	var shut_outside: bool = toward != Vector2i.ZERO and _rig._shuts_light(end, toward, high)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_check(toward != Vector2i.ZERO and shut_inside and open_behind and not shut_outside,
+			"the floor's end with no wall on it (the upstairs room's %s going %s): shut indoors, the floor behind open, open out of doors" % [end, toward])
+
+
+## The cells within [param r] of [param at], nearest rows first.
+func _cells_round(at: Vector2i, r: int) -> Array:
+	var out := []
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
+			out.append(at + Vector2i(dx, dy))
+	return out
 
 
 func _test_hip_lantern() -> void:
