@@ -1,6 +1,8 @@
 # Each checkout's tests use ports of their own, so worktrees can run their tests at the
 # same time: a test's base port plus the offset for the checkout's folder name.
-# A folder not listed gets 1000 + 200 * (the sum of its name's bytes mod 20).
+# A folder not listed gets 5600 + 200 * (the md5 of its name, lower-cased, mod 100): above every
+# listed offset by more than a step, so it never takes a listed tree's ports (278 amended (11)).
+# Every offset here is a multiple of 200 and stays below the unlisted range (tests/suite_test).
 # PSYKINETIC_TEST_PORT_OFFSET, when set, overrides both.
 # Read by tests/test_ports.gd, tests/test_ports.sh and tests/test_ports.ps1.
 psykinetic 0

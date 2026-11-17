@@ -1,0 +1,14 @@
+# Unlisted folder names and the offset each must get (278 amended (11)): 5600 + 200 * (the md5
+# of the name, lower-cased, mod 100). tests/suite_test checks test_ports.gd's hashed() against
+# these, tests/port_hash_test.sh checks test_ports.sh and test_ports.ps1 in a folder of each name,
+# so the three agree. twohands, wtrack and envfill all had psykinetic-release's 3400 by the old
+# byte sum (animation's scratch "twohands" met the cut's view_world_test on port 21123, 11-16).
+twohands 6000
+wtrack 8000
+envfill 6200
+perf-abc 18600
+perf-cba 14000
+maps-den 7200
+maps-ned 18200
+perf-ports 9200
+Perf-Ports 9200

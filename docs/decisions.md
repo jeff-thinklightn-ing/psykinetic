@@ -5794,6 +5794,39 @@ _setup/_finish calls and the new port. The halves print 1285 PASS lines against 
 the setup's free-body check. A new row goes in the half whose header names its subject, at the end of its list
 unless it needs another row's state. A helper or const both halves need goes in the base. Tests only; protocol
 unchanged; no class_name; no bullet.
+278 amended (11): no two checkouts' test ports meet (the coordinator's go, 2026-11-16, on perf's reading of the
+port 21123 clash and with perf's remainder rule in place of the span rule; label from tools/decision_number.sh). At
+15:13 to 15:16 animation's scratch checkout "twohands" ran view_world_test on port 21123 while the cut's suite in
+psykinetic-release ran it on the same port. An unlisted folder's offset was 1000 + 200 * (the sum of its name's
+bytes mod 20), always one of the listed trees' offsets (twohands, wtrack, envfill and builder-accept all had
+psykinetic-release's 3400), and four base pairs were exactly a step apart (companion_test 17786 and door_day_test
+17986, zone 17792 and visitor_road 17992, resident 17796 and hut_town 17996, builder_zone 17798 and repair_site
+17998), so checkouts 200 apart met on them. Every offset is a multiple of the step (test_ports.gd's STEP, 200), so
+two checkouts' ports meet only where two claimed ports differ by a multiple of it: tests/suite_test now fails,
+naming both, on two claimed ports with one remainder mod 200, over every claimed port (the bases, their + k, and the
+shell tools' "<base> + PORT_OFFSET" under tools/: net_bench, net_chase, net_smooth, net_wind, tour), and on a claimed
+port outside 17700..18099 (PORT_LOW, PORT_HIGH). Moving economy's four high bases was not enough once the + k ports
+counted: fire_night_test's 17962 sat a step above net_test's 17762 (its 17760 + 2), and tour.sh's 17801 took
+the first pick for hut_town. The five move, all economy's (economy told before the queue): door_day 17985,
+visitor_road 17984, hut_town 18003, repair_site 18002, fire_night 17959. The first landing failed on a sixth:
+level_dungeons_test's 17772 (278 amended (10)'s split, on main after the pretest) met first_room_test's 17972; it
+moves to 17905. An unlisted folder now gets
+UNLISTED_BASE + STEP * (the md5 of its name, lower-cased, its first 8 hex digits, mod UNLISTED_COUNT): 5600 +
+200 * (0..99), in tests/test_ports.gd (hashed()), test_ports.sh (md5sum) and test_ports.ps1
+([Security.Cryptography.MD5]) alike. The highest listed port (18010 + 4800 = 22810) lies 512 below the lowest
+unlisted one (17722 + 5600 = 23322), and the top (18010 + 5600 + 19800 = 43410) under 49152 with room; suite_test
+fails on a listed offset in tests/port_offsets.txt that is not a multiple of the step or comes within a step of the
+unlisted range, and on a top within 1000 of 49152. Two unlisted folders still meet one time in a hundred (twohands
+and startstop both have 6000); a scratch checkout that must not meet another can be listed. tests/port_hash_cases.txt
+names nine unlisted names and their offsets: suite_test holds hashed() to them and tests/port_hash_test.sh (a tool
+part of land.sh, 8 s) holds test_ports.sh and test_ports.ps1 to them, each run from a folder of the name, so the
+three agree; a listed folder keeps its table's offset and PSYKINETIC_TEST_PORT_OFFSET still overrides both. Rows:
+two names the old byte sum put together (wtrack, envfill) now differ; an anagram pair differs (perf-abc and
+perf-cba, maps-den and maps-ned); a name and its capitals agree; twohands reaches no listed offset; the four pairs
+meet at no offset difference; no listed checkout's claimed port is any unlisted offset's. perf's own land scripts
+no longer force PSYKINETIC_TEST_PORT_OFFSET=200 on every perf-* checkout: each takes its folder's offset. A
+checkout not yet rebased onto this keeps the old numbers (the byte sum, the old bases), so the clash fades only as
+trees rebase. Tests only; protocol unchanged; no class_name; no bullet.
 
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 

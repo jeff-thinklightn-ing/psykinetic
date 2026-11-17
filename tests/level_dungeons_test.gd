@@ -10,7 +10,7 @@ extends "res://tests/level_test_base.gd"
 
 
 func _ready() -> void:
-	Net.port = preload("res://tests/test_ports.gd").of(17772)
+	Net.port = preload("res://tests/test_ports.gd").of(17905)
 	_setup()
 	_test_barrow_won()
 	await _test_hall_door()

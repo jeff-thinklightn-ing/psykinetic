@@ -317,6 +317,7 @@ tool_part land_checks_test bash tests/land_checks_test.sh
 tool_part run_parse_test bash tests/run_parse_test.sh
 tool_part load_check_test bash tests/load_check_test.sh
 tool_part tracked_on_main_test bash tests/tracked_on_main_test.sh
+tool_part port_hash_test bash tests/port_hash_test.sh
 # Each font's .fontdata before any Godot part: a first import that segfaulted on the fonts left
 # them unmade and server_boot_test's export failed on it (perf-sha, 11-13). One more import if
 # one is missing, under this run's take; still missing, the part fails naming it.

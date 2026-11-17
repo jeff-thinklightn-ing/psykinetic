@@ -24,7 +24,7 @@ func _ready() -> void:
 func _run() -> void:
 	World.set_process(false)
 	var ports := preload("res://tests/test_ports.gd")
-	Net.port = ports.of(17998)
+	Net.port = ports.of(18002)
 	Net.companions = false
 	Net.map_name = "wilds"
 	Net.lawspeaker = "off"

@@ -13,8 +13,10 @@ if ($env:PSYKINETIC_TEST_PORT_OFFSET -match '^-?\d+$') {
 		}
 	}
 	if ($null -eq $portOffset) {
-		$total = 0
-		foreach ($byte in [Text.Encoding]::UTF8.GetBytes($folder)) { $total += $byte }
-		$portOffset = 1000 + 200 * ($total % 20)
+		# Not listed: 5600 + 200 * (the md5 of the name, lower-cased, mod 100), as test_ports.gd's
+		# hashed() (278 amended (11)).
+		$md5 = [Security.Cryptography.MD5]::Create()
+		$digest = -join ($md5.ComputeHash([Text.Encoding]::UTF8.GetBytes($folder.ToLowerInvariant()))[0..3] | ForEach-Object { $_.ToString('x2') })
+		$portOffset = 5600 + 200 * [int]([Convert]::ToUInt64($digest, 16) % 100)
 	}
 }

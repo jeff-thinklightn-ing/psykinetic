@@ -6,7 +6,9 @@ else
 	folder="$(basename "$(pwd)")"
 	PORT_OFFSET="$(awk -v f="$folder" '$1 == f && NF == 2 { print $2; exit }' tests/port_offsets.txt)"
 	if [ -z "$PORT_OFFSET" ]; then
-		total=$(printf %s "$folder" | od -An -tu1 | tr -s ' ' '\n' | awk '{ s += $1 } END { print s + 0 }')
-		PORT_OFFSET=$((1000 + 200 * (total % 20)))
+		# Not listed: 5600 + 200 * (the md5 of the name, lower-cased, mod 100), as test_ports.gd's
+		# hashed() (278 amended (11)).
+		digest=$(printf %s "$folder" | tr 'A-Z' 'a-z' | md5sum | cut -c1-8)
+		PORT_OFFSET=$((5600 + 200 * (0x$digest % 100)))
 	fi
 fi

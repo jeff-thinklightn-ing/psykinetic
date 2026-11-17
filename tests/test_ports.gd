@@ -11,6 +11,11 @@ extends RefCounted
 ##   var folder: String = preload("res://tests/test_ports.gd").scratch("editor_test/")
 
 const OFFSETS := "res://tests/port_offsets.txt"
+## Every offset is a multiple of STEP; tests/suite_test keeps every claimed port's remainder mod
+## STEP its own, so no two checkouts' ports meet at any offset difference (278 amended (11)).
+const STEP := 200
+const UNLISTED_BASE := 5600
+const UNLISTED_COUNT := 100
 
 
 static func of(base: int) -> int:
@@ -60,7 +65,14 @@ static func offset() -> int:
 		var fields := line.strip_edges().split(" ", false)
 		if fields.size() == 2 and fields[0] == folder and fields[1].is_valid_int():
 			return fields[1].to_int()
-	var total := 0
-	for byte in folder.to_utf8_buffer():
-		total += byte
-	return 1000 + 200 * (total % 20)
+	return hashed(folder)
+
+
+## The offset of a folder not listed in tests/port_offsets.txt (278 amended (11)): UNLISTED_BASE
+## plus STEP times the md5 of its name, lower-cased, mod UNLISTED_COUNT (its first 8 hex digits).
+## The listed offsets stay below the range by more than a step (tests/suite_test checks), so an
+## unlisted folder never takes a listed tree's ports; the old byte sum, 1000 + 200 * (sum mod 20),
+## always did (animation's scratch "twohands" ran on psykinetic-release's, 11-16). Two unlisted
+## folders still meet one time in UNLISTED_COUNT. tests/test_ports.sh and .ps1 give the same.
+static func hashed(folder: String) -> int:
+	return UNLISTED_BASE + STEP * (folder.to_lower().md5_text().substr(0, 8).hex_to_int() % UNLISTED_COUNT)
