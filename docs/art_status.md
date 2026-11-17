@@ -268,7 +268,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.anvil` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.banner` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.barrel` | 1 | art-kit, by hand | own | 2026-10-19 |
-| `prop.bed` | 1 | art-kit, by hand | own | 2026-10-19 |
+| `prop.bed` | 1 | art-kit, by hand | own | 2026-11-16 |
 | `prop.bed_straw` | 1 | art-kit, by hand | own | 2026-10-27 |
 | `prop.bedroll` | 1 | art-kit, by hand | own | 2026-10-31 |
 | `prop.bell` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
