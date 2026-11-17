@@ -1654,6 +1654,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
+	if click.button_index == MOUSE_BUTTON_LEFT and Net.test_click_log:
+		# 935 amended (8): what the click picked and where the pointer was (the cursor's own, which a test's pick of a cell does not move): a
+		# click that did nothing says why (a person under the pointer is a talk, the ground a walk).
+		print("[click] pointer %s, cell %s, %s" % [Vector2i(get_viewport().get_mouse_position()), tile, ("on a %s (%s)" % [target.get_script().get_global_name(), "under the pointer" if on_sprite else "on the cell"]) if target != null else "ground"])
 	# Fishing (805 amended (11), "fishing that works"): the float down, a left
 	# click strikes; a left click on water with a rod on you casts there.
 	if click.button_index == MOUSE_BUTTON_LEFT and _fish_click(player, tile, on_sprite):

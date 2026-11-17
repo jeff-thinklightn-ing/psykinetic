@@ -20718,6 +20718,46 @@ func _test_stone_names() -> void:
 		"a talking stone monster with no given name and no label has no plate, never its node name")
 	if bare != null:
 		World.despawn(bare)
+	# A resident beside the player and the clicks round them (ui-design's newcomer look, 11-16: a click four cells off opened Maud's window): under the low
+	# camera a ground click whose ray passes through her body picks her (a sprite under the cursor is the target), so the cells her body shadows are the
+	# strip BEHIND her on the line from the camera. Counted per yaw over the cells round them: none off that strip.
+	var near_at: Vector2i = _main._nearest_free(player.tile + Vector2i(1, 1))
+	World._relocate(knight, near_at)
+	var low_pick_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	_rig._camera_target = Vector3(player.tile.x, _rig._ground_height(Vector2(player.tile)), player.tile.y)
+	var yaw_pick_was: float = _rig.yaw
+	var table: Array[String] = []
+	var off_strip: Array[String] = []
+	for yaw_try: float in [0.0, 15.0, 30.0, 45.0, 60.0, 90.0, 135.0, 180.0, 270.0]:
+		_rig._set_yaw(yaw_try)
+		_rig._place_camera()
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		_rig._sync_puppets()
+		await get_tree().physics_frame
+		var origin: Vector3 = _rig._camera.global_position
+		var knight_ground := Vector3(near_at.x, _rig._ground_height(Vector2(near_at)), near_at.y)
+		var line := Vector2(knight_ground.x - origin.x, knight_ground.z - origin.z).normalized()
+		var picked := 0
+		for dx in range(-6, 7):
+			for dy in range(-6, 7):
+				var cell := player.tile + Vector2i(dx, dy)
+				if World.distance(cell, near_at) <= 1:
+					continue
+				var point := Vector3(cell.x, _rig._ground_height(Vector2(cell)), cell.y)
+				var ray: Array[Vector3] = [origin, (point - origin).normalized()]
+				if _rig.entity_on_ray(ray) == knight:
+					picked += 1
+					var across := absf(line.cross(Vector2(point.x - origin.x, point.z - origin.z)))
+					var ahead := line.dot(Vector2(point.x - knight_ground.x, point.z - knight_ground.z))
+					if across > 1.0 or ahead < -0.5:
+						off_strip.append("yaw %d cell %s (across %.1f, ahead %.1f)" % [int(yaw_try), cell, across, ahead])
+		table.append("%d:%d" % [int(yaw_try), picked])
+	print("  CLICK SHADOW: cells (of 169 less her own) that pick the resident beside the player, by camera yaw: %s" % [table])
+	_check(off_strip.is_empty(), "a ground click picks her only along the strip behind her on the line from the camera, never off it (%s)" % [off_strip.slice(0, 4)])
+	_rig._set_yaw(yaw_pick_was)
+	Net.set_camera_low(low_pick_was, false)
 	var box := Chest.new()
 	box.name = "ViewBox"
 	add_child(box)

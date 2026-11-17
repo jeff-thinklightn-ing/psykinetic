@@ -1172,6 +1172,8 @@ var test_hold_far := sqrt(2.0)
 var test_hold_flip := 0.0
 ## --test-smooth: Main measures what it draws (net/smooth_meter.gd).
 var test_smooth := false
+## --test-click-log: every left click says what it picked and where the pointer was (Main's "[click] pointer" line, 935 amended (8)); off in play.
+var test_click_log := false
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
 var test_walk: Array[Dictionary] = []
 ## --test-walk-on-wind: the walk waits for the local player's own wind-up.
@@ -2532,6 +2534,8 @@ func _parse_args(given: Array = []) -> void:
 				regenerate = true
 			"--test-smooth":
 				test_smooth = true
+			"--test-click-log":
+				test_click_log = true
 			"--test-walk-on-wind":
 				test_walk_on_wind = true
 			"--world-map":

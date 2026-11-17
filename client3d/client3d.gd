@@ -6117,8 +6117,12 @@ func _pick() -> Dictionary:
 ## front stops the ray. Where no puppet is hit, a monster within PICK_SLACK
 ## of the cursor's ray is the one (the nearest, if more).
 func entity_under_mouse() -> GridEntity:
+	return entity_on_ray(_mouse_ray())
+
+
+## The entity a ray [param ray] ([origin, direction], as _mouse_ray gives) picks: the cursor's, or a test's from the camera through a ground cell.
+func entity_on_ray(ray: Array[Vector3]) -> GridEntity:
 	var own := _local_player()
-	var ray := _mouse_ray()
 	var query := PhysicsRayQueryParameters3D.create(ray[0], ray[0] + ray[1] * CAMERA_DISTANCE * 3.0)
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
