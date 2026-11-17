@@ -3204,7 +3204,13 @@ func _free_drive(delta: float) -> bool:
 		player.aim = Vector2.ZERO
 	elif Net.controls == "wasd" and (_free["path"] as Array).is_empty():
 		_aim_at_cursor(player)
-	var commands := own.hold(player, intent, minf(delta, 0.1))
+	var held := minf(delta, 0.1)
+	var commands := own.hold(player, intent, held)
+	if not _niche_lean.is_empty() and intent != Vector2.ZERO and intent == _niche_lean["way"]:
+		# 608 amended (10): a niche's lean spends the time its commands carry (a frame's
+		# delta, capped at 0.1 s as here), the time the server's press (World._free_pressed)
+		# is given: a client that stalls a second sends 0.1 s of it, and leans on after.
+		_niche_lean["left"] = float(_niche_lean["left"]) - held
 	if commands.is_empty():
 		return true
 	if Net.is_authority():
@@ -3254,7 +3260,9 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 		# its stone, the server's press (World._free_pressed) as a held walk into it.
 		# 608 amended (9): dropped only when its time is out, never because the
 		# route still has a step to walk (that dropped a click made on arrival).
-		if Time.get_ticks_msec() >= int(_niche_lean["until"]):
+		# 608 amended (10): its time is the time it has been held (_free_drive), not the
+		# clock's, so a frame that stalls between the lean and the press drops nothing.
+		if float(_niche_lean["left"]) <= 0.0:
 			_niche_lean = {}
 		elif (_free.get("path", []) as Array).is_empty():
 			return _niche_lean["way"]
@@ -27899,7 +27907,7 @@ var _altar_wanted := NONE
 ## niche's floor cell, a click on the niche did nothing, its cell being no
 ## floor, so the click was a walk of none): the niche (niche_at) walked to,
 ## its floor cell, and on it the body leans into the stone (_niche_lean,
-## NICHE_LEAN_MSEC), so the server's press answers as a walk into it does
+## NICHE_LEAN_SECONDS), so the server's press answers as a walk into it does
 ## (Main._on_niche_pressed: the hidden slab opened once the way is
 ## revealed, else NICHE_SHUT_LINE): at once when he stands there, else when
 ## the walk ends there (_niche_wanted, _update_niche). Every niche alike.
@@ -27944,18 +27952,22 @@ func niche_at(tile: Vector2i) -> Dictionary:
 
 ## How long a clicked niche's lean lasts (608 amended (8)): the body's way
 ## from the cell's middle to the stone and World.FREE_PRESS_TICKS against
-## it, with a join's frames to spare.
-const NICHE_LEAN_MSEC := 500
+## it, with a join's frames to spare. 608 amended (10): seconds of the lean
+## held and sent (the commands' time, _free_drive), not the clock's: five of
+## the server's ticks, one or two to the stone, two pressed, one spare for a
+## tick its commands reach late (a tick with none starts the press's count again).
+const NICHE_LEAN_SECONDS := 0.5
 ## The niche a click asked to press, walked to its floor cell first; {} if none.
 var _niche_wanted := {}
-## The lean into a clicked niche (608 amended (8)): {until (msec), way}; {} if none.
+## The lean into a clicked niche (608 amended (8)): {left (seconds still to hold,
+## 608 amended (10)), way}; {} if none.
 var _niche_lean := {}
 ## Whether the zone's hidden slab was open at the last frame (_found_hold).
 var _slab_was_open := false
 
 
 func _lean_into(niche: Dictionary) -> void:
-	_niche_lean = {"until": Time.get_ticks_msec() + NICHE_LEAN_MSEC, "way": niche["way"]}
+	_niche_lean = {"left": NICHE_LEAN_SECONDS, "way": niche["way"]}
 
 
 ## Each frame (608 amended (8)): a niche clicked from afar leaned into once

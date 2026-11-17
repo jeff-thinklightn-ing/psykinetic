@@ -4893,6 +4893,47 @@ func _test_niche_click() -> void:
 		_check(not _main._niche_lean.is_empty(), "a niche's lean is kept while the route still has a step to walk, dropped only when its time is out (608 amended (9))")
 		_main._free["path"] = []
 		_main._niche_lean = {}
+		# 608 amended (10): the lean's time is the time it is held and sent, not the
+		# clock's. A blocking stall inside the lean (the machine's, a client's hitch:
+		# 608 amended (9)'s 600 ms made the row fail on the clock) drops nothing.
+		for stall: int in [600, 2000]:
+			_main._told_niche.erase(player.owner_peer)
+			_put(player, Vector2i(2, 1))
+			told = _click_niche(player, Vector2i(2, 0), heard, 240, stall)
+			_check(told == [shut], "a stall of %d ms inside the lean, blocking: the stone pressed all the same (608 amended (10): %s)" % [stall, told])
+		# The lean spent whole without a press (the body held by the server, never
+		# pressed): dropped after NICHE_LEAN_SECONDS of it held, nothing pressed after.
+		_main._told_niche.erase(player.owner_peer)
+		_put(player, Vector2i(2, 1))
+		_main._lean_into(_main.niche_at(Vector2i(2, 0)))
+		var before := heard.size()
+		var spent := 0
+		for i in 120:
+			player.free_halt_until = World.tick + 10
+			player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+			_main._free_drive(1.0 / 60.0)
+			if i % 6 == 5:
+				World.step()
+			if _main._niche_lean.is_empty() and spent == 0:
+				spent = i + 1
+		player.free_halt_until = 0
+		for i in 60:
+			player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+			_main._free_drive(1.0 / 60.0)
+			if i % 6 == 5:
+				World.step()
+		_check(spent > 0 and spent <= int(ceil(Main.NICHE_LEAN_SECONDS * 60.0)) + 2 and heard.size() == before,
+			"a lean held its whole time with no press (the body held): dropped after %d frames, %d of %.1f s, nothing pressed after (608 amended (10): %s)" % [spent, spent, Main.NICHE_LEAN_SECONDS, heard.slice(before)])
+		# A slow connection: the lean's commands reach the server late, none in one of
+		# its ticks (World._free_pressed's count starts again). Any one tick of the
+		# lean's empty: pressed all the same, by the spare tick NICHE_LEAN_SECONDS holds.
+		var gaps: Array[String] = []
+		for gap: int in [1, 2, 3, 4]:
+			_main._told_niche.erase(player.owner_peer)
+			_put(player, Vector2i(2, 1))
+			told = _click_niche(player, Vector2i(2, 0), heard, 240, 0, gap)
+			gaps.append("tick %d empty: %s" % [gap, "pressed" if told == [shut] else str(told)])
+		_check(gaps.all(func(g: String) -> bool: return g.ends_with("pressed")), "the lean's commands none in one of the server's ticks (a slow connection): pressed whichever tick (608 amended (10): %s)" % [gaps])
 		_main._told_niche.erase(player.owner_peer)
 		_put(player, Vector2i(4, 4))
 		told = _click_niche(player, Vector2i(4, 0), heard, 1200)
@@ -4943,23 +4984,41 @@ func _test_niche_click() -> void:
 ## Main's click on a niche's [param stone] (_niche_click), then its frames
 ## as a player's: _free_drive and _update_niche each frame, the world a tick
 ## every 6 frames (the throne's click rows' drive), till a "party" line is
-## heard or [param frames] pass; the lines heard since.
-func _click_niche(player: Player, stone: Vector2i, heard: Array[String], frames: int) -> Array[String]:
+## heard or [param frames] pass; the lines heard since. 608 amended (10):
+## [param stall_msec] blocks the test that long after the click's first frame
+## (a hitch); [param gap_tick] (the nth tick after the click) gets none of the
+## commands sent so far, they reaching the server the tick after (a slow link).
+func _click_niche(player: Player, stone: Vector2i, heard: Array[String], frames: int, stall_msec := 0, gap_tick := -1) -> Array[String]:
 	var before := heard.size()
 	player.free_view = null
+	# 608 amended (10): a client view started afresh counts its commands from the
+	# start, so the server's count does too (decision 689, as a placement does): a
+	# click from the cell he stands on (no placement) had the server drop the new
+	# view's first commands as taken already (seq under free_seen), the lean's whole.
+	player.free_seen = -1
+	player.free_acked = -1
 	player.free_halt_until = 0
 	if not _main._niche_click(player, stone):
 		return ["(no niche click)"]
+	var ticks := 0
 	for i in frames:
+		if i == 1 and stall_msec > 0:
+			OS.delay_msec(stall_msec)
 		player.free_allowance = World.FREE_COMMANDS_PER_SECOND  # The test runs faster than the clock.
-		if not _main._niche_lean.is_empty():
-			# Likewise the lean's time (NICHE_LEAN_MSEC, wall clock): kept on the test's
-			# frames, so a stall of the machine (11-16 21:02, C: full) drops no lean.
-			_main._niche_lean["until"] = Time.get_ticks_msec() + Main.NICHE_LEAN_MSEC
 		_main._free_drive(1.0 / 60.0)
 		_main._update_niche()
 		if i % 6 == 5:
-			World.step()
+			ticks += 1
+			if ticks == gap_tick:
+				var late: Array[Dictionary] = player.free_inputs.duplicate()
+				player.free_inputs.clear()
+				World.step()
+				var since: Array[Dictionary] = player.free_inputs.duplicate()
+				player.free_inputs.clear()
+				player.free_inputs.append_array(late)
+				player.free_inputs.append_array(since)
+			else:
+				World.step()
 		if heard.size() > before:
 			break
 	_main._niche_lean = {}
