@@ -2005,6 +2005,36 @@ func _test_world_map() -> void:
 		"a link's end mark on the known world by its cue: a dark mouth down, a light ring up, dim when sealed, the dot otherwise (589, ui's side)")
 	_check(panel.ways_drawn().any(func(way: Dictionary) -> bool: return WorldMapPanel.end_mark(way) == "mouth"),
 		"the barrow's way down ends in a mouth")
+	# Jeff's reports closed by ui-design's look (11-17): no box for a test level, one line to a way, no holder for nobody.
+	var own_was := panel.own_area
+	panel.own_area = "castle"
+	_check(panel.area_shown("castle") and panel.area_shown("wilds") and not panel.area_shown("test_room") and not panel.area_shown("sample")
+			and not panel.area_shown("practice") and not panel.area_shown("mine_look") and not panel.area_shown("bear_yard"),
+		"the known world draws no box for a test level (test_room, sample, the dev levels)")
+	panel.own_area = "test_room"
+	_check(panel.area_shown("test_room") and not panel.area_shown("sample"), "where the player stands in one, it is drawn")
+	panel.own_area = own_was
+	var lines := WorldMapPanel.one_line_ways(panel.ways_drawn())
+	var pairs := {}
+	var twice := false
+	for line: Dictionary in lines:
+		var pair := [str(line["a"]), str(line["b"])]
+		pair.sort()
+		twice = twice or pairs.has(pair)
+		pairs[pair] = line
+	var barrow_wilds: Dictionary = pairs.get(["barrow", "wilds"], {})
+	_check(not twice and lines.size() < panel.ways_drawn().size() and not barrow_wilds.is_empty()
+			and barrow_wilds["marks"].get("wilds") == "ring" and barrow_wilds["marks"].get("barrow") == "mouth",
+		"one line to a pair of areas (%d lines for %d ways); the barrow and the wilds' four ways: a ring at the wilds, a mouth at the barrow" % [lines.size(), panel.ways_drawn().size()])
+	var sealed_pair := WorldMapPanel.one_line_ways([{"from": "a", "to": "b", "kind": "link", "cue": "sealed", "closed": true},
+		{"from": "b", "to": "a", "kind": "link", "cue": "sealed", "closed": true}] as Array[Dictionary])
+	var open_pair := WorldMapPanel.one_line_ways([{"from": "a", "to": "b", "kind": "link", "cue": "sealed", "closed": true},
+		{"from": "b", "to": "a", "kind": "link", "cue": "none", "closed": false}, {"from": "a", "to": "b", "kind": "edge"}] as Array[Dictionary])
+	_check(sealed_pair.size() == 1 and sealed_pair[0]["sealed"] and not sealed_pair[0]["edge"] and open_pair.size() == 1 and not open_pair[0]["sealed"]
+			and open_pair[0]["edge"] and open_pair[0]["marks"] == {"b": "sealed", "a": "dot"},
+		"a pair of sealed ways draws dim; any open way or an edge makes it plain; each end keeps its one mark")
+	_check(not WorldMapPanel.holder_named(["nobody", 1]) and not WorldMapPanel.holder_named(null) and WorldMapPanel.holder_named(["goblins", 3]),
+		"an unclaimed place names no holder")
 	_check(panel.own_area == World.zone.name, "the player's area is the zone (%s)" % panel.own_area)
 	_check(panel.faction_look("goblins")["name"] == "the Blood Rot" and panel.faction_look("nobody")["name"] == "nobody",
 		"a faction's name and colour from levels/factions.json")
