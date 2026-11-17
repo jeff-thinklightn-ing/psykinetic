@@ -11685,6 +11685,27 @@ back after (a row checks). Until this take the busy, over-limit and hung rows re
 so a landing run while free commit dipped under 2 GB failed on them (C:/dev/review/perf/flakes.md lists 17:06's
 failure under this cause). The gate itself is unchanged. Tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (63) (perf, 2026-11-16; the coordinator's go and terms; label from tools/decision_number.sh): the land
+lock's room check charges a waiter its own reservation only. lock_turn judged whether a take waiting on a free lock had
+room by leaving the take out of running and then applying as_owed(), which charges the oldest lock waiter in the list it
+is given its whole estimate: with the take left out, the next-oldest became that head, so each waiter was charged
+another's reservation on top of its own, and with two or more on a free lock every one of them needed the margin and two
+reservations. That night from 21:08:28 the lock stood free with three suite_remote takes on it (perf-ports first, then
+lore, then perf-busyrow) and about twenty landings queued behind on "3 already wait": at 10.3 GB free (margin 8, the
+head's 1.7, the scenes' 0.1 owed: 9.8 wanted) each try said "no room yet: 1.0 to 1.5 GB short"; the pass (36's
+UNFED_PASS_SECONDS) could not help, every waiter carrying the same charge; and the refusal wrote nothing to the lock's log,
+so the lock read as one nobody tried. The 17:06 stall (394 amended (60)'s) had two waiters on the lock and the same
+shape. Now as_owed() runs over every take and this one is left out after: the head owes only its own reservation, each
+later waiter is charged the head's (it goes first) and its own once. The margin is unchanged. A refusal for room writes
+"<time> kept for <tree>: free, and N GB short of its <kind>'s R GB reservation (free RAM, margin, owed to others)" to
+<lock>.log at its first refusal and then at most every LOCK_SHORT_LOG_SECONDS (120); the line never reads as a take.
+GATE_REVISION 48. heavy_job_test, new section, beside main's code loaded in-process: three on a free lock at 10.3 GB
+free, the head fed; main's code before this mend refuses it; the second charged the head's 1.7 and its own, 1.2 short;
+two on the lock, the head fed; at 9.5 GB, under the true need, the head refused 0.3 short, its own alone; the log's
+line at once, not again a moment later, again past 120 s, never read as a take; a waiter on main's code behind the fed
+head refused naming it, as on this code. RESULT: PASS. Stacked on 394 amended (60). Tools and tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

@@ -226,7 +226,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 47  # 54: a guarded saturn take read as waiting on the lock.
+GATE_REVISION = 48  # 63: a lock waiter charged its own reservation only, never another waiter's.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -462,6 +462,8 @@ def counted_going(job, running):
 # itself UNFED_PASS_SECONDS (3 minutes, release's), then a waiter that fits
 # may pass it ("passed" in the gate's log); it still goes first once it fits.
 LOCK_LIVE_SECONDS = 150
+## 394 amended (63): how often a lock kept free for a waiter short of room says so in <lock>.log.
+LOCK_SHORT_LOG_SECONDS = 120
 UNFED_PASS_SECONDS = 180
 
 
@@ -2811,15 +2813,33 @@ def lock_turn(tree, lock, free):
     fits, short = True, 0.0
     if entry is not None and entry.get("lock_wait"):
         free_ram, free_commit = _memory()
-        others = [each for each in as_owed([each for each in running if each["file"] != entry["file"]])]
+        # 394 amended (63): as_owed over every take first, then this one left out. Leaving it out
+        # first made the next-oldest waiter the head, owing its whole reservation: each waiter was
+        # charged another's on top of its own, and with two or more on a free lock every one of
+        # them needed the margin and two reservations (11-16 from 21:08:28, the lock free, the head
+        # perf-ports 1.0 to 1.5 GB "short" at 10.3 GB free, twenty landings behind; and 17:06).
+        others = [each for each in as_owed(running) if each["file"] != entry["file"]]
         room = free_ram - reserved_gb(others)
         short = entry["ram_gb"] + MARGIN_GB - room
         fits = short <= 0 and (free_commit is None
             or free_commit - reserved_commit_gb(others) >= commit_of(entry) + COMMIT_MARGIN_GB)
     if fits:
         mine_record.pop("unfed_since", None)
+        mine_record.pop("short_logged", None)
     elif free:
         mine_record.setdefault("unfed_since", now)
+        # 394 amended (63): a free lock nobody takes is explained in the lock's own log, at the
+        # first refusal for room and then at most every LOCK_SHORT_LOG_SECONDS.
+        if now - mine_record.get("short_logged", 0.0) >= LOCK_SHORT_LOG_SECONDS:
+            mine_record["short_logged"] = now
+            try:
+                with open(lock + ".log", "a") as handle:
+                    handle.write("%s kept for %s: free, and %.1f GB short of its %s's %.1f GB reservation (free RAM %.1f GB, "
+                        "margin %.0f GB, %.1f GB owed to others) (394 amended (63))\n" % (time.strftime("%Y-%m-%d %H:%M:%S",
+                        time.localtime(now)), tree, max(short, 0.0), entry["kind"], entry["ram_gb"], free_ram, MARGIN_GB,
+                        reserved_gb(others)))
+            except OSError:
+                pass
     waiters[tree] = mine_record
     _write(os.path.join(folder, tree + ".json"), mine_record)
     if not free:

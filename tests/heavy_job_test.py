@@ -2271,7 +2271,7 @@ check(gate.jumps(load48, [scene48], [], 40.0, 40.0)[0] and not gate.jumps(load48
     "never past one of its own kind: first come among them")
 check(not gate.jumps(dict(gate.KINDS["scene"], kind="scene"), [export48], busy48, 40.0, 40.0)[0],
     "a scene does not: first come, as before")
-check(gate.GATE_REVISION == 47, "gate revision 47")
+check(gate.GATE_REVISION == 48, "gate revision 48 (63: a lock waiter charged its own reservation only)")
 
 mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
 saved48 = gate._read(gate._path("kinds.json"))
@@ -2755,6 +2755,115 @@ if was59 is None:
     os.environ.pop(gate.LAND_LOCK_ENV, None)
 else:
     os.environ[gate.LAND_LOCK_ENV] = was59
+
+print("== the land lock's room: a waiter charged its own reservation only (394 amended (63)) ==")
+# 11-16 from 21:08:28: the lock free, perf-ports first of three suite_remote takes on it, "1.0 to 1.5
+# GB short" at 10.3 GB free (margin 8, its 1.7, a scene's 0.1 owed: 9.8 wanted), twenty landings
+# behind. The check left the take out and then ran as_owed, so the next-oldest waiter became the
+# head and owed its whole 1.7: every waiter needed the margin and two reservations (11.5 GB).
+import importlib.util as importlib63
+mem63 = gate._memory
+lock63 = os.path.join(STATE, "room63", "land.lock")
+os.makedirs(os.path.dirname(lock63), exist_ok=True)
+free63 = [10.3]
+gate._memory = lambda: (free63[0], 40.0)
+main_dir63 = tempfile.mkdtemp(prefix="heavy_job_main_")
+shown63 = subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(gate.__file__)), "show", "origin/main:tools/heavy_job.py"],
+    capture_output=True, text=True, encoding="utf-8", timeout=60)
+check(shown63.returncode == 0 and "GATE_REVISION" in shown63.stdout, "main's gate code read (origin/main:tools/heavy_job.py)")
+with open(os.path.join(main_dir63, "heavy_job.py"), "w", encoding="utf-8", newline="") as handle:
+    handle.write(shown63.stdout)
+spec63 = importlib63.spec_from_file_location("heavy_job_main63", os.path.join(main_dir63, "heavy_job.py"))
+old63 = importlib63.module_from_spec(spec63)
+spec63.loader.exec_module(old63)
+old63._memory = gate._memory
+print("  main's gate code: revision %s beside this one's %d" % (old63.GATE_REVISION, gate.GATE_REVISION))
+for folder in ("queue", "running"):
+    for name in os.listdir(gate._path(folder)):
+        gate._retried(os.remove, gate._path(folder, name))
+
+
+def take63(tree, ram, started, lock_wait=True, using=0.0, kind="suite_remote"):
+    gate._write(gate._path("running", "%s-%s-%d.json" % (tree, kind, os.getpid())), {"tree": tree, "kind": kind,
+        "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()), "queued": started - 60, "started": started,
+        "ram_gb": ram, "commit_gb": 1.0, "gpu": False, "using_gb": using, "using_commit_gb": using, "watched": False,
+        **({"lock_wait": True} if lock_wait else {})})
+
+
+def turn63(code, tree):
+    said = io.StringIO()
+    with contextlib.redirect_stdout(said):
+        got = code.lock_turn(tree, lock63, True)
+    return got, said.getvalue()
+
+
+def fresh63():
+    shutil.rmtree(lock63 + ".waiters", ignore_errors=True)
+    try:
+        os.remove(lock63 + ".log")
+    except OSError:
+        pass
+
+
+def log63():
+    try:
+        with open(lock63 + ".log") as handle:
+            return handle.read()
+    except OSError:
+        return ""
+
+
+now63 = time.time()
+take63("perf-ports", 1.7, now63 - 900)
+take63("lore", 1.7, now63 - 800)
+take63("perf-busyrow", 1.7, now63 - 300)
+take63("dungeon-nichefix", 1.1, now63 - 60, lock_wait=False, using=1.0, kind="scene")
+fresh63()
+code63, said63 = turn63(gate, "perf-ports")
+check(code63 == 0, "three on a free lock, 10.3 GB free (the true need 9.8, the old 11.5): the head is fed and takes it (%s, %s)"
+    % (code63, said63.strip()))
+fresh63()
+code63, said63 = turn63(old63, "perf-ports")
+check(code63 == 1 and "no room yet" in said63 and gate.GATE_REVISION > old63.GATE_REVISION or code63 == 0 and old63.GATE_REVISION >= 48,
+    "and main's code before this mend refuses it (%s)" % said63.strip())
+fresh63()
+code63, said63 = turn63(gate, "lore")
+check(code63 == 1 and "no room yet: 1.2 GB short" in said63,
+    "the second is charged the head's 1.7 once and its own once, 11.5 wanted at 10.3: 1.2 short (%s)" % said63.strip())
+gate._retried(os.remove, gate._path("running", "perf-busyrow-suite_remote-%d.json" % os.getpid()))
+fresh63()
+code63, said63 = turn63(gate, "perf-ports")
+check(code63 == 0, "two on a free lock: the head fed as well (%s)" % said63.strip())
+free63[0] = 9.5
+fresh63()
+code63, said63 = turn63(gate, "perf-ports")
+check(code63 == 1 and "no room yet: 0.3 GB short" in said63,
+    "9.5 GB free, under the true need 9.8: the head refused, short its own 0.3 alone (%s)" % said63.strip())
+check(log63().count("kept for perf-ports: free, and 0.3 GB short of its suite_remote's 1.7 GB reservation") == 1,
+    "the refusal for room is written in the lock's log at once (%s)" % log63().strip()[:200])
+turn63(gate, "perf-ports")
+check(log63().count("kept for perf-ports") == 1, "a second try a moment later: no second line")
+record63 = gate._read(os.path.join(lock63 + ".waiters", "perf-ports.json"))
+record63["short_logged"] = time.time() - gate.LOCK_SHORT_LOG_SECONDS - 5
+gate._write(os.path.join(lock63 + ".waiters", "perf-ports.json"), record63)
+turn63(gate, "perf-ports")
+check(log63().count("kept for perf-ports") == 2, "past %d s, a line again" % gate.LOCK_SHORT_LOG_SECONDS)
+check(not re.search(r"^\S+ \S+ taken by ", log63(), re.M), "the line never reads as a take of the lock")
+# Beside main's code: a waiter whose checkout runs main's code is no worse off. Its own try is
+# judged by its own code, as today; behind the new head it is refused naming the head, as today.
+free63[0] = 12.0  # Room for the second too: what it meets is the order.
+fresh63()
+take63("perf-busyrow", 1.7, now63 - 300)
+turn63(gate, "perf-ports")
+code63, said63 = turn63(old63, "lore")
+check(code63 == 1 and "perf-ports is ahead of you" in said63, "a waiter on main's code behind a fed head: refused naming it, as today (%s)" % said63.strip())
+code63, said63 = turn63(gate, "lore")
+check(code63 == 1 and "perf-ports is ahead of you" in said63, "the same waiter on this code: the same answer")
+for name in os.listdir(gate._path("running")):
+    gate._retried(os.remove, gate._path("running", name))
+fresh63()
+gate._memory = mem63
+shutil.rmtree(main_dir63, ignore_errors=True)
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
