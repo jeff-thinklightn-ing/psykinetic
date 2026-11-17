@@ -46,6 +46,18 @@ const PALETTE_NAME := "palette"
 ## A wall piece's faces that are its wall (881): drawn in the wall's own
 ## set material (Client3D._wall_faces), their UVs in metres, not the palette.
 const WALL_SET_NAME := "wall_set"
+## A piece's faces drawn in a roof set's own texture (966: a kit hut's straw
+## in material.roof.thatch, as the composer's thatch roofs): a .glb material
+## named "roof.<set>@<rrggbb>", the palette colour its faces stood in, their
+## UVs laid as the composer lays its slopes' (metres along the ridge from
+## its end and metres out from the ridge, over 2). Drawn with
+## kit_roof_material's copy of Client3D._roof_material(set); kept on the
+## palette while the set has no texture of its own.
+const KIT_ROOF_PREFIX := "roof."
+## How far a kit roof's texture is brought to its faces' own palette colour
+## (966): 0 draws it raw, exactly the composer's roofs' colour; 1 scales the
+## texture so its mean is the face's palette colour; between, part way.
+const KIT_ROOF_TINT := 0.0
 ## Where a creature's blow lands in its clip when the slot's clip names no
 ## "contact": this far through it (CreatureView strikes it so; ArtCheck
 ## checks a named one).
@@ -96,6 +108,10 @@ static var _recipes: Dictionary[String, Array] = {}
 static var _grey_recipes: Dictionary[String, Array] = {}
 static var _variants: Dictionary[String, int] = {}
 static var _greys: Dictionary[Color, StandardMaterial3D] = {}
+## Kit roof materials by their .glb name (kit_roof_material), and each
+## roof set's texture mean, linear (_roof_mean).
+static var _kit_roofs: Dictionary[String, StandardMaterial3D] = {}
+static var _roof_means: Dictionary[String, Color] = {}
 ## Told the slot whose art changed ("" for every slot) each time forget
 ## runs (a drop, the preview's reload): what keeps something drawn from a
 ## slot, as ItemIcons' icons, draws it again (on_changed, off_changed).
@@ -504,6 +520,8 @@ static func _carve_arrow(way: String, length: float, tall: float, y: float, mate
 static func forget(slot := "") -> void:
 	if slot == "":
 		_scenes.clear()
+		_kit_roofs.clear()
+		_roof_means.clear()
 		_variants.clear()
 		_recipes.clear()
 		_grey_recipes.clear()
@@ -740,6 +758,67 @@ static func _share_palette(scene: PackedScene) -> void:
 			var own := mesh.surface_get_material(surface)
 			if own != null and own != shared and own.resource_name == PALETTE_NAME:
 				mesh.surface_set_material(surface, shared)
+			elif own != null and is_kit_roof(own.resource_name):
+				mesh.surface_set_material(surface, kit_roof_material(own.resource_name))
+
+
+## Whether [param material_name] names a kit roof's faces ("roof.<set>@<rrggbb>",
+## KIT_ROOF_PREFIX): a set and a colour. ArtCheck accepts it as a set the kit
+## has a texture slot for (material.roof.<set>).
+static func is_kit_roof(material_name: String) -> bool:
+	if not material_name.begins_with(KIT_ROOF_PREFIX) or material_name.count("@") != 1:
+		return false
+	var roof_set := material_name.trim_prefix(KIT_ROOF_PREFIX).get_slice("@", 0)
+	return roof_set != "" and not "." in roof_set and Color.html_is_valid(material_name.get_slice("@", 1))
+
+
+## The set a kit roof's material name names ("thatch" of "roof.thatch@c7b380").
+static func kit_roof_set(material_name: String) -> String:
+	return material_name.trim_prefix(KIT_ROOF_PREFIX).get_slice("@", 0)
+
+
+## The material a kit roof's faces named [param material_name] draw in, one
+## per name: Client3D._roof_material(set) (the composer's roofs': the set's
+## texture raw, roughness 0.95, linear with mipmaps) copied with its back
+## faces culled, as the palette's (a kit piece is closed, the composer's
+## sheets are not), its albedo brought KIT_ROOF_TINT of the way from white to
+## the face's palette colour over the texture's mean. The palette while the
+## set has no texture (a flat swatch would draw every course one colour).
+static func kit_roof_material(material_name: String) -> Material:
+	var roof_set := kit_roof_set(material_name)
+	if not has("material.roof." + roof_set) or texture("material.roof." + roof_set) == null:
+		return load(PALETTE) as Material
+	if not _kit_roofs.has(material_name):
+		var material := Client3D._roof_material(roof_set).duplicate() as StandardMaterial3D
+		material.resource_name = material_name
+		material.cull_mode = BaseMaterial3D.CULL_BACK
+		if KIT_ROOF_TINT > 0.0:
+			var face := Color.html(material_name.get_slice("@", 1)).srgb_to_linear()
+			var mean := _roof_mean(roof_set)
+			var scale := Color(lerpf(1.0, face.r / maxf(mean.r, 0.001), KIT_ROOF_TINT),
+					lerpf(1.0, face.g / maxf(mean.g, 0.001), KIT_ROOF_TINT),
+					lerpf(1.0, face.b / maxf(mean.b, 0.001), KIT_ROOF_TINT))
+			material.albedo_color = scale.linear_to_srgb()
+		_kit_roofs[material_name] = material
+	return _kit_roofs[material_name]
+
+
+## material.roof.<set>'s mean colour, linear: its image's last mipmap (each
+## level four texels of the one above averaged). Read only when KIT_ROOF_TINT is above 0.
+static func _roof_mean(roof_set: String) -> Color:
+	if not _roof_means.has(roof_set):
+		var image := texture("material.roof." + roof_set).get_image().duplicate() as Image
+		if image.is_compressed():
+			image.decompress()
+		image.convert(Image.FORMAT_RGBA8)
+		image.srgb_to_linear()  # 8-bit, as Image does it; then averaged in floats.
+		image.convert(Image.FORMAT_RGBAF)
+		image.clear_mipmaps()
+		image.generate_mipmaps()
+		var at := image.get_mipmap_offset(image.get_mipmap_count())
+		var last := image.get_data().slice(at, at + 16).to_float32_array()
+		_roof_means[roof_set] = Color(last[0], last[1], last[2])
+	return _roof_means[roof_set]
 
 
 ## [param scene]'s nodes read from its state, none made (decision 296: in

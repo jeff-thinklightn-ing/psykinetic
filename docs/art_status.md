@@ -62,7 +62,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.hatch_sealed` | 1 | art-kit, by hand | own | 2026-10-24 |
 | `building.house` | 1 | art-kit, by hand (roof, roof_damaged); art-gen c5, fitted (trim, state_damaged) | own | 2026-11-11 |
 | `building.hunters_blind` | 1 | art-kit, by hand | own | 2026-11-03 |
-| `building.hut` | 1 | art-kit, by hand | own | 2026-11-16 |
+| `building.hut` | 1 | art-kit, by hand | own | 2026-11-17 |
 | `building.lean_to` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `building.link_arch` | 3 | art-kit, by hand | own | 2026-10-22 |
 | `building.market_stall` | 1 | art-kit, by hand | own | 2026-11-11 |

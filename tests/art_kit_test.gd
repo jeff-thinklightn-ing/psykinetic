@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_live_read()
 	_test_live_is_preview_only()
 	_test_palette_shared()
+	_test_kit_roof()
 	_test_scene_read()
 	_test_changed_told()
 	_test_creature_rig()
@@ -408,6 +409,78 @@ func _test_palette_shared() -> void:
 	door.free()
 	ArtKit.show_placeholders = false
 	ArtKit.forget()
+
+
+## 966: a kit roof's faces ("roof.<set>@<rrggbb>") draw in the set's texture as
+## the composer's roofs do, whole, damaged and faded.
+func _test_kit_roof() -> void:
+	print("
+== a kit roof's faces draw in its set's texture, as the composer's roofs (966) ==")
+	_check(ArtKit.is_kit_roof("roof.thatch@c7b380") and ArtKit.kit_roof_set("roof.thatch@c7b380") == "thatch",
+			"\"roof.thatch@c7b380\" names the thatch set's faces")
+	_check(not ArtKit.is_kit_roof("roof.thatch") and not ArtKit.is_kit_roof("roof.thatch@zz") and not ArtKit.is_kit_roof(ArtKit.PALETTE_NAME)
+			and not ArtKit.is_kit_roof("roof.thatch.profile@c7b380"),
+			"a set with no colour, a colour that isn't one, the palette and a slot's name are not")
+	var composer := Client3D._roof_material("thatch")
+	var hut := ArtKit.instance("building.hut")
+	var problems := ArtCheck.check_node("building.hut", hut).filter(func(line: String) -> bool: return line.begins_with("error"))
+	_check(problems.is_empty(), "ArtCheck takes the hut, its two roof materials and the palette within its 3: %s" % [problems])
+	var view := Client3D.new()
+	for part in ["roof", "roof_damaged"]:
+		var node := hut.find_child(part, true, false) as Node3D
+		var kit: Array[StandardMaterial3D] = []
+		var palette := 0
+		for mesh: MeshInstance3D in ([node] if node is MeshInstance3D else []) + node.find_children("*", "MeshInstance3D", true, false):
+			for surface in mesh.mesh.get_surface_count():
+				var material := mesh.mesh.surface_get_material(surface)
+				if material is StandardMaterial3D and ArtKit.is_kit_roof(material.resource_name):
+					kit.append(material)
+				elif material == load(ArtKit.PALETTE):
+					palette += 1
+		var names := kit.map(func(material: StandardMaterial3D) -> String: return material.resource_name)
+		_check(names.has("roof.thatch@c7b380") and names.has("roof.thatch@a88e5e") and palette > 0,
+				"%s: its straw on the thatch set's two (%s), its seams and fringe on the palette (%d)" % [part, names, palette])
+		var as_composer := true
+		for material in kit:
+			as_composer = as_composer and material.albedo_texture != null and material.albedo_texture == composer.albedo_texture \
+					and material.texture_filter == composer.texture_filter and material.roughness == composer.roughness \
+					and material.cull_mode == BaseMaterial3D.CULL_BACK \
+					and (ArtKit.KIT_ROOF_TINT > 0.0 or material.albedo_color == composer.albedo_color)
+		_check(as_composer,
+				"%s: the composer's thatch (its texture, filter, roughness%s), back faces culled" % [part, ", raw" if ArtKit.KIT_ROOF_TINT == 0.0 else ""])
+		# Faded (the player under it, the camera's side): see-through, its texture kept.
+		view._set_near(node, true)
+		var faded := 0
+		var kept := true
+		for mesh: MeshInstance3D in ([node] if node is MeshInstance3D else []) + node.find_children("*", "MeshInstance3D", true, false):
+			for surface in mesh.mesh.get_surface_count():
+				if ArtKit.is_kit_roof(mesh.mesh.surface_get_material(surface).resource_name):
+					var near := mesh.get_surface_override_material(surface) as StandardMaterial3D
+					faded += 1
+					kept = kept and near != null and near.albedo_texture == composer.albedo_texture \
+							and near.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and near.albedo_color.a < 1.0
+		_check(faded > 0 and kept, "%s faded: each of its %d straw surfaces see-through, its texture kept" % [part, faded])
+	view.free()
+	hut.free()
+	# A set the kit has no texture for is named, an error.
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	var door := ArtKit.instance("door.single")
+	var other := StandardMaterial3D.new()
+	other.resource_name = "roof.straw@c7b380"
+	for box in door.find_children("*", "MeshInstance3D", true, false):
+		(box as MeshInstance3D).material_override = other
+	var named := ArtCheck.check_node("door.single", door)
+	_check(named.any(func(line: String) -> bool: return line.begins_with("error") and "roof.straw@c7b380" in line and "material.roof.straw" in line),
+			"a roof set with no texture slot fails, naming it: %s" % [named])
+	door.free()
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+	# Tinted (966's take (a)): the texture's mean brought to the face's colour.
+	var mean := ArtKit._roof_mean("thatch")
+	var c7 := Color.html("c7b380").srgb_to_linear()
+	_check(mean.r > 0.05 and mean.r < 0.6 and c7.r / mean.r > 1.0,
+			"the thatch tile's mean, linear, read from its last mipmap (%.3f %.3f %.3f): darker than the hut's c7b380" % [mean.r, mean.g, mean.b])
 
 
 func _test_scene_read() -> void:

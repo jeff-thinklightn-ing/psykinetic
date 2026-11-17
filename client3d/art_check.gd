@@ -116,7 +116,14 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	# A body drawn in a material of the game's own (a humanoid's "human":
 	# Client3D's HUMAN_MATERIAL, its tints per person) names it: accepted.
 	var accepted := str(entry.get("body_material", ""))
-	var foreign: Array = counts.names.filter(func(name: String) -> bool: return name != "" and name != ArtKit.PALETTE_NAME and name != ArtKit.WALL_SET_NAME and name != accepted)
+	# A kit roof's faces (966: "roof.<set>@<rrggbb>") are a roof set's: its
+	# texture slot named, else drawn on the palette and named as a mistake.
+	var roofs: Array = counts.names.filter(func(name: String) -> bool: return ArtKit.is_kit_roof(name))
+	for name: String in roofs:
+		if not ArtKit.has("material.roof." + ArtKit.kit_roof_set(name)):
+			out.append("error: material \"%s\" names the roof set \"%s\", which has no texture slot (material.roof.%s): name a set the kit has, or colour the faces from the palette" % [
+				name, ArtKit.kit_roof_set(name), ArtKit.kit_roof_set(name)])
+	var foreign: Array = counts.names.filter(func(name: String) -> bool: return name != "" and name != ArtKit.PALETTE_NAME and name != ArtKit.WALL_SET_NAME and name != accepted and name not in roofs)
 	# The palette's name with a Blender suffix ("palette.001": a second
 	# "palette" made in a file that already held one) is never swapped for
 	# the shared palette, so the piece draws in plain grey-white (896
