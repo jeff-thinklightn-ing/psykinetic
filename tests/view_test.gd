@@ -4883,7 +4883,7 @@ func _test_tavern_inside() -> void:
 ## none), so none was drawn and the keeper slept on a bedroll on the boards.
 ## Each drawn as a dwelling's, prop.bed on the middle of its two cells at
 ## the floor, its head (-z) the bed's way; a sleeper on a head cell lies on
-## the bed (0.37), no bedroll.
+## the bed (LIE_HEIGHT["prop.bed"], 0.43 since 751 amended (8)), no bedroll.
 func _test_room_beds() -> void:
 	print("\n== a room level's own beds drawn and slept on (948) ==")
 	for name: String in ["umbrage_tavern_up", "umbrage_tavern"]:
