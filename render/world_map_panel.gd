@@ -1015,8 +1015,12 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 	var measure := func(words: String) -> Vector2:
 		return sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + pad * 2.0
 	# A label stays inside the box and off the frame's own line (KnownWorld own_edge wide, half of it inside).
-	var groups := WorldMapModel.fold(labels, keep_off, _k(&"ring") + pad.x, name_of, measure, _inner(rect, _k(&"own_edge")))
-	_name_towns_once(groups, rect, cell_px)
+	var apart: Array[Rect2] = []  # What a label keeps clear of, with four pixels to spare: never edge to edge with a chip.
+	for off: Rect2 in keep_off:
+		apart.append(off.grow(4.0))
+	var inside := _inner(rect, _k(&"own_edge"))
+	var groups := WorldMapModel.fold(labels, apart, _k(&"ring") + pad.x, name_of, measure, inside)
+	_name_towns_once(groups, rect, cell_px, apart, _k(&"ring") + pad.x, measure, inside)
 	for group: Dictionary in groups:
 		var ids: Array = group["ids"]
 		var folded := bool(group["folded"])
@@ -1029,14 +1033,16 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 
 ## A town's name is said once in the window: of the folded labels that read the same town name, the first keeps it
 ## and each later one reads its nearest place's name alone (ui-design's look of cec148ba5: "Umbrage" twice).
-func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2) -> void:
+func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2, keep_off: Array[Rect2], gap: float, measure: Callable, inside: Rect2) -> void:
 	var said := {}
-	for group: Dictionary in groups:
+	for i in groups.size():
+		var group := groups[i]
 		if not bool(group["folded"]):
 			continue
 		var words := str(group["name"])
 		if said.has(words):
-			group["name"] = _nearest_place_name(group["ids"], group["at"], rect, cell_px)
+			# Its new words laid again: they may be longer than the town's name was.
+			groups[i] = WorldMapModel.reword(group, _nearest_place_name(group["ids"], group["at"], rect, cell_px), keep_off, gap, measure, inside)
 		else:
 			said[words] = true
 

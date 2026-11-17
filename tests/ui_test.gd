@@ -2282,9 +2282,15 @@ func _test_world_map_window() -> void:
 	panel._model_dirty = true
 	var groups_in: Array[Dictionary] = [{"folded": true, "name": "Umbrage", "ids": [ids[0]], "at": Vector2(100, 100)},
 		{"folded": true, "name": "Umbrage", "ids": [ids[1]], "at": Vector2(400, 400)}]
-	panel._name_towns_once(groups_in, Rect2(Vector2.ZERO, Vector2(cells) * 4.0), Vector2(4.0, 4.0))
+	var measure_in := func(words: String) -> Vector2: return Vector2(words.length() * 10.0, 20.0)
+	groups_in[0]["rect"] = Rect2(110, 90, 70, 20)
+	groups_in[1]["rect"] = Rect2(410, 390, 70, 20)
+	panel._name_towns_once(groups_in, Rect2(Vector2.ZERO, Vector2(cells) * 4.0), Vector2(4.0, 4.0), [] as Array[Rect2], 10.0, measure_in, Rect2(0, 0, 500, 500))
 	_check(groups_in[0]["name"] == "Umbrage" and groups_in[1]["name"] == str(panel.world.areas["wilds"]["places"][ids[1].get_slice("/", 1)]["name"]),
 		"a town's name is said once: the second fold reads its nearest place's name alone (%s)" % [groups_in[1]["name"]])
+	var renamed_width: float = (groups_in[1]["rect"] as Rect2).size.x
+	_check(is_equal_approx(renamed_width, str(groups_in[1]["name"]).length() * 10.0) and Rect2(0, 0, 500, 500).encloses(groups_in[1]["rect"]),
+		"and its label is laid again for the longer words, inside the box (%s)" % [groups_in[1]["rect"]])
 	# The HUD's labels give way to the map while Main's is open.
 	_main.open_world_map()
 	_check(is_zero_approx(_main.compass.modulate.a) and is_zero_approx(_main.minimap.modulate.a) and (_main.name_plates == null or is_zero_approx(_main.name_plates.modulate.a))

@@ -239,6 +239,22 @@ static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, 
 	return groups
 
 
+## [param group] reading [param words] instead (a town's name said once in the window, so a later fold reads its nearest place's):
+## its rect laid again for the new words beside its ring, clear of [param keep_off] and inside [param inside] as _placed has it;
+## where no spot is clear it keeps the place it had, so the words may be longer than it but never nowhere.
+static func reword(group: Dictionary, words: String, keep_off: Array[Rect2], gap: float, measure: Callable, inside := Rect2()) -> Dictionary:
+	var out := group.duplicate()
+	out["name"] = words
+	var size: Vector2 = measure.call(words)
+	var rect := _placed(group["at"], size, keep_off, gap, inside)
+	if rect.size != Vector2.ZERO:
+		out["rect"] = rect
+	else:
+		var old: Rect2 = group["rect"]
+		out["rect"] = Rect2(old.position, size)
+	return out
+
+
 ## One group of two, its words from [param name_of] and its rect beside the middle of their rings.
 static func _join(a: Dictionary, b: Dictionary, keep_off: Array[Rect2], gap: float, name_of: Callable, measure: Callable, inside: Rect2) -> Dictionary:
 	var ids: Array = (a["ids"] as Array) + (b["ids"] as Array)
