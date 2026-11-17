@@ -489,6 +489,44 @@
 			"up": 1.4
 		}
 	],
+	"windows": [
+		{
+			"cells": [
+				[
+					17,
+					12
+				]
+			],
+			"side": "east"
+		},
+		{
+			"cells": [
+				[
+					11,
+					0
+				]
+			],
+			"side": "north"
+		},
+		{
+			"cells": [
+				[
+					3,
+					13
+				]
+			],
+			"side": "south"
+		},
+		{
+			"cells": [
+				[
+					0,
+					1
+				]
+			],
+			"side": "west"
+		}
+	],
 	"building_codes": {
 		"B": 1,
 		"T": 5

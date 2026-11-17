@@ -27,6 +27,12 @@
 			],
 			"stairs": [
 				{"cells": [[16, 10], [17, 10]], "to": "umbrage_tavern_up", "spawns": [[16, 11], [17, 11]], "way": "up", "facing": "north"}
+			],
+			"windows": [
+				{"cells": [[17, 12]], "side": "east"},
+				{"cells": [[11, 0]], "side": "north"},
+				{"cells": [[3, 13]], "side": "south"},
+				{"cells": [[0, 1]], "side": "west"}
 			]
 		},
 		{
@@ -47,11 +53,18 @@
 				{"id": "room_5", "use": "room", "name": "Hired room", "rect": [6, 8, 6, 6],
 					"doors": [{"to": "hall_up", "cells": [[8, 8], [9, 8]], "side": "north"}], "beds": [[7, 13]]},
 				{"id": "stair_up", "use": "stair", "rect": [12, 8, 6, 6],
-					"doors": [{"to": "hall_up", "cells": [[13, 8], [14, 8]], "side": "north"}]}
+					"doors": [{"to": "hall_up", "cells": [[13, 8], [14, 8]], "side": "north"}],
+					"tables": [[16, 8]], "candles": true}
 			],
 			"stairs": [
 				{"cells": [[16, 10], [17, 10]], "to": "umbrage_tavern", "spawns": [[16, 11], [17, 11]], "way": "down", "facing": "north"},
 				{"cells": [[12, 11], [12, 12]], "to": "umbrage_tavern_attic", "spawns": [[13, 11], [13, 12]], "way": "up", "facing": "west"}
+			],
+			"windows": [
+				{"cells": [[17, 12]], "side": "east"},
+				{"cells": [[11, 0]], "side": "north"},
+				{"cells": [[3, 13]], "side": "south"},
+				{"cells": [[0, 1]], "side": "west"}
 			]
 		},
 		{

@@ -43,6 +43,18 @@ rooms and its stairs:
   Never a chest: chests are for dungeons only (Jeff, 2026-11-04). A
   player's storage at home is its own container piece (a strongbox,
   wardrobe or vault), and the locker is opened through a person.
+- its "windows" (946, environment's reader; the coordinator's terms): each
+  {"cells": [[x, y], ...], "side": north|south|west|east}, a window on that
+  side of each cell, written through to level.json "windows". Each cell in
+  a room, the cell across its side outside every room (an outer wall, never
+  one between rooms), and never a stair's cell or arrival, the front door's
+  cell or a hearth's. Where a floor names none, the reader lays its own.
+  An inside's windows stand on the same sides as its building's outside
+  ones (the spec says which, by hand).
+- any other room's "tables" (946, a landing's flame): each a
+  building.tavern_table as the common room's, its "candles" lit on it, no
+  seats (only a common room's tables are the tavern's); never on a door,
+  stair or arrival cell, nor off the room.
 - a stair: two cells side by side (the two-cell passages rule), the floor it
   reaches, the two cells beside it one arrives on from there, and its way
   ("up" or "down"), and its "facing" (north, south, west or east: the way its
@@ -329,9 +341,46 @@ def check(spec):
             holds = any(room.get(key) for key in HOLDING) or any(o.startswith("floor:") for o in opens)
             if len(opens) <= 1 and not holds and room["use"] not in ("common",):
                 faults.append("%s/%s: a dead end holding nothing" % (level, room["id"]))
+    # Windows (946): on an outer wall, off a stair, an arrival, the front door and a hearth.
+    front = spec["front"]
+    for floor in spec["floors"]:
+        level = floor["level"]
+        kept = {tuple(c) for stair in floor.get("stairs", []) for c in stair["cells"] + stair["spawns"]}
+        if front["floor"] == level:
+            kept |= {tuple(c) for c in front["cells"]}
+        for room in floor["rooms"]:
+            if room.get("hearth"):
+                kept |= set(hearth_cells(room["rect"], room["hearth"])[1])
+        for window in floor.get("windows", []):
+            side = window.get("side")
+            if side not in SIDES:
+                faults.append("%s: a window's side %r is none of %s" % (level, side, list(SIDES)))
+                continue
+            dx, dy = SIDES[side]
+            for cell in window.get("cells", []):
+                cell = tuple(cell)
+                if (level, cell) not in owner:
+                    faults.append("%s: the window at %s is in no room" % (level, cell))
+                elif (level, (cell[0] + dx, cell[1] + dy)) in owner:
+                    faults.append("%s: the window at %s %s opens into a room, not out of the building" % (level, cell, side))
+                elif cell in kept:
+                    faults.append("%s: the window at %s is on a stair, an arrival, the front door or a hearth" % (level, cell))
+        # Another room's tables (946): in the room, off its doors, stairs and arrivals, none on another.
+        for room in floor["rooms"]:
+            if room["use"] == "common" or not room.get("tables"):
+                continue
+            x0, y0, rw, rh = room["rect"]
+            doors = {tuple(c) for d in room.get("doors", []) for c in d["cells"]}
+            taken = set()
+            for at in room["tables"]:
+                for cell in piece_cells(TABLE, at):
+                    if not (x0 <= cell[0] < x0 + rw and y0 <= cell[1] < y0 + rh):
+                        faults.append("%s/%s: the table at %s runs off the room at %s" % (level, room["id"], at, cell))
+                    elif cell in doors or cell in kept or cell in taken:
+                        faults.append("%s/%s: the table at %s is on a door, a stair, an arrival or a table at %s" % (level, room["id"], at, cell))
+                    taken.add(cell)
     # Every room reached from the front door; the door in a wall, its
     # doorstep outside every room.
-    front = spec["front"]
     for cell in front["cells"]:
         step = doorstep(front, cell)
         if (front["floor"], tuple(cell)) not in owner:
@@ -445,6 +494,18 @@ def lay(spec, floor):
                     places["tavern"]["lore_id"] = spec["lore_id"]
                 if room.get("hearth"):
                     places["tavern"]["hearth"] = list(room["hearth"])
+        if room["use"] != "common" and room.get("tables"):
+            # Another room's tables (946, a landing's flame): the common room's
+            # piece, a lit candle on each if "candles", no seats.
+            for index, at in enumerate(room["tables"]):
+                piece = {"slot": TABLE[0], "at": list(at)}
+                if index % 2:
+                    piece["variant"] = 2
+                buildings.append(piece)
+                if room.get("candles"):
+                    x, y = at
+                    lit_candles.append(dict({"at": [x + (TABLE[1] - 1) / 2, y + (TABLE[2] - 1) / 2], "top": TABLE_TOP,
+                                             "up": CANDLE_LIGHT_OVER_TABLE}, **TABLE_CANDLE_LIGHT))
         if room["use"] == "forge":
             # The smithy's forge room (811 amended (2)): its solid pieces, the
             # tool wall hung beside its wall, and the place the smith works at.
@@ -529,6 +590,9 @@ def lay(spec, floor):
     }
     if lit_candles:
         config["lit_candles"] = lit_candles
+    if floor.get("windows"):
+        # Its windows (946): written as the spec has them; environment's reader checks them again.
+        config["windows"] = [{"cells": [list(c) for c in w["cells"]], "side": w["side"]} for w in floor["windows"]]
     if spec.get("spots"):
         # Where its people stand and sit (Level.spots_from, the frozen-townsfolk mend): laid by hand
         # in the spec, written through as they are; Level checks them.
