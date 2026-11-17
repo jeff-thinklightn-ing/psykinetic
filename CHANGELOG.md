@@ -7,21 +7,24 @@ notes (decision 324).
 
 ## Unreleased
 
-- When someone runs, you, your companion or a townsperson, their arms pump forward and back beside the body, opposite each other, with shoulders square and head steady, sword in hand or not (953 amended (2)).
-- Towns: every stair in the Mughouse, from the common room up to the attic, is a wooden flight with rails; upstairs, the attic stair stands beside the way down, candle stands light the stairs, and the way down glows with the light of the room below (589 amended (3), 589 amended (4)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
-- In a fight your companion stays near you, chasing a foe farther only when you're fighting it too (957).
 - Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).
 - In the crypt, clicking a wall niche walks you to it and presses it, even from right in front of it, so once the fallen knight has told you of the way down, the niche that hides it opens to a click, and the stair behind it takes you down at the first click (608 amended (8)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
-- In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
+- In a fight your companion calls each warning once, as it comes, and keeps their idle talk until a while after (917).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.227
+
+- When someone runs, you, your companion or a townsperson, their arms pump forward and back beside the body, opposite each other, with shoulders square and head steady, sword in hand or not (953 amended (2)).
+- Towns: every stair in the Mughouse, from the common room up to the attic, is a wooden flight with rails; upstairs, the attic stair stands beside the way down, candle stands light the stairs, and the way down glows with the light of the room below (589 amended (3), 589 amended (4)).
+- In a fight your companion stays near you, chasing a foe farther only when you're fighting it too (957).
 
 ## v0.1.226
 
