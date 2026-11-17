@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3070)
+## Lines in the code (3071)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -2166,7 +2166,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (827)
+### server and windows (828)
 
 | | Line | Where |
 |---|---|---|
@@ -2731,6 +2731,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | Empty. You have taken what the Mound-breakers hid here. | `main.gd` CAMP_EMPTY |
 |  | the robbers' camp chest | `main.gd` _search_camp() |
 |  | Brand's key turns in the lock. You find %d gold in %s. | `main.gd` _search_camp() |
+|  | %d of %d | `main.gd` rack_count_view() |
 |  | You pick up | `main.gd` _item_command() |
 |  | Your pack is full. | `main.gd` _item_command() |
 |  | You pick up %d gold. | `main.gd` _item_command() |
