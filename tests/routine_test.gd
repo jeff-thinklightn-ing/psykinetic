@@ -93,6 +93,44 @@ func _test_offsets() -> void:
 	_check(least >= -most and greatest <= most and least < -most * 0.5 and greatest > most * 0.5, "offsets spread within %.2f h (%.2f .. %.2f)" % [most, least, greatest])
 	_check(differ, "so at the stroke of a stint some are already there and some not yet")
 	_check(Townsfolk.offset_of("rt-7") == Townsfolk.offset_of("rt-7") and Townsfolk.offset_of("") == 0.0, "the same id keeps its offset; no id has none")
+	_test_noon_stagger()
+
+
+## 969 (the coordinator's ruling, in npc's place): the default day's noon at the square, staggered by its own
+## offset_hours, its edges the work stints' on either side, never the square's fallback.
+func _test_noon_stagger() -> void:
+	print("\n== the noon at the square, staggered by its own quarter hour (969) ==")
+	Townsfolk.use_days({})
+	var noon: Dictionary = (Townsfolk.days()["default"]["stints"] as Array)[2]
+	var own := float(noon.get("offset_hours", 0.0))
+	_check(str(noon.get("at", "")) == "square" and own > 0.0 and own < float(Townsfolk.days()["offset_hours"]),
+		"the default's noon: the square, its own stagger %.3f h under the day's %.2f (%s)" % [own, float(Townsfolk.days()["offset_hours"]), noon])
+	var arrivals := {}
+	var early := INF
+	var late := -INF
+	var always := true
+	var edges_work := true
+	for i in 200:
+		var id := "rt-noon-%d" % i
+		var came := -1.0
+		for k in 241:  # 11:30 to 12:30, every 15 s of the game's clock.
+			var h := 11.5 + k / 240.0
+			if Townsfolk.whereabouts("hauler", h, "", "", id) == "square":
+				came = h
+				break
+		early = minf(early, came)
+		late = maxf(late, came)
+		arrivals[snappedf(came, 1.0 / 240.0)] = true
+		for k in 10:
+			always = always and Townsfolk.whereabouts("hauler", 12.0 + own + 0.02 + k * (1.0 - 2.0 * own - 0.04) / 9.0, "", "", id) == "square"
+		edges_work = edges_work and Townsfolk.whereabouts("hauler", 12.0 - own - 0.02, "", "", id) == "work" \
+			and Townsfolk.whereabouts("hauler", 13.0 + own + 0.02, "", "", id) == "work"
+	_check(early >= 12.0 - own - 0.01 and late <= 12.0 + own + 0.01 and arrivals.size() > 20,
+		"200 come between %.3f and %.3f, at %d different times (never all on one tick)" % [early, late, arrivals.size()])
+	_check(always, "every one of them at the square from %.2f to %.2f" % [12.0 + own, 13.0 - own])
+	_check(edges_work, "just before and just after, at work: the gap the day's wider stagger leaves is the work stint's, never the square's fallback")
+	_check(Townsfolk.whereabouts("smith", 12.5) == "inn" and Townsfolk.whereabouts("merchant", 12.5) == "inn" and Townsfolk.whereabouts("hauler", 18.5) == "inn",
+		"the smith and the merchant keep the inn at noon, and the evening's inn is as it was")
 
 
 func _test_types_and_seasons() -> void:

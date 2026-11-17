@@ -61652,3 +61652,63 @@ companion_test, level_test, raid_groups_test and resident_test PASS.
 
 Client only; protocol unchanged; no new class_name; no bullet until it is seen joined, before and after
 (voice's words then: "the first click after you arrive no longer hitches").
+
+## 969. Umbrage: the square at noon: the default day's noon at the square, not the inn (economy, in npc's place; the coordinator's approval, 2026-11-17, from sound's ears tour)
+
+Sound's joined ears tour stood 130 s at Umbrage's square at noon and met one person within 8 cells, with no activity
+word; the square is where every newcomer arrives. Economy's count on a fresh local world past step 310 (the host at
+the level's starts, (191,220); thirty samples a game hour; bodies in the open within 8 cells, Companion.building_at
+telling who stood inside; C:/dev/review/economy/square/): a mean of 0.0 to 0.7 at the arrival and 0.0 to 1.3 at the
+square's fire (194,211) from 08:00 to 20:00, the town's ten bodies at their work or at the inn, the square used only in
+the priest's (12-13, 19-21), the carpenter's (12-13) and the farmer's (16-18) short stints. The default day
+(residents.json, every trade without a day of its own: in Umbrage's townsfolk the hunter and the woodcutter) took its
+noon at the inn, a separate zone to the west. The tradeless bodies the count met (Hale, Oswin, Nell) are visitors, the
+road's travellers and pedlars: their words follow the default day too, but Main gives a visitor one visit spot for
+every place (_visitor_places), so no stint moves where one stands. The rest keep a day of their own that works through
+noon (Rolf the vendor's, Edda the farmer's, Hob the medicine man's; Snagfin kept at his stand, 875 amended (4)), and
+Maud's carpenter's noon at the square, on the day's wider offset, falls about 11:15 to 12:15 on her own clock.
+
+Its noon stint, 12:00 to 13:00, is now "square": Resident's square places, the fire's seats and the talk pairs (853
+amended (18)), as the priest's and the carpenter's noons already were. Moved alone it fell short (the take's first
+table: the whole town's square-goers at 12:00 from 1.2 to 3.9 bodies, but within 8 cells of the fire, in the open,
+from 1.2 to 1.9, at most 3): the day's offset (offset_hours, 0.75) spread a one-hour stint so that about half were in
+it at once, and four of the square's twelve places stand north of the temple, out of sight of the arrival. So, on the
+coordinator's ruling (in npc's place for Townsfolk.whereabouts):
+- A stint may carry its own "offset_hours" (Townsfolk.offset_of's span): the noon's is 0.125, so they drift in from
+  11:52 to 12:08 (never on one tick: seven arriving and leaving together read as a machine) and all are there from
+  about 12:08 to 12:52. Townsfolk.stint_at (whereabouts' stint lookup, now its own) keeps a body in such a stint
+  through its own window first; in the gap the narrower stagger leaves against the day's wider one, the body keeps
+  the stint on the side it is on (before its window, the work before; past it, the work after), never the square's
+  fallback: every body's noon is still an hour, and its day holds as many working hours as before.
+- Not kept: a "near": "fire" on the stint, filling the square's places within 8 cells of the fire's seats first. The
+  joined look (ui-design, Atlas, take beside main) found Umbrage's square fire has no seats: its eight seat cells carry
+  no seat decor, and nobody sits on air (Main.fire_seat_spots, the coordinator's, 11-15), so the fire has no "fire"
+  spots, 853 amended (18)'s two sitters never sit there, and a rule measured from the seats never applied. On the
+  coordinator's ruling it is dropped rather than mended to the fire's own cell; seats at the square's fire are maps'
+  piece of this package, after which the two sitters (and a seated noon) come of 853 amended (18) unchanged.
+
+A meal is no place: Economy._eat is a need on its own step timer, bought from or doled
+out of the town's shop and store wherever the body stands, and the inn's fee (Economy._stay) is its own timer while the
+inn stands, so nothing bought or eaten moves with the stint. Left as they were: the evening's inn (18:00 to 20:00, 678
+amended (2)'s Mughouse evening); the smith's, the merchant's (Snagfin's noon stand) and the lawspeaker's noon at the
+inn, and the taverner at his counter, so an inn never stands empty at noon where it has those; Rolf at his stall (his
+day the vendor's). The day table is npc's file, changed here in npc's place on the coordinator's ruling.
+
+What it gives (the landing version's table, same count): within 8 cells of the fire at 12:00, a mean of 2.3 bodies
+where main had 1.2, at most 3: the hunter and the priest standing at the talk pair and the stands a few cells off
+nearly the whole hour (29 and 24 samples of 30), nobody seated, the woodcutter in from the woods for about a quarter of it, and whoever is visiting; the whole town's square-goers
+at 12:00 from 1.2 to 5.2, two of them visitors at their own spots; at the arrival a mean of 0.5, at most 2. Not "the
+square fills": the limit is the town, ten people of whom four keep a counter, not the stint, and the four stands and
+two talk pairs within reach of the fire never fill. The coordinator's bar of five at the fire was withdrawn for this
+take (2026-11-17), FIRE_SITTERS kept at two; a bigger Umbrage is Jeff's pick. The joined look agrees (ui-design, Atlas,
+C:/dev/review/ui-design/looks/square_00d4bc781 beside square_main_77bcb52f3; within 6 cells of the fire, every 2 s):
+2.17 at 12:00 and 2.23 at 12:30, at most 3, where main had 0.03 and 0; nobody seated, nobody within 3 cells. Not done: the carpenter's day
+unchanged (Maud at her work on the square is already in view), visitors' noon left at their own spots.
+
+What a hungry noon looks like (Jeff: "have hunger be something the players can see and feel"): the same people come to
+the square and stand about with nothing, as the store's empty shelves already show; no penalty and nobody leaves town for it.
+Fewer coming as the store's food runs lower is a row of its own after this one, not in it.
+
+Package "Umbrage: the square at noon", economy's to switch on: the stint is the switch, on at landing (its joined look
+passed); maps' seats at the square's fire are a piece of the same package, landing on their own. Server only (the day table is the server's); protocol unchanged; who stands where in Umbrage changes at the
+deploy that carries it.

@@ -19,6 +19,7 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+- Towns: at noon a couple of Umbrage's townsfolk spend the hour in the square near its fire, drifting in over a quarter of an hour, and another comes in from the woods to join them for a while (969).
 
 ## v0.1.228
 

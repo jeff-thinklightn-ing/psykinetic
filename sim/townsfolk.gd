@@ -1969,23 +1969,63 @@ static func whereabouts(trade: String, hour: float, season := "", type := "", wo
 	for stint: Variant in table.get("types", {}).get(type, []):
 		if stint is Dictionary and _within(at, float(stint.get("from", 0)), float(stint.get("to", 0))):
 			return str(stint.get("at", "square"))
+	var stint := stint_at(trade, hour, season, worker_id)
+	if stint.is_empty():
+		return "square"
+	var where := str(stint.get("at", "square"))
+	if where == "home" and not worker_id.is_empty() and table.has("night") 			and not asleep_at(worker_id, hour + float(table["night"].get("lead", 0.25))):
+		return night_at(trade, worker_id, day if day < 0 or hour >= 12.0 else day - 1)  # Up the night through (772).
+	return where
+
+
+## The stint of [param trade]'s day (the default's for a trade not listed) that [param worker_id] keeps at
+## [param hour] on the town's clock, its edges moved by [param season]; {} for none (whereabouts' square). Read on the
+## body's own clock (offset_of). 969 (the coordinator's ruling, in npc's place): a stint with an "offset_hours" of its
+## own keeps the body through its own window first, staggered by that alone (the noon at the square: seven drift in
+## over a quarter of an hour, never on one tick); in the gap that narrower stagger leaves against the day's wider one,
+## the body keeps the stint on the side it is on (before its own window, the one before; past it, the one after),
+## never the square's fallback. The temple day, a hidden type's stints and a mood are whereabouts' own, not here.
+static func stint_at(trade: String, hour: float, season := "", worker_id := "") -> Dictionary:
+	var table := days()
 	var edges: Dictionary = table.get("seasons", {}).get(season, {})
 	var morning := float(edges.get("morning", 0.0))
 	var evening := float(edges.get("evening", 0.0))
 	var day_of: Dictionary = table.get(trade, table["default"]) if table.get(trade) is Dictionary else table["default"]
-	for stint: Variant in day_of.get("stints", []):
-		if not stint is Dictionary:
+	var stints: Array = day_of.get("stints", [])
+	var windows: Array[Vector2] = []
+	for stint: Variant in stints:
+		windows.append(_stint_window(stint, morning, evening))
+	for i in stints.size():
+		if stints[i] is Dictionary and (stints[i] as Dictionary).has("offset_hours") \
+				and _within(_own_clock(stints[i], hour, worker_id), windows[i].x, windows[i].y):
+			return stints[i]
+	var at := fposmod(hour - offset_of(worker_id), 24.0)
+	for i in stints.size():
+		if not stints[i] is Dictionary or not _within(at, windows[i].x, windows[i].y):
 			continue
-		var from := float(stint.get("from", 0))
-		var to := float(stint.get("to", 0))
-		from = fposmod(from + (morning if from < 12.0 else evening), 24.0)
-		to = fposmod(to + (morning if to < 12.0 else evening), 24.0)
-		if _within(at, from, to):
-			var where := str(stint.get("at", "square"))
-			if where == "home" and not worker_id.is_empty() and table.has("night") 					and not asleep_at(worker_id, hour + float(table["night"].get("lead", 0.25))):
-				return night_at(trade, worker_id, day if day < 0 or hour >= 12.0 else day - 1)  # Up the night through (772).
-			return where
-	return "square"
+		var stint: Dictionary = stints[i]
+		if not stint.has("offset_hours"):
+			return stint
+		var length := fposmod(windows[i].y - windows[i].x, 24.0)
+		var past := fposmod(_own_clock(stint, hour, worker_id) - windows[i].x, 24.0) - length
+		var side: Variant = stints[(i + (1 if past < (24.0 - length) / 2.0 else -1) + stints.size()) % stints.size()]
+		return side if side is Dictionary else {}
+	return {}
+
+
+## A stint's [from, to] on the town's clock, the season's morning edge on an edge before noon and its evening edge on
+## the rest; (-1, -1) for one that is no stint.
+static func _stint_window(stint: Variant, morning: float, evening: float) -> Vector2:
+	if not stint is Dictionary:
+		return Vector2(-1.0, -1.0)
+	var from := float(stint.get("from", 0))
+	var to := float(stint.get("to", 0))
+	return Vector2(fposmod(from + (morning if from < 12.0 else evening), 24.0), fposmod(to + (morning if to < 12.0 else evening), 24.0))
+
+
+## [param hour] on [param worker_id]'s clock by [param stint]'s own stagger (969).
+static func _own_clock(stint: Dictionary, hour: float, worker_id: String) -> float:
+	return fposmod(hour - offset_of(worker_id, float(stint["offset_hours"])), 24.0)
 
 
 ## Resident [param worker_id]'s sleep spell (decision 772), (from, to) in
@@ -2043,10 +2083,11 @@ static func night_at(trade: String, worker_id: String, day: int) -> String:
 
 ## How far resident [param worker_id]'s own clock runs ahead (+) or behind
 ## the town's, in hours: within offset_hours, by the id; 0 for no id.
-static func offset_of(worker_id: String) -> float:
+static func offset_of(worker_id: String, span := NAN) -> float:
 	if worker_id.is_empty():
 		return 0.0
-	var most := float(days().get("offset_hours", 0.0))
+	# 969: a stint with a stagger of its own ([param span], its "offset_hours") scales the same place in -1..1.
+	var most := float(days().get("offset_hours", 0.0)) if is_nan(span) else span
 	return (float(absi(hash("clock:" + worker_id)) % 1000) / 999.0 * 2.0 - 1.0) * most
 
 

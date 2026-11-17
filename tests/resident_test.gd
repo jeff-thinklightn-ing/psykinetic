@@ -7529,7 +7529,7 @@ func _test_vendor_day(rolf: Resident, stand: Dictionary, given: Dictionary) -> v
 	for h in range(7, 17):
 		by_day = by_day and Resident.doing_at(rolf.trade, h + 0.5, "", "", rolf.worker_id) == Resident.Doing.WORK
 	_check(by_day and Resident.doing_at(rolf.trade, 23.5, "", "", rolf.worker_id) != Resident.Doing.WORK
-		and Resident.doing_at("", 12.5) == Resident.Doing.INN, "at work through the day, noon too; not at night; the default day's noon the inn as before")
+		and Resident.doing_at("", 12.5) == Resident.Doing.SQUARE, "at work through the day, noon too; not at night; the default day's noon the square (969), not his stall")
 	# No temple hour for him (saturn: his temple morning stood him at his stall as TEMPLE till 09); others keep theirs.
 	Townsfolk.test_temple_day = true
 	var his_temple := Resident.doing_at(rolf.trade, 9.5 + Townsfolk.offset_of(rolf.worker_id), "", "", rolf.worker_id, 0)
