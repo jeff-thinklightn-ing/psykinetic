@@ -4783,18 +4783,21 @@ func _test_daylight_indoors() -> void:
 			and door_dark.size() == 1 and (door_dark[0][1] as Color).r > (door_dark[0][1] as Color).b and (door_dark[0][0] as Transform3D).origin.z < 0.0,
 			"a window with the sun on its side its sky's pool and the sun's patch %.2f m long; the sun behind its wall the pool alone; none at night; the way out's warm pool then, outside its threshold" % [-(lit[1][1] as Color).a if lit.size() == 2 else 0.0])
 	# 946, the floors above: above the ground floor no ground round the walls, the background alone;
-	# its windows and patches as below. The ground floor's apron as before.
+	# its windows and patches as below. The ground floor's apron as before. Each floor's panes as maps
+	# marks them: four below and upstairs, none in the attic under the thatch (marked with none, never the rule's).
 	var storeys: Array[String] = []
 	var no_apron: Array[String] = []
+	var panes: Array[int] = []
 	for name: String in ["umbrage_tavern", "umbrage_tavern_up", "umbrage_tavern_attic"]:
 		var storey_level := Level.load_level(name)
 		_rig.rebuild(storey_level["terrain"], storey_level["spawn_points"].values()[0])
 		storeys.append("%s %d" % [name, int(storey_level["terrain"].get("storey", -1))])
 		if _rig._inside_lit() and _rig._inside_apron == null:
 			no_apron.append(name)
+		panes.append(_rig._inside_panes.size())
 	_check(storeys == ["umbrage_tavern 0", "umbrage_tavern_up 1", "umbrage_tavern_attic 2"]
-			and no_apron == ["umbrage_tavern_up", "umbrage_tavern_attic"],
-			"the Mughouse's storeys %s: the ground floor's apron laid, none round the floors above (%s)" % [storeys, no_apron])
+			and no_apron == ["umbrage_tavern_up", "umbrage_tavern_attic"] and panes == [4, 4, 0],
+			"the Mughouse's storeys %s: the ground floor's apron laid, none round the floors above (%s); panes %s, none in the attic" % [storeys, no_apron, panes])
 	# An outdoor level none of it.
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])

@@ -72,6 +72,7 @@
 			"name": "The Mughouse attic",
 			"size": [18, 8],
 			"ambient": 0.05,
+			"windows": [],
 			"rooms": [
 				{"id": "attic", "use": "attic", "name": "Attic", "rect": [0, 0, 18, 8],
 					"holds": [[1, 1], [2, 1], [1, 6], [9, 3]]}

@@ -603,8 +603,9 @@ def lay(spec, floor):
     }
     if lit_candles:
         config["lit_candles"] = lit_candles
-    if floor.get("windows"):
-        # Its windows (946): written as the spec has them; environment's reader checks them again.
+    if "windows" in floor:
+        # Its windows (946): written as the spec has them; environment's reader checks them again. An empty
+        # list is written too: a floor marked with none (the attic, under the thatch) has none, not the rule's.
         config["windows"] = [{"cells": [list(c) for c in w["cells"]], "side": w["side"]} for w in floor["windows"]]
     if spec.get("spots"):
         # Where its people stand and sit (Level.spots_from, the frozen-townsfolk mend): laid by hand
