@@ -25851,11 +25851,26 @@ static func lantern_dark(ambient: float, outdoor: bool) -> float:
 	return 1.0 - day_share(ambient) if outdoor else 1.0
 
 
-## lantern_dark at [param cell] as this view stands; 1 with lantern_by_day off.
+## lantern_dark at [param cell] as this view stands; 1 with lantern_by_day off. On an inside 946
+## lights (_inside_lit) the room's own dark (inside_lantern_dark, 451 amended (9)): the sim's light
+## in a room is the level's flat ambient, never the clock, so a carried lantern burned full at noon
+## in a room the windows fill (a companion's beside a pale face whitened a fifth of it). The one
+## helper every carried light reads: the lantern, its pane, and the face light.
 func _lantern_dark_at(cell: Vector2i) -> float:
 	if not lantern_by_day:
 		return 1.0
+	if not _outdoor and _inside_lit():
+		return inside_lantern_dark(DayNight.light, ambient_share(_terrain))
 	return lantern_dark(World.fields.ambient_at(cell) if World.fields != null else DayNight.light, _outdoor)
+
+
+## A carried lantern's dark on an inside 946 lights (451 amended (9), the coordinator's ruling of
+## 2026-11-17): 1 - day_share of the sky's [param light] (DayNight.light, the clock 946's windows
+## follow) times the floor's [param share] of its zone's light (ambient_share: the Mughouse's
+## ground floor 0.875, upstairs 0.375, the attic 0.125). Full at night on every floor; by day in
+## the common room nearly out, in the attic nearly full.
+static func inside_lantern_dark(light: float, share: float) -> float:
+	return 1.0 - day_share(light) * clampf(share, 0.0, 1.0)
 
 
 ## A carried lantern's energy lit, before the dark: _size_lantern's.
