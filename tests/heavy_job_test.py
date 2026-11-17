@@ -2865,6 +2865,69 @@ fresh63()
 gate._memory = mem63
 shutil.rmtree(main_dir63, ignore_errors=True)
 
+print("== status counts the landing takes on the older room check (394 amended (64)) ==")
+# The coordinator, 11-16 after 4b86b0b2f: the rule against solo scenes on a free lock stays until
+# every waiter judges room by 63's code; status says how many still don't, and which.
+lock64 = os.path.join(STATE, "room64", "land.lock")
+os.makedirs(lock64 + ".waiters", exist_ok=True)
+check(gate.ROOM_CHECK_REVISION == 48, "the room check's first revision is 48 (394 amended (63))")
+check(gate.old_room_takes([], [], lock64) is None, "no landing take: no line")
+
+
+def entry64(tree, gate_rev, kind="suite_remote", lock_wait=False):
+    entry = {"tree": tree, "kind": kind, "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()),
+        "queued": time.time() - 120, "started": time.time() - 60, "ram_gb": 1.7, "commit_gb": 1.0, "gpu": False,
+        "using_gb": 0.0, "using_commit_gb": 0.0, "watched": False}
+    if gate_rev is not None:
+        entry["gate"] = gate_rev
+    if lock_wait:
+        entry["lock_wait"] = True
+    return entry
+
+
+queued64 = [entry64("q-old", 47), entry64("q-new", 48), entry64("q-unknown", None), entry64("q-scene", 40, kind="scene")]
+got64 = gate.old_room_takes([], queued64, lock64)
+check(got64 == (["q-old (revision 47)", "q-unknown (revision unknown)"], 3),
+    "queued: revision 47 and none named, 48 not, a scene not counted (%s)" % (got64,))
+gate._write(os.path.join(lock64 + ".waiters", "w-mended.json"), {"since": time.time() - 60, "last": time.time(), "gate": 48})
+gate._write(os.path.join(lock64 + ".waiters", "w-stale.json"), {"since": time.time() - 60, "last": time.time(), "gate": 47})
+running64 = [entry64("w-mended", 47, lock_wait=True), entry64("w-stale", 48, lock_wait=True), entry64("w-unwritten", 47, lock_wait=True)]
+got64 = gate.old_room_takes(running64, [], lock64)
+check(got64 == (["w-stale (revision 47)", "w-unwritten (revision 47)"], 3),
+    "on the lock: its own lock_turn's revision first (a gate copy at 47, a checkout at 48: not named), else its entry's (%s)" % (got64,))
+for name in os.listdir(gate._path("running")):
+    gate._retried(os.remove, gate._path("running", name))
+for name in os.listdir(gate._path("queue")):
+    gate._retried(os.remove, gate._path("queue", name))
+gate._write(gate._path("running", "perf-x-suite_remote-%d.json" % os.getpid()), entry64("perf-x", 47, lock_wait=True))
+lock_was64 = gate.LAND_LOCK
+gate.LAND_LOCK = lock64
+mem64 = gate._memory
+gate._memory = lambda: (30.0, 40.0)
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.lock_turn("perf-x", lock64, True)
+check((gate._read(os.path.join(lock64 + ".waiters", "perf-x.json")) or {}).get("gate") == gate.GATE_REVISION,
+    "lock_turn writes the revision that judged it in its waiter record")
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.status()
+line64 = [each for each in said.getvalue().splitlines() if each.startswith("older room check")]
+check(line64 == ["older room check: 0 of 1 landing takes (394 amended (64))"],
+    "status, its one waiter on this code: a count of none, no names (%s)" % line64)
+gate._write(os.path.join(lock64 + ".waiters", "perf-x.json"), {"since": time.time() - 60, "last": time.time()})
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.status()
+line64 = [each for each in said.getvalue().splitlines() if each.startswith("older room check")]
+check(len(line64) == 1 and line64[0].startswith("older room check: 1 of 1 landing takes (394 amended (64)): perf-x (revision 47) judge")
+    and "the free-lock rule stays until none" in line64[0], "a waiter record older code wrote (no revision): named by its entry's (%s)" % line64)
+gate.LAND_LOCK = lock_was64
+gate._memory = mem64
+for name in os.listdir(gate._path("running")):
+    gate._retried(os.remove, gate._path("running", name))
+shutil.rmtree(os.path.dirname(lock64), ignore_errors=True)
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

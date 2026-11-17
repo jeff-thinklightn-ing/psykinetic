@@ -11706,6 +11706,21 @@ line at once, not again a moment later, again past 120 s, never read as a take; 
 head refused naming it, as on this code. RESULT: PASS. Stacked on 394 amended (60). Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
+394 amended (64) (perf, 2026-11-16; the coordinator's ask after 63 landed; label from tools/decision_number.sh):
+`status` counts the landing takes still judged by the older room check. The waiters queued before 63 landed check the
+land lock from their own older checkouts until each lands or requeues, so the coordinator's rule (no solo scene of one's
+own while the lock stands free) stays until none is left; the line lets any tree see why. After the rows' lines:
+"older room check: N of M landing takes (394 amended (64))", and when N is above 0, the takes named with their revisions
+and "the free-lock rule stays until none". Counted over the LOCK_WAIT_KINDS takes running or queued; older is a revision
+under ROOM_CHECK_REVISION (48, 63's) or none written. A take waiting on the lock goes by the revision its own lock_turn
+last wrote in <lock>.waiters/<tree>.json ("gate", new: the checkout's code judges room, and a take's gate entry may
+come from another copy, as perf's land scripts take the gate with main's), else by its entry's; a queued one by its
+entry's. Nothing judged changes, so GATE_REVISION stays 48. On tonight's gate the line counted 24 of 25. heavy_job_test,
+new section: no take, no line; queued 47 and none named, 48 not, a scene not counted; on the lock the waiter record
+first (a gate entry at 47 with a record at 48 not named, the reverse named), else the entry's; lock_turn writes its
+revision; status with one waiter on this code reads "0 of 1", with a record older code wrote names it by its entry.
+RESULT: PASS. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

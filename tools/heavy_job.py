@@ -464,6 +464,11 @@ def counted_going(job, running):
 LOCK_LIVE_SECONDS = 150
 ## 394 amended (63): how often a lock kept free for a waiter short of room says so in <lock>.log.
 LOCK_SHORT_LOG_SECONDS = 120
+## 394 amended (64): the first GATE_REVISION whose land lock room check charges a waiter its own
+## reservation only (394 amended (63)). A landing take judged by older code keeps a free lock
+## unfed while the next waiter's reservation is charged too, so the coordinator's rule (no solo
+## scene of one's own while the lock stands free) holds until `status` counts none.
+ROOM_CHECK_REVISION = 48
 UNFED_PASS_SECONDS = 180
 
 
@@ -2012,6 +2017,29 @@ def unrevised(entry):
     return "gate" not in entry
 
 
+def old_room_takes(running, queue, lock=None):
+    """394 amended (64): ([tree (revision), ...], how many) over the landing
+    takes (LOCK_WAIT_KINDS) running or queued whose land lock room check is
+    older than ROOM_CHECK_REVISION; None with no such take. A take waiting on
+    the lock is judged by the revision its own lock_turn last wrote in
+    <lock>.waiters/<tree>.json (the checkout's code, which may differ from
+    the code that took the gate), else by its entry's; a queued one by its
+    entry's. None written (before 394 amended (37)) counts as older."""
+    takes = [each for each in running + queue if each["kind"] in LOCK_WAIT_KINDS]
+    if not takes:
+        return None
+    folder = (lock or LAND_LOCK) + ".waiters"
+    named = []
+    for each in takes:
+        gate = each.get("gate")
+        if each.get("lock_wait"):
+            record = _read(os.path.join(folder, each["tree"] + ".json")) or {}
+            gate = record.get("gate", gate)
+        if gate is None or gate < ROOM_CHECK_REVISION:
+            named.append("%s (%s)" % (each["tree"], "revision unknown" if gate is None else "revision %d" % gate))
+    return named, len(takes)
+
+
 def unbeaten(entry, now=None):
     """Whether [entry], a landing's take (not a run), has gone
     UNBEATEN_SECONDS since its start with no beat and no run adopting it."""
@@ -2810,6 +2838,7 @@ def lock_turn(tree, lock, free):
     mine_record = dict(waiters.get(tree, {}))
     mine_record["since"] = entry["started"] if entry is not None else mine_record.get("since", now)
     mine_record["last"] = now
+    mine_record["gate"] = GATE_REVISION  # 394 amended (64): the code judging this waiter's room.
     fits, short = True, 0.0
     if entry is not None and entry.get("lock_wait"):
         free_ram, free_commit = _memory()
@@ -3185,6 +3214,11 @@ def status():
             print("self-waiting: %s %s queued %.0f min from the checkout holding the land lock (%s, %s): this landing waits on"
                 " itself; release the lock (883 amended)" % (entry["tree"], entry["kind"], (time.time() - entry["queued"]) / 60,
                     lock_owner(LAND_LOCK), _where(entry)))
+    old_room = old_room_takes(running, queue)
+    if old_room is not None:
+        print("older room check: %d of %d landing takes (394 amended (64))%s" % (len(old_room[0]), old_room[1],
+            ": %s judge the free lock's room by gate code before revision %d, charging the next waiter's reservation"
+            " too; the free-lock rule stays until none" % (", ".join(old_room[0]), ROOM_CHECK_REVISION) if old_room[0] else ""))
     if not running and not queue:
         print("no heavy jobs")
     # 394 amended (43): last, so the lines above keep their places for scripts.
