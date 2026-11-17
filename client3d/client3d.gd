@@ -4179,8 +4179,16 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## sim's light (Fields, at the carrier's tile), emit_light and the pane are as they were.
 const FACE_LIGHT_AHEAD := 0.45
 const FACE_LIGHT_OVER := -0.15
-## 0.13 left the pale faces under their crowns at night (the third look, 11-17): 0.30.
-const FACE_LIGHT_ENERGY := 0.30
+## 0.13 left the pale faces under their crowns at night (the third look, 11-17); 0.30 clipped the palest
+## (the fourth); between, the coordinator's bar: the highest at which skin 1 clips nowhere. A look sweeps it
+## by ArtKit's feel "client3d.face_light_energy" (set_feel); this the default.
+const FACE_LIGHT_ENERGY := 0.22
+## Its specular: none, a fill's (Godot's 0.5 put a glint on a pale nose). Feel "client3d.face_light_specular".
+const FACE_LIGHT_SPECULAR := 0.0
+## The point its lift is solved for, ahead of the head's axis: the nose's tip, the face's nearest to the light,
+## so by a wall the nose takes its open light and the cheek a little less (at the eyes, 0.1, the nose went
+## over). Feel "client3d.face_lift_ahead".
+const FACE_LIFT_AHEAD := 0.13
 const FACE_LIGHT_RANGE := 1.5
 const LANTERN_WALL_GAP := 0.15
 ## The carrier's face, from its head's axis and top (the eyes: a tenth ahead, 0.12 under the top).
@@ -4242,18 +4250,20 @@ static func omni_window(d: float, r: float) -> float:
 	return n * n
 
 
-## The face light's distance to its carrier's face in the open: FACE_LIGHT_AHEAD ahead, FACE_LIGHT_OVER
-## from the head's top, the face FACE_AHEAD_OF_AXIS ahead and FACE_UNDER_TOP under it.
-static func face_open_distance() -> float:
-	return Vector2(FACE_LIGHT_AHEAD - FACE_AHEAD_OF_AXIS, FACE_LIGHT_OVER + FACE_UNDER_TOP).length()
+## The face light's distance in the open to a point of its carrier's face [param ahead] of the head's axis
+## (the eyes FACE_AHEAD_OF_AXIS, the nose FACE_LIFT_AHEAD) and FACE_UNDER_TOP under its top: the light
+## FACE_LIGHT_AHEAD ahead, FACE_LIGHT_OVER from the top.
+static func face_open_distance(ahead := FACE_AHEAD_OF_AXIS) -> float:
+	return Vector2(FACE_LIGHT_AHEAD - ahead, FACE_LIGHT_OVER + FACE_UNDER_TOP).length()
 
 
 ## What a face light [param to_face] from its carrier's face, in a range of [param lit] with a falloff of
 ## [param attenuation] (Godot's: its window times distance^-attenuation), is lifted by so the face takes
 ## what it takes in the open (face_open_distance, FACE_LIGHT_RANGE): by a wall the light stands nearer
 ## the face and its window is cut, and both count (the window alone overshot about 1.4x, the third look).
-static func face_lift(to_face: float, lit: float, attenuation: float) -> float:
-	var open := face_open_distance()
+## [param ahead]: the point's place ahead of the head's axis, its open distance face_open_distance's.
+static func face_lift(to_face: float, lit: float, attenuation: float, ahead := FACE_AHEAD_OF_AXIS) -> float:
+	var open := face_open_distance(ahead)
 	var here := omni_window(to_face, lit) * pow(maxf(to_face, 0.0001), -attenuation)
 	return omni_window(open, FACE_LIGHT_RANGE) * pow(open, -attenuation) / maxf(here, 0.0001)
 
@@ -4301,7 +4311,9 @@ func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 		light.set_meta("range_until", now + int(FACE_RANGE_AGAIN * 1000.0))
 	if not is_equal_approx(light.omni_range, lit):
 		light.omni_range = lit
-	light.set_meta("lift", face_lift(to_face, lit, light.omni_attenuation))
+	var lift_ahead := ArtKit.feel("client3d.face_lift_ahead", FACE_LIFT_AHEAD)
+	var lift_point := Vector3(way.x * lift_ahead, face.y, way.y * lift_ahead)
+	light.set_meta("lift", face_lift(want.distance_to(lift_point), lit, light.omni_attenuation, lift_ahead))
 	return true
 
 
@@ -4316,7 +4328,10 @@ func _light_face(entity: GridEntity, puppet: Node3D, lantern: OmniLight3D) -> vo
 			_inside_lit(), DayNight.light, ambient_share(_terrain))
 	var shown := lantern.visible and dark >= LANTERN_DAY_LEAST and not (_body_fill != null and _body_fill.visible) \
 			and _place_face_light(puppet, face)
-	face.light_energy = FACE_LIGHT_ENERGY * dark * float(face.get_meta("lift", 1.0))
+	face.light_energy = ArtKit.feel("client3d.face_light_energy", FACE_LIGHT_ENERGY) * dark * float(face.get_meta("lift", 1.0))
+	var glint := ArtKit.feel("client3d.face_light_specular", FACE_LIGHT_SPECULAR)
+	if face.light_specular != glint:
+		face.light_specular = glint
 	if face.visible != shown:
 		face.visible = shown
 
@@ -29718,6 +29733,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		face.light_energy = 0.0
 		face.omni_range = FACE_LIGHT_RANGE
 		face.shadow_enabled = false
+		face.light_specular = FACE_LIGHT_SPECULAR
 		face.light_cull_mask = FACE_LAYER
 		face.visible = false
 		face.position.y = height + FACE_LIGHT_OVER

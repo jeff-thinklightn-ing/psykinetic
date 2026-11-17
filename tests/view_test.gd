@@ -3511,22 +3511,30 @@ func _test_face_light() -> void:
 						heads.append(at.distance_to(head + Vector3(side.x, 0.0, side.y)))
 				var opened := Client3D.face_light_range(Vector2(at.x, at.z), 0.0, never)
 				var lift_here := float(light.get_meta("lift", 1.0))
-				var to_face := light.position.distance_to(Vector3(faced.x * Client3D.FACE_AHEAD_OF_AXIS, face_y, faced.y * Client3D.FACE_AHEAD_OF_AXIS))
+				var tip := Client3D.FACE_LIFT_AHEAD
+				var to_face := light.position.distance_to(Vector3(faced.x * tip, face_y, faced.y * tip))
 				var falls := light.omni_attenuation
-				var open_d := Client3D.face_open_distance()
+				var open_d := Client3D.face_open_distance(tip)
 				var same := absf(Client3D.omni_window(to_face, light.omni_range) * pow(to_face, -falls) * lift_here
 						- Client3D.omni_window(open_d, Client3D.FACE_LIGHT_RANGE) * pow(open_d, -falls)) < 0.001
 				rows[kind] = [cell, step, light.omni_range, heads, opened, same]
 				clear = clear and same and heads.all(func(d: float) -> bool: return d > light.omni_range and d < opened)
-	# The lift: none in the open; nose to a wall it makes up the window and the nearer stand both.
-	var open_lift := Client3D.face_lift(Client3D.face_open_distance(), Client3D.FACE_LIGHT_RANGE, 1.0)
-	var wall_d := Vector2(0.5 - gap - Client3D.FACE_AHEAD_OF_AXIS, Client3D.FACE_LIGHT_OVER + Client3D.FACE_UNDER_TOP).length()
-	var wall_lift := Client3D.face_lift(wall_d, wall_d * Client3D.FACE_RANGE_LEAST, 1.0)
-	var wall_takes := Client3D.omni_window(wall_d, wall_d * Client3D.FACE_RANGE_LEAST) / wall_d * wall_lift
-	var open_takes := Client3D.omni_window(Client3D.face_open_distance(), Client3D.FACE_LIGHT_RANGE) / Client3D.face_open_distance()
-	_check(is_equal_approx(open_lift, 1.0) and absf(wall_takes - open_takes) < 0.0001 and wall_lift > 1.0 and wall_lift < 1.3,
-			"the lift: 1 in the open (%.3f); nose to a wall (%.3f m from the face, its range %.3f) %.3f, the face taking what it takes in the open (%.3f, %.3f)" % [
-			open_lift, wall_d, wall_d * Client3D.FACE_RANGE_LEAST, wall_lift, wall_takes, open_takes])
+	# The lift: none in the open; nose to a wall it makes up the window and the nearer stand both, solved for
+	# the nose's tip (FACE_LIFT_AHEAD): the nose takes what it takes in the open, the eyes a little less.
+	var nose_at := Client3D.FACE_LIFT_AHEAD
+	var open_lift := Client3D.face_lift(Client3D.face_open_distance(nose_at), Client3D.FACE_LIGHT_RANGE, 1.0, nose_at)
+	var eyes_d := Vector2(0.5 - gap - Client3D.FACE_AHEAD_OF_AXIS, Client3D.FACE_LIGHT_OVER + Client3D.FACE_UNDER_TOP).length()
+	var nose_d := Vector2(0.5 - gap - nose_at, Client3D.FACE_LIGHT_OVER + Client3D.FACE_UNDER_TOP).length()
+	var wall_range := eyes_d * Client3D.FACE_RANGE_LEAST
+	var wall_lift := Client3D.face_lift(nose_d, wall_range, 1.0, nose_at)
+	var takes_at := func(d: float, r: float) -> float: return Client3D.omni_window(d, r) / d
+	var nose_share: float = takes_at.call(nose_d, wall_range) * wall_lift / takes_at.call(Client3D.face_open_distance(nose_at), Client3D.FACE_LIGHT_RANGE)
+	var eyes_share: float = takes_at.call(eyes_d, wall_range) * wall_lift / takes_at.call(Client3D.face_open_distance(), Client3D.FACE_LIGHT_RANGE)
+	_check(is_equal_approx(open_lift, 1.0) and absf(nose_share - 1.0) < 0.0001 and eyes_share > 0.7 and eyes_share < 1.0,
+			"the lift: 1 in the open (%.3f); nose to a wall (the nose's tip %.3f m off, the eyes %.3f, its range %.3f) %.3f: the nose takes %.3f of its open light, the eyes %.3f" % [
+			open_lift, nose_d, eyes_d, wall_range, wall_lift, nose_share, eyes_share])
+	# The face light is a fill: no glint (FACE_LIGHT_SPECULAR), its energy and specular the feel's when a look sets them.
+	_check(is_equal_approx(light.light_specular, Client3D.FACE_LIGHT_SPECULAR), "the face light's specular %.2f (FACE_LIGHT_SPECULAR)" % light.light_specular)
 	# Its range kept while the light stands still (found again only once it moves, or after FACE_RANGE_AGAIN).
 	var kept_until := int(light.get_meta("range_until", 0))
 	_rig._place_face_light(puppet, light)
