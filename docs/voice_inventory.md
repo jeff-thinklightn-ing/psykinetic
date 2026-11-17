@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3072)
+## Lines in the code (3073)
 
 ### companions (Pip, Wren, Nix) (671)
 
@@ -2167,7 +2167,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (828)
+### server and windows (829)
 
 | | Line | Where |
 |---|---|---|
@@ -2480,6 +2480,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | a gift from %s | `main.gd` _favour_given() |
 |  | brought you %s | `main.gd` _favour_given() |
 |  | %s gives %s %s. | `main.gd` _favour_given() |
+|  | no rulings until it is mended | `main.gd` _make_lawspeaker() |
 | L | the medicine man | `main.gd` _visits_due() |
 |  | gathered by the medicine man | `main.gd` _take_herbs() |
 |  | %s by %s | `main.gd` _take_herbs() |
