@@ -61847,3 +61847,36 @@ well im not sure the solution".
   level none of it.
 Client and level data; protocol unchanged; no new class_name; a bullet only after the coordinator sees the
 joined pair.
+
+946 amended (1): the Mughouse's windows marked on each floor, and a landing's flame upstairs (maps; the script's label;
+environment's 946, daylight indoors, the coordinator's approval and terms: no window on a door, link or hearth cell, an
+inside's windows on the same sides as its building's outside ones; the coordinator's ask, 11-15: the upstairs lit at night
+only by the lanterns that walk in, so an empty upstairs is black, "so the stair leads somewhere"). Package "Umbrage:
+daylight indoors"; carried in environment's 946 landing, so the table and its candle (seen) never reach main before the
+reader.
+- tools/make_interior.py: a floor's "windows", [{"cells": [[x, y]], "side": north|south|west|east}], written through to
+  level.json "windows" (environment's format). Checked or nothing is written: each cell in a room, the cell across its
+  side in none (an outer wall, never one between rooms), never a stair's cell or arrival, the front door's cell or a
+  hearth's fire. Any room but the common room may hold "tables" (the common room's building.tavern_table, two by two) and
+  "candles" (one lit on each, the common room's top and light, 811 amended (4)), with no seats (only the common room's
+  tables are the tavern's); never off its room, on a door, a stair, an arrival or another table.
+- The outside, read on the parsed wilds (BuildingComposer.windows(I1)): one wall.wood.window_tall a side (two storeys),
+  on its north wall at x 178, its west (back) wall at y 207, its east (front) wall at y 211 (the sill lamp's, two cells
+  south of the door) and its south wall at x 171; no gable.wood art, so no gable window. Turned in as one walks (west
+  outside is north inside: the wilds' north, west, east and south walls to the inside's east, north, south and west),
+  along each wall in proportion: on the ground floor and upstairs alike (17, 12) east (each stair room, clear of the
+  stairs), (11, 0) north, (3, 13) south (two cells west of the front door, as the sill lamp's window beside the outside
+  door) and (0, 1) west (clear of the hearth (0, 6)). The attic none: it keeps its flame. Environment's read: with
+  "windows" marked its rule is off for that level (the ground floor's rule laid 12), the common room's day mostly the
+  ambient lift; it measures on this take and asks for a second window a long wall if it needs one.
+- Upstairs' landing: one tavern table in the stair room's north-east corner at (16, 8)..(17, 9), a lit candle on it at
+  (16.5, 8.5), on the room's far side from the camera so one arriving at (16, 11) sees it (ui-design's look on the first
+  cell, (14, 12) against the south wall: the near wall hid it); clear of both stairs' cells and arrivals and of the hall
+  door's inside cells (13, 9)/(14, 9).
+level_test _test_tavern_zone: one candle upstairs, on the landing's table at its top; each floor's windows as marked, each
+on an outer wall's floor cell off its links, arrivals and hearth, the attic none. Also run alone: resident_test,
+town_day_test, zone_test; load_check. Level data and the tool; protocol unchanged (Level reads no "windows"; environment's
+reader is client-side); no new class_name; no bullet (environment's package, voice's words).
+Built over maps' timber stairs (589 amended (3) and (4), landed first; the coordinator's ruling, 11-16): 589 amended (4)'s
+east stand moved (17,12) to (17,13), off the window's cell (maps' own move, done in environment's merge), so upstairs
+holds three lights, the landing table's candle and the two stands; level_test's upstairs-candles row reads all three.
