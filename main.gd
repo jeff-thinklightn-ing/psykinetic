@@ -3060,6 +3060,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles
 	_altar_wanted = NONE  # 896: and a far altar (_altar_click).
 	_niche_wanted = {}  # 608 amended (8): and a far niche (_niche_click sets it after).
 	_rack_wanted = {}  # And a far rack (_rack_click sets it after).
+	_niche_lean = {}  # 608 amended (9): a lean kept past a route's step goes with a new walk.
 	_talk_wanted = null
 	_free_waiting = {}
 	if _free_own(player) == null:
@@ -3242,9 +3243,12 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	if not _niche_lean.is_empty():
 		# 608 amended (8): a niche clicked, its floor cell reached: the body leans into
 		# its stone, the server's press (World._free_pressed) as a held walk into it.
-		if Time.get_ticks_msec() < int(_niche_lean["until"]) and (_free.get("path", []) as Array).is_empty():
+		# 608 amended (9): dropped only when its time is out, never because the
+		# route still has a step to walk (that dropped a click made on arrival).
+		if Time.get_ticks_msec() >= int(_niche_lean["until"]):
+			_niche_lean = {}
+		elif (_free.get("path", []) as Array).is_empty():
 			return _niche_lean["way"]
-		_niche_lean = {}
 	var at := own.shown(player)
 	if Net.controls == "wasd":
 		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
@@ -27773,6 +27777,9 @@ func _niche_click(player: Player, tile: Vector2i) -> bool:
 	if niche.is_empty():
 		return false
 	if player.tile == niche["floor"]:
+		# 608 amended (9): clicked the instant he steps onto it, the route still
+		# holds its arrival step (the walk to the cell's middle): dropped, he leans now.
+		_free["path"] = []
 		_lean_into(niche)
 		return true
 	_move_click(player, niche["floor"])

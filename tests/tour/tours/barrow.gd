@@ -739,6 +739,24 @@ func _niche(bot: Node) -> void:
 	bot.expect(from_hall["opened"], "after the turn-in, a tap on the slab from the hall walks me into it and it opens", "at %s; told %s" % [bot.cell(), from_hall["told"]])
 	if from_hall["opened"]:
 		await _shut_again(bot, p)
+	# 608 amended (9): walked in from the hall and the slab tapped the instant I
+	# step onto its floor cell, the route's arrival step still to walk (main
+	# 4864df07b: 0 of 6 opened, 3 of 3 a second later); each opened shut by E.
+	var on_arrival: Array = []
+	for i in 6:
+		await bot.walk_to(p["hall"], 0, 30.0)
+		await bot.seconds(0.5)
+		await bot.walk_to(p["from"], 0, 30.0)
+		var stopped: int = bot.now_msec()
+		var stopped_frame := Engine.get_process_frames()
+		var arrived := await _tap_and_watch(bot, "after the turn-in, tap %d on arrival at its floor cell (the route's path %s)" % [i + 1, bot.main._free.get("path", [])], p["inside"], edge)
+		bot.log_line("tap %d: the press %d ms (%d frames) after I stepped onto its floor cell, as a parsed input event; the slab %s" % [i + 1,
+			int(arrived["pressed"]) - stopped, int(arrived["pressed_frame"]) - stopped_frame, "open" if arrived["opened"] else "shut"])
+		on_arrival.append(arrived["opened"])
+		if arrived["opened"]:
+			await bot.seconds(1.0)  # The finder's hold.
+			await _shut_again(bot, p)
+	bot.expect(on_arrival.all(func(x: bool) -> bool: return x), "after the turn-in, a tap on the slab the instant I step onto its floor cell opens it, every time", "%s" % [on_arrival])
 	await bot.walk_to(p["from"], 0, 30.0)
 	var from_floor := await _tap_and_watch(bot, "after the turn-in, on its floor cell, a tap on the slab", p["inside"], edge)
 	bot.expect(from_floor["opened"], "after the turn-in, a tap on the slab from its floor cell walks me into it and it opens", "at %s; told %s" % [bot.cell(), from_floor["told"]])
@@ -831,6 +849,8 @@ func _tap_and_watch(bot: Node, what: String, cell: Vector2i, edge: Vector3i, mos
 	var since: int = bot.now_msec()
 	var started: Vector2i = bot.cell()
 	var pick := await _point_at(bot, cell)
+	var pressed: int = bot.now_msec()
+	var pressed_frame := Engine.get_process_frames()
 	_button(true, _screen_of(bot, cell))
 	await bot.seconds(0.05)
 	_button(false, _screen_of(bot, cell))
@@ -842,7 +862,7 @@ func _tap_and_watch(bot: Node, what: String, cell: Vector2i, edge: Vector3i, mos
 	var opened := door != null and door.open
 	var told: Array = bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]))
 	bot.log_line("%s: tapped %s (the pick %s) from %s; now at %s; the slab %s; told %s" % [what, cell, pick, started, bot.cell(), "open" if opened else "shut", told])
-	return {"opened": opened, "told": told}
+	return {"opened": opened, "told": told, "pressed": pressed, "pressed_frame": pressed_frame}
 
 
 ## The opened slab shut again for the next case (setup, not a press under

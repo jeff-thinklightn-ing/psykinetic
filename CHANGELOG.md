@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, a wall niche answers a click the moment you stop in front of it, so the one the fallen knight told you of opens to your first click however quickly you make it (608 amended (9)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - Up close by day, hair near a face's own colour is a shade darker at its hairline, so it reads as hair (419 amended (12)).

@@ -4838,6 +4838,19 @@ func _test_niche_click() -> void:
 		_put(player, Vector2i(2, 1))
 		var told := _click_niche(player, Vector2i(2, 0), heard, 240)
 		_check(told == [shut] and player.tile == Vector2i(2, 1), "on a plain niche's floor cell, a click on its stone presses it: the shut line (%s, at %s)" % [told, player.tile])
+		# 608 amended (9): clicked the instant he steps onto it, the route still
+		# holding its arrival step (the tour's taps on arrival: 0 of 6 pressed).
+		_main._told_niche.erase(player.owner_peer)
+		_main._free["path"] = [Vector2i(2, 1)]
+		told = _click_niche(player, Vector2i(2, 0), heard, 240)
+		_check(told == [shut], "clicked the instant he steps onto its floor cell, the route's arrival step still to walk: the step dropped, the stone pressed (608 amended (9): %s)" % [told])
+		_main._lean_into({"way": Vector2(0, -1)})
+		_main._free["path"] = [Vector2i(2, 1)]
+		_main._free_intent(player, _main._free_own(player))
+		_check(not _main._niche_lean.is_empty(), "a niche's lean is kept while the route still has a step to walk, dropped only when its time is out (608 amended (9))")
+		_main._free["path"] = []
+		_main._niche_lean = {}
+		_main._told_niche.erase(player.owner_peer)
 		_put(player, Vector2i(4, 4))
 		told = _click_niche(player, Vector2i(4, 0), heard, 1200)
 		_check(told == [shut] and player.tile == Vector2i(4, 1), "from the hall, a click on another niche's stone walks to it and presses it (%s, at %s)" % [told, player.tile])
@@ -4896,6 +4909,10 @@ func _click_niche(player: Player, stone: Vector2i, heard: Array[String], frames:
 		return ["(no niche click)"]
 	for i in frames:
 		player.free_allowance = World.FREE_COMMANDS_PER_SECOND  # The test runs faster than the clock.
+		if not _main._niche_lean.is_empty():
+			# Likewise the lean's time (NICHE_LEAN_MSEC, wall clock): kept on the test's
+			# frames, so a stall of the machine (11-16 21:02, C: full) drops no lean.
+			_main._niche_lean["until"] = Time.get_ticks_msec() + Main.NICHE_LEAN_MSEC
 		_main._free_drive(1.0 / 60.0)
 		_main._update_niche()
 		if i % 6 == 5:
