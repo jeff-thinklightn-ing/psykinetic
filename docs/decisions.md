@@ -61190,6 +61190,12 @@ well im not sure the solution".
   level none of it.
 Client and level data; protocol unchanged; no new class_name; a bullet only after the coordinator sees the
 joined pair.
+The frame's cost (perf, 11-16, C:/dev/review/perf/946_bench_host.md; map_bench on a host, not joined, the Lenovo, 16
+runs ABBA at the inside view's nearest zoom, f355ad4b0, built over maps' timber stairs, against those stairs alone,
+dc9814744): added to the frame's median, the 95th beside it, ground floor noon +0.07 ms (+0.14), upstairs noon +0.31
+(+0.40), ground floor 21:30 +0.36 (+0.38), upstairs 21:30 +0.52 (+0.56), against the coordinator's stop of 1 ms; the
+GPU's share about 0.1 ms, the rest CPU outside rendering (what upstairs' 0.3 to 0.5 ms is, a row for after). The
+joined look's runs logged no frame time, so there is no second reading.
 
 946 amended (1): the Mughouse's windows marked on each floor, and a landing's flame upstairs (maps; the script's label;
 environment's 946, daylight indoors, the coordinator's approval and terms: no window on a door, link or hearth cell, an
