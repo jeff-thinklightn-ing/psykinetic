@@ -30263,6 +30263,25 @@ Wire: unchanged; slot_notes and slot_counts as before. Load by weight and the st
 unchanged. items_test _test_arrow_stacks; _test_arrows' fresh bundle now joins the held one.
 Server and client data; protocol unchanged; no new class_name.
 
+619 amended (5): a reordered stack's new first reaches the record (items, the script's label; the
+coordinator's approval, 11-17, from playtest's look_arrows619b, whose step 4 came back from a death
+holding "bundle of arrows, 0 of 10" alone). World._order_ammo changed a slot's first uid (the
+stack's new leader after a wear or a join) without World._slots_changed, the one call that tells the
+holder's record (Main._on_slots_changed sets record.slot_items). The record kept the old first, the
+bundle just spent and moved to the back, with no stack of its own; Main._join_player, which a join
+(a relog), a travel's re-join and a bringing back after death all go through, rebuilds the hand by
+World.set_slots from the record, so the player came back holding that one spent bundle and the rest
+of the stack stayed in the book with no slot. Live from v0.1.216 to v0.1.229. _order_ammo now calls
+_slots_changed when it changes the first, so the record, the counts and the notes follow at once.
+The other writers of a slot's first uid were read and all call it (the transfers, put_item, the
+counter, show_held, set_slots, and every caller of _unit_out); World.slot_uid's lazy mint of a uid
+for a stocked slot writes without it but loses nothing (a rebuild mints again), and is left.
+Bundles stranded before the mend are not given back here: a repair of players' records is Jeff's
+pick (C:/dev/review/decisions/lost-arrow-bundles.md). items_test _test_arrow_stacks: after the
+knocks the record names the new first, and a body rebuilt from the record by set_slots holds the
+three in order with count 3 and the bow draws (both rows fail without the mend). Server only;
+protocol unchanged; no new class_name; the held 619 amended (4) bullet carries it (voice's words).
+
 ## 620. The cone of flight
 
 Jeff, on v0.1.168: "I'm wondering if we can have an cone of flight that narrows the longer the

@@ -16,7 +16,7 @@ notes (decision 324).
 - In a fight your companion calls each warning once, as it comes, and keeps their idle talk until a while after (917).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
-- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
+- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, keep their count when you die, log out or travel, and a bundle you pick up with your bow out joins those in your hand (619 amended (4), 619 amended (5)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
 

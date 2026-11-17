@@ -2664,6 +2664,19 @@ func _test_arrow_stacks() -> void:
 			"four knocks spend the first: it goes to the back, the next leads, the bow still draws (%s)" % [order])
 	note = host.slot_notes[hand] if host.slot_notes.size() > hand else ""
 	_check("7 of 10" in note, "the square reads the new first's condition (%s)" % note)
+	# 619 amended (5): the record hears of the new first, so a body rebuilt from
+	# it (a death and bringing back, a relog, a trip) holds the stack in order
+	# (look_arrows619b, step 4: it came back as the spent one alone).
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_check(record.slot_items.size() > hand and record.slot_items[hand] == half and record.slots[hand] == "arrows",
+			"the record names the new first (%s)" % [record.slot_items[hand] if record.slot_items.size() > hand else -1])
+	var saved_slots := record.slots.duplicate()
+	var saved_uids := record.slot_items.duplicate()  # Read before the clear: clearing writes the record too.
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	World.set_slots(host, saved_slots, saved_uids)
+	order = World.slot_units(host, hand)
+	_check(order == [half, fresh, low] and host.slot_counts.size() > hand and host.slot_counts[hand] == 3 and World.bundle_slot(host) == hand,
+			"rebuilt from the record: the three in order, count 3, the bow draws (%s, %s)" % [order, host.slot_counts])
 	# Ways out: a sale, a donation or a payment never takes the one in use while another is there.
 	_check(World._leaving(host, hand, half) == low and World._leaving(host, hand, fresh) == fresh,
 			"asked for the one in use, the last goes in its place; any other, itself")

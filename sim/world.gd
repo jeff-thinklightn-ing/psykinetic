@@ -3763,6 +3763,12 @@ func _order_ammo(entity: GridEntity, slot: int) -> void:
 	var uids := entity.slot_items.duplicate()
 	uids[slot] = ordered[0]
 	entity.slot_items = uids
+	# 619 amended (5): the slot's first changed, so its holder's record must
+	# hear of it (Main._on_slots_changed, through slots_changed). Without it the
+	# record kept the spent bundle as the first, and a death, a relog or a trip
+	# rebuilt the hand as that one alone, the rest lost (playtest's
+	# look_arrows619b, step 4).
+	_slots_changed(entity)
 
 
 ## The unit of [param entity]'s [param slot] that goes when [param uid] is
