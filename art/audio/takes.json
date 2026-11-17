@@ -1837,6 +1837,53 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.digger_pick": [
+			{
+				"file": "sfx.digger_pick.ogg",
+				"from": "freesound",
+				"original": "freesound 558414: Pick axe striking rocks #1.m4a (from 1.81 s for 0.6 s)",
+				"sha256": "00c5159ade33701e783ca915ae95abca49b3b7f86e58c8ea22f81e4434f64e42",
+				"by": "guyburns",
+				"url": "https://freesound.org/people/guyburns/sounds/558414/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.digger_pick.2.ogg",
+				"from": "freesound",
+				"original": "freesound 558414: Pick axe striking rocks #1.m4a (from 6.54 s for 0.6 s)",
+				"sha256": "5938fbbb952beda9b3308b7402d49d6f180cbdb4e2e8fefbfa0ec3ce4c8607a4",
+				"by": "guyburns",
+				"url": "https://freesound.org/people/guyburns/sounds/558414/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.digger_pick.3.ogg",
+				"from": "freesound",
+				"original": "freesound 558412: Pick axe striking rocks #2.m4a (from 6.77 s for 0.6 s)",
+				"sha256": "9efad521d5b324e6291f158666a5104dd19e811ed5ca0ca84959383250fceb71",
+				"by": "guyburns",
+				"url": "https://freesound.org/people/guyburns/sounds/558412/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.digger_pick.4.ogg",
+				"from": "freesound",
+				"original": "freesound 558412: Pick axe striking rocks #2.m4a (from 16.65 s for 0.6 s)",
+				"sha256": "bf24b7f43b7bfa58b78b0623897c8b68f45dd8ad4a571f445676f7a0156298e0",
+				"by": "guyburns",
+				"url": "https://freesound.org/people/guyburns/sounds/558412/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.digger_pick.5.ogg",
+				"from": "freesound",
+				"original": "freesound 593895: dig1.mp3",
+				"sha256": "8e6e902d67c184383de2b08cfa3a9811fe1ea9b6a050ed8d981f3629d6d2e7f3",
+				"by": "igroglaz",
+				"url": "https://freesound.org/people/igroglaz/sounds/593895/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.door_wood_bar": [
 			{
 				"file": "sfx.door_wood_bar.ogg",

@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_tavern()
 	_test_idle_people()
 	_test_biters()
+	_test_digger()
 	_test_heard_over_list()
 	_test_music()
 	_test_folders()
@@ -773,6 +774,34 @@ func _test_biters() -> void:
 		for path: String in SoundKit.files("sfx.wolf_snarl"):
 			longest = maxf(longest, (load(path) as AudioStream).get_length() / slowest)
 		_check(longest > 0.0 and longest <= red - 0.05, "each snarl heard ends by %.2f s, inside his %.1f s red" % [longest, red])
+
+
+## 952: the digger's pick, one slot heard as far as Monster.DIG_REACH (the one number a
+## companion's ear reads too), each take a single strike done before the next can come;
+## and the digger heard as the kobold it is drawn as (SoundKit.heard_kind,
+## Monster.drawn_kind): a goblin's cries at the sneak's pitch, its death, its idle.
+func _test_digger() -> void:
+	print("\n== the digger's pick, and the digger heard as the kobold (952) ==")
+	_check(SoundKit.has(SoundKit.DIG) and SoundKit.positional(SoundKit.DIG) and SoundKit.bus(SoundKit.DIG) == "sfx"
+			and SoundKit.reach(SoundKit.DIG) == Monster.DIG_REACH,
+			"the pick's slot: positional on the sfx bus, heard %d cells, Monster.DIG_REACH (%d)" % [SoundKit.reach(SoundKit.DIG), Monster.DIG_REACH])
+	if SoundKit.files(SoundKit.DIG).is_empty():
+		_check(true, "its takes not synced here: the take lengths skipped")
+	else:
+		var longest := 0.0
+		for path: String in SoundKit.files(SoundKit.DIG):
+			longest = maxf(longest, (load(path) as AudioStream).get_length() / (1.0 - Sfx.PITCH_JITTER))
+		_check(longest > 0.0 and longest < 1.0 and longest < Client3D.DIG_EVERY_S.x,
+				"each chink a single strike, done in %.2f s, under a second and before the next (%.0f s at the soonest)" % [longest, Client3D.DIG_EVERY_S.x])
+	_check(SoundKit.heard_kind("digger") == "sneak" and SoundKit.heard_kind("wolf") == "wolf" and SoundKit.heard_kind("") == "",
+			"heard as its drawn kind: the digger the sneak, others themselves")
+	_check(SoundKit.goblin("digger") and SoundKit.creature_slot_name("digger") == "goblin" and is_equal_approx(SoundKit.pitch("digger"), SoundKit.pitch("sneak"))
+			and is_equal_approx(SoundKit.pitch("sneak"), 1.05) and is_equal_approx(SoundKit.pitch("wolf"), 1.0) and is_equal_approx(SoundKit.pitch("old_wolf"), 0.8),
+			"a goblin's slots at the sneak's pitch (%.2f); pitches by kind as before" % SoundKit.pitch("digger"))
+	_check(SoundKit.death("digger") == SoundKit.death("sneak") and SoundKit.cry("digger", "rout") == SoundKit.cry("sneak", "rout")
+			and SoundKit.idle("digger") == SoundKit.idle("sneak") and SoundKit.steady_slot("digger") == SoundKit.steady_slot("sneak")
+			and SoundKit.steady_slot("sneak") == "sfx.chief_steady",
+			"its death, cries, idle and steadying the sneak's")
 
 
 func _test_idle_people() -> void:

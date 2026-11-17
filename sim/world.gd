@@ -2436,6 +2436,31 @@ func weather_hearing_at(cell: Vector2i) -> float:
 	return fields.weather_hearing if fields.under_sky(cell) else 1.0
 
 
+## How far a sound of [param reach] cells made at [param at] carries (952):
+## rain and wind under the sky shorten it (weather_hearing_at), never under
+## a cell; [param weather] false keeps it whole (a voice, Sfx.hearing's
+## speech).
+func carried_reach(reach: int, at: Vector2i, weather := true) -> int:
+	if reach > 0 and weather:
+		var cover := weather_hearing_at(at)
+		if cover < 1.0:
+			return maxi(1, roundi(reach * cover))
+	return reach
+
+
+## Whether a sound of [param reach] cells made at [param at] is heard at
+## [param from] (952: the one hearing rule both sides call): within its
+## carried_reach (Chebyshev), half that where [param line] is false. The
+## caller gives the line, from the sound to the ear: the client
+## has_hearing_line (Sfx.hearing), the server has_clear_line (a companion's
+## ear, a digger's pick); the hearing line is clear wherever the clear line
+## is, so what the server calls heard the client hears. Holds no flags.
+func heard(reach: int, at: Vector2i, from: Vector2i, line: bool, weather := true) -> bool:
+	var carries := carried_reach(reach, at, weather)
+	var d := distance(at, from)
+	return carries > 0 and d <= carries and (line or d == 0 or d * 2 <= carries)
+
+
 ## Whether a creature standing at [param at] burns. Asked of every cell a
 ## path or a flood looks at: with nobody carrying heat (as now, always) it
 ## is the map's heat alone, a lookup, where heat_at goes through every

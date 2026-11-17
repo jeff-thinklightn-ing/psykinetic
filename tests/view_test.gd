@@ -118,6 +118,7 @@ func _ready() -> void:
 		_test_idle_voices()
 		_test_idle_people()
 		await _test_bite_heard()
+		await _test_dig_beat()
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
@@ -2307,6 +2308,111 @@ func _test_bite_heard() -> void:
 		World.despawn(beast)
 	_rig._process(0.0)
 	await _frames(1)
+
+
+## 952: the digger's pick (package "a first fight"). A drawn digger at its
+## burrow, its beat driven on a clock of the test's own (no frame between
+## the calls, so the game's own calls never cut in): no chink till it has
+## stood DIG_STILL_S by the client's still clock, the first within
+## DIG_FIRST_S, then one each DIG_EVERY_S; roused, sitting or down, silent
+## at once, and afresh after; a step sets the still clock. And the one
+## hearing rule (World.heard): its rows by hand, and Sfx.hearing's heard
+## the same as World.heard given the client's line at every cell round it.
+func _test_dig_beat() -> void:
+	print("\n== the digger's pick heard while it is at work, and the one hearing rule (952) ==")
+	var at := Vector2i(9, 9)  # The idle voices' free row.
+	if World.get_entity_at(at) != null:
+		World.despawn(World.get_entity_at(at))
+	var spec := Level._spec_for("monster_digger", Level.MONSTER_TYPES)
+	spec["name"] = "DigBeat"
+	spec["tile"] = at
+	var digger := _main._spawn(spec) as Monster
+	var puppet: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		puppet = _rig._puppets.get(digger.get_instance_id()) if digger != null else null
+		if puppet != null:
+			break
+		await get_tree().process_frame
+	if digger == null or puppet == null:
+		_check(false, "a digger drawn (%s, %s)" % [digger != null, puppet != null])
+		if digger != null:
+			World.despawn(digger)
+		return
+	digger.sight_range = 0  # Still: nothing to rouse it.
+	digger.alert = Monster.Alert.IDLE
+	digger.pose = Monster.Pose.STAND
+	var id := digger.get_instance_id()
+	# A step sets the client's still clock.
+	var stepped_before := Time.get_ticks_msec()
+	World._relocate(digger, at + Vector2i(1, 0))
+	_rig._process(0.0)
+	var stepped := int(_rig._moved_ms.get(id, -1)) >= stepped_before
+	World._relocate(digger, at)
+	_rig._process(0.0)
+	_check(stepped and int(_rig._moved_ms.get(id, -1)) >= stepped_before and digger.burrow_cell() == at,
+			"a step sets its still clock (%s); its burrow its tile (%s)" % [stepped, digger.burrow_cell()])
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	var t0 := Time.get_ticks_msec()
+	_rig._moved_ms[id] = t0
+	_rig._dig_next.erase(id)
+	var chinks := func(when: int, roll := 0.5) -> int:
+		var before := _rig.sfx.played.size()
+		_rig._dig_beat(digger, puppet, t0 + when, roll)
+		return _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]) == SoundKit.DIG).size()
+	var still_ms := roundi(Monster.DIG_STILL_S * 1000.0)
+	var first_ms := roundi(Client3D.DIG_FIRST_S * 500.0)  # At a roll of 0.5.
+	var every_ms := roundi(lerpf(Client3D.DIG_EVERY_S.x, Client3D.DIG_EVERY_S.y, 0.5) * 1000.0)
+	var early: int = chinks.call(still_ms - 100)
+	var at_still: int = chinks.call(still_ms)
+	var first: int = chinks.call(still_ms + first_ms)
+	var between: int = chinks.call(still_ms + first_ms + every_ms - 100)
+	var second: int = chinks.call(still_ms + first_ms + every_ms)
+	_check(early == 0 and at_still == 0 and first == 1 and between == 0 and second == 1,
+			"none till it has stood %.0f s (%d, %d); the first %d ms on (%d), the next %d ms after (%d, %d)" % [Monster.DIG_STILL_S, early, at_still, first_ms, first, every_ms, between, second])
+	var later := still_ms + first_ms + every_ms
+	digger.alert = Monster.Alert.SUSPICIOUS
+	var roused: int = chinks.call(later + every_ms)
+	digger.alert = Monster.Alert.IDLE
+	var back: int = chinks.call(later + every_ms + 100, 0.0)
+	digger.pose = Monster.Pose.SIT
+	var sitting: int = chinks.call(later + 3 * every_ms)
+	digger.pose = Monster.Pose.STAND
+	var hp_was := digger.hp
+	digger.hp = 0
+	var down: int = chinks.call(later + 4 * every_ms)
+	digger.hp = hp_was
+	_rig._moved_ms[id] = t0 + later + 5 * every_ms
+	var walked: int = chinks.call(later + 5 * every_ms + still_ms - 100, 0.0)
+	var player := _player()
+	var not_a_digger := 0
+	if player != null and _rig._puppets.has(player.get_instance_id()):
+		var before := _rig.sfx.played.size()
+		_rig._dig_beat(player, _rig._puppets[player.get_instance_id()], t0 + later + 9 * every_ms, 0.0)
+		not_a_digger = _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]) == SoundKit.DIG).size()
+	_check(roused == 0 and back == 1 and sitting == 0 and down == 0 and walked == 0 and not_a_digger == 0,
+			"roused silent (%d), afresh at once at a roll of 0 back at peace (%d); sitting (%d), down (%d), just walked (%d), anyone else (%d) silent" % [roused, back, sitting, down, walked, not_a_digger])
+	_rig.sfx.hear_everything = hear_was
+	_rig._dig_next.erase(id)
+	# The one hearing rule: by hand, then as Sfx.hearing has it everywhere round the digger.
+	var reach := Monster.DIG_REACH
+	var east := func(d: int) -> Vector2i: return at + Vector2i(d, 0)
+	_check(World.heard(reach, at, east.call(reach), true, false) and not World.heard(reach, at, east.call(reach + 1), true, false)
+			and World.heard(reach, at, east.call(int(reach / 2.0)), false, false) and not World.heard(reach, at, east.call(int(reach / 2.0) + 1), false, false)
+			and World.heard(reach, at, at, false, false) and not World.heard(0, at, at, true, false)
+			and World.carried_reach(reach, at, false) == reach,
+			"World.heard: to %d cells on a clear line, %d past a wall, its own cell always, nothing of no reach" % [reach, int(reach / 2.0)])
+	var cells := 0
+	var apart: Array[String] = []
+	for dy in range(-reach - 2, reach + 3, 3):
+		for dx in range(-reach - 2, reach + 3, 3):
+			var ear := at + Vector2i(dx, dy)
+			cells += 1
+			if Sfx.hearing(SoundKit.DIG, at, ear).heard != World.heard(reach, at, ear, World.has_hearing_line(at, ear)):
+				apart.append(str(ear))
+	_check(apart.is_empty(), "Sfx.hearing heard the pick as World.heard has it with the client's line, at all %d cells round it (%s)" % [cells, apart])
+	World.despawn(digger)
 
 
 ## 940: a town's people at rest heard now and then: a cleared throat in

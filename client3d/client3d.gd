@@ -2857,6 +2857,12 @@ const IDLE_EVERY_MS := 1000
 const IDLE_AT_ONCE := 2
 const IDLE_SPAN_MS := 3000
 const IDLE_QUIET_MS := 6000
+## The digger's pick (952, _dig_beat): while it is at work (Monster.at_work,
+## its still time from the client's own clock, _moved_ms), its first chink
+## within DIG_FIRST_S of its being at work, then one every DIG_EVERY_S (a
+## roll between, each time), at the body; out of work, silent at once.
+const DIG_FIRST_S := 1.0
+const DIG_EVERY_S := Vector2(3.0, 5.0)
 ## A town's people at rest heard now and then (940, _idle_people): checked
 ## every IDLE_EVERY_MS; a person within PEOPLE_REACH cells of the listener,
 ## standing at one of SoundKit.IDLE_PEOPLE_WORDS, rolls once a check for one
@@ -3111,6 +3117,12 @@ var _last_tile: Dictionary[int, Vector2i] = {}
 ## that gave (SoundKit.step_pace), for worn armour's clank (676 1b).
 var _last_step_ms: Dictionary[int, int] = {}
 var _step_pace: Dictionary[int, float] = {}
+## Entity instance id -> when (ms) its tile last changed, a step or a jump,
+## from when it was first drawn: the client's still clock (952, _dig_beat;
+## the server's is Monster.still_s).
+var _moved_ms: Dictionary[int, int] = {}
+## A digger at work's instance id -> when (ms) its next chink is due (_dig_beat).
+var _dig_next: Dictionary[int, int] = {}
 ## Entity instance id -> its last cell's footstep slot, played on its
 ## drawn body's footfalls (_footfall_sounds).
 var _step_slot: Dictionary[int, String] = {}
@@ -7109,7 +7121,7 @@ func creature_tell(id: int, data: Dictionary) -> void:
 	var creature := str((source as Monster).spawn_spec.get("kind", "")) if source is Monster else ""
 	var cry := SoundKit.tell_cry(creature, str(data.get("kind", "")))
 	if cry != "" and sfx != null:
-		sfx.play(cry, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+		sfx.play(cry, puppet.position + Vector3.UP * 0.8, SoundKit.pitch(creature))
 	# From the tick it was told on (390 amended (4)), as a winding's ticks are counted from its news: the
 	# client's own tick runs a little behind the message, and counted from it the tell drew a tick long.
 	var told_from := int(data.get("from_tick", World.tick))
@@ -7899,7 +7911,7 @@ func far_cry(creature: String, cry: String, cell: Vector2i) -> bool:
 	var slot := SoundKit.cry(creature, cry)
 	if slot == "":
 		return false
-	sfx.play(slot, _tile_position(cell) + Vector3.UP * 1.0, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+	sfx.play(slot, _tile_position(cell) + Vector3.UP * 1.0, SoundKit.pitch(creature))
 	return true
 
 
@@ -23613,6 +23625,8 @@ func _sync_puppets() -> void:
 				puppet.process_mode = Node.PROCESS_MODE_DISABLED
 				entity.set_process(false)
 			_far[id] = true
+			if _last_tile.get(id, entity.tile) != entity.tile:
+				_moved_ms[id] = now  # The still clock runs on while it is far (952).
 			_last_tile[id] = entity.tile
 			if _last_hp.get(id, entity.hp) != entity.hp:
 				_combat_at[id] = now
@@ -23720,6 +23734,7 @@ func _sync_puppets() -> void:
 			view.frame(puppet, entity as Monster)
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
+		_dig_beat(entity, puppet, now)
 	for remains: Node3D in _bier_remains:
 		if remains.visible != laid:
 			remains.visible = laid
@@ -23883,6 +23898,8 @@ func _entity_went(id: int) -> void:
 	_last_hp.erase(id)
 	_last_tile.erase(id)
 	_last_step_ms.erase(id)
+	_moved_ms.erase(id)
+	_dig_next.erase(id)
 	_step_pace.erase(id)
 	_step_slot.erase(id)
 	_far.erase(id)
@@ -23983,6 +24000,8 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 	var id := entity.get_instance_id()
 	var last: Vector2i = _last_tile.get(id, entity.tile)
 	_last_tile[id] = entity.tile
+	if last != entity.tile or not _moved_ms.has(id):
+		_moved_ms[id] = Time.get_ticks_msec()
 	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
 		# A ford (decision 505) is waded, though it isn't deep water.
 		var wet := wades(entity.tile)
@@ -24999,14 +25018,14 @@ func _pain(struck: GridEntity, puppet: Node3D) -> void:
 		if cry != "":
 			sfx.play(cry, puppet.position + Vector3.UP * 0.8)
 		return
-	if struck is Monster and not struck is Animal and creature in SoundKit.GOBLINS and randi() % PAIN_EVERY == 0:
-		sfx.play("sfx.goblin_pain", puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+	if struck is Monster and not struck is Animal and SoundKit.goblin(creature) and randi() % PAIN_EVERY == 0:
+		sfx.play("sfx.goblin_pain", puppet.position + Vector3.UP * 0.8, SoundKit.pitch(creature))
 
 
 ## A goblin standing idle mutters now and then (heard by players only:
 ## its slot carries no noise).
 func _sync_chatter(monster: Monster, puppet: Node3D) -> void:
-	if monster is Animal or monster.alert != Monster.Alert.IDLE or str(puppet.get_meta("creature", "")) not in SoundKit.GOBLINS:
+	if monster is Animal or monster.alert != Monster.Alert.IDLE or not SoundKit.goblin(str(puppet.get_meta("creature", ""))):
 		return
 	var now := Time.get_ticks_msec()
 	if not puppet.has_meta("chatter_at"):
@@ -25014,7 +25033,7 @@ func _sync_chatter(monster: Monster, puppet: Node3D) -> void:
 	elif now >= int(puppet.get_meta("chatter_at")):
 		puppet.set_meta("chatter_at", now + int(randf_range(CHATTER_SECONDS.x, CHATTER_SECONDS.y) * 1000.0))
 		sfx.play("sfx.goblin_chatter", puppet.position + Vector3.UP * 0.8,
-				float(SoundKit.CREATURE_PITCH.get(str(puppet.get_meta("creature", "")), 1.0)))
+				SoundKit.pitch(str(puppet.get_meta("creature", ""))))
 
 
 ## [param slot] at [param at] after [param seconds] (a body landing as its
@@ -29832,7 +29851,7 @@ func _on_stunned(ticks: int, cause: StringName, id: int) -> void:
 		var creature := str(puppet.get_meta("creature", ""))
 		var thud := SoundKit.crash(cause, creature)
 		if thud != "":
-			sfx.play(thud, puppet.position + Vector3.UP * 0.6, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+			sfx.play(thud, puppet.position + Vector3.UP * 0.6, SoundKit.pitch(creature))
 		return
 	if cause != &"guarded":
 		return
@@ -30419,7 +30438,7 @@ func _on_cried(cry: StringName, id: int) -> void:
 		return
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
-		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+		sfx.play(slot, puppet.position + Vector3.UP * 0.8, SoundKit.pitch(creature))
 	if cry == &"rout" and not monster is Animal and music != null and sfx.listener != null 			and _cells_apart(monster.tile, sfx.listener) <= Music.TENSION_NEAR:
 		music.sting("victory")
 
@@ -30457,10 +30476,33 @@ func _idle_voices(now: int, roll := -1.0) -> void:
 					or now - int(_idle_slot_at.get(slot, -(1 << 40))) < int(SoundKit.IDLE_APART_MS.get(slot, 0)):
 				continue
 			if (randf() if roll < 0.0 else roll) < IDLE_EVERY_MS / 1000.0 / float(sounds[slot]):
-				sfx.play(slot, puppet.position + Vector3.UP * 0.5, float(SoundKit.CREATURE_PITCH.get(kind, 1.0)))
+				sfx.play(slot, puppet.position + Vector3.UP * 0.5, SoundKit.pitch(kind))
 				_idle_heard.append(now)
 				_idle_slot_at[slot] = now
 				break
+
+
+## A digger at work by its burrow is heard at its digging (952, package "a
+## first fight"): while Monster.at_work holds (up, standing, at peace, still
+## DIG_STILL_S by _moved_ms, within DIG_HOME_CELLS of its burrow), a chink of
+## its pick (SoundKit.DIG) within DIG_FIRST_S, then one every DIG_EVERY_S, at
+## the body, so no body, no chink; out of work (roused, walking home, down,
+## sitting) it stops at once and starts afresh. Reach and walls are the
+## slot's (Sfx.hearing: World.heard). [param roll] in place of randf (tests).
+func _dig_beat(entity: GridEntity, puppet: Node3D, now: int, roll := -1.0) -> void:
+	var digger := entity as Monster
+	if digger == null or str(digger.spawn_spec.get("kind", "")) != Monster.DIGGER_KIND:
+		return
+	var id := entity.get_instance_id()
+	if sfx == null or not Monster.at_work(digger, (now - int(_moved_ms.get(id, now))) / 1000.0):
+		_dig_next.erase(id)
+		return
+	if not _dig_next.has(id):
+		_dig_next[id] = now + roundi(1000.0 * DIG_FIRST_S * (randf() if roll < 0.0 else roll))
+	if now < _dig_next[id]:
+		return
+	sfx.play(SoundKit.DIG, puppet.position + Vector3.UP * 0.3)
+	_dig_next[id] = now + roundi(1000.0 * lerpf(DIG_EVERY_S.x, DIG_EVERY_S.y, randf() if roll < 0.0 else roll))
 
 
 ## A town's people at rest now and then make a small sound (940): a

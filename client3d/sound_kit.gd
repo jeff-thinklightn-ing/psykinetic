@@ -276,6 +276,31 @@ static func footstep(ground: String, mass: float, creature := "") -> String:
 ## are the goblin's slots, pitched by size: an imp high, a brute low.
 const GOBLINS := ["", "imp", "brute", "sneak"]
 const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05, "great_bear": 0.85, "boar_king": 0.85, "old_wolf": 0.8}
+
+
+## The kind [param creature] (a monster's kind) is heard as: the kind it is
+## drawn as (Monster.drawn_kind, 952: the digger as the kobold, the sneak), so
+## its cries, pitch, steps and death are that kind's. Every kind-keyed lookup
+## here reads it.
+static func heard_kind(creature: String) -> String:
+	return Monster.drawn_kind(creature) if creature != "" else ""
+
+
+## [param creature]'s pitch (CREATURE_PITCH, by heard_kind), 1 for most.
+static func pitch(creature: String) -> float:
+	return float(CREATURE_PITCH.get(heard_kind(creature), 1.0))
+
+
+## Whether [param creature] cries as a goblin (GOBLINS, by heard_kind).
+static func goblin(creature: String) -> bool:
+	return heard_kind(creature) in GOBLINS
+
+
+## The digger's pick (952, package "a first fight"): one chink at a time
+## while Monster.at_work (Client3D._dig_beat). Its range is
+## Monster.DIG_REACH, which a companion's ear reads too (sound_kit_test holds
+## the two equal).
+const DIG := "sfx.digger_pick"
 ## The slot a blow lands with, by the weapon [param id] it was struck with
 ## (World.wielded): bare hands a fist's, a blunt weapon (Items' blunt) a
 ## blunt one's, any other weapon a blade's; on flesh, or on metal where the
@@ -349,7 +374,7 @@ const HIT_STEADIED := "sfx.hit_steadied"
 ## The slot a body of [param kind] makes as it steadies itself coming out of
 ## a stagger (843; combat calls it only for a steadied body): "" for none.
 static func steady_slot(kind: String) -> String:
-	return str(STEADY_SLOTS.get(kind, ""))
+	return str(STEADY_SLOTS.get(heard_kind(kind), ""))
 
 
 ## A swing's slot: a two-handed weapon's heavier whoosh.
@@ -529,13 +554,15 @@ static func idle_person(word: String, body: StringName, pick: float) -> String:
 ## The sounds [param creature] (a monster's kind) makes at peace, slot ->
 ## its average seconds between (IDLE); empty for a kind with none.
 static func idle(creature: String) -> Dictionary:
-	return IDLE.get(str(IDLE_AS.get(creature, creature)), {})
+	var kind := heard_kind(creature)
+	return IDLE.get(str(IDLE_AS.get(kind, kind)), {})
 
 
 ## The name a [param creature] (a monster's kind) goes by in slot names:
 ## "goblin" for the goblins, else its own or SOUNDS_AS's.
 static func creature_slot_name(creature: String) -> String:
-	return "goblin" if creature in GOBLINS else str(SOUNDS_AS.get(creature, creature))
+	var kind := heard_kind(creature)
+	return "goblin" if kind in GOBLINS else str(SOUNDS_AS.get(kind, kind))
 
 
 ## The slot for a [param creature] (a monster's kind) crying

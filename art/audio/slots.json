@@ -2344,6 +2344,15 @@
 			"volume_db": -4.0,
 			"uses": "a pick (or any blow) striking an ore seam (769 amended (4)); Client3D._on_struck, a Seam struck"
 		},
+		"sfx.digger_pick": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 18,
+			"volume_db": -10.0,
+			"uses": "a kobold digger at work by its burrow, its pick on earth and stone, a slow chink every 3 to 5 s heard from the road (952, package \"a first fight\": Client3D._dig_beat, only while Monster.at_work; the range is Monster.DIG_REACH, held equal by a test)"
+		},
 		"sfx.chop_wood": {
 			"category": "world",
 			"type": "oneshot",

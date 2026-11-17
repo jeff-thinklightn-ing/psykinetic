@@ -147,7 +147,7 @@ static func _set_bus_volume(index: int, linear: float, duck := 0.0) -> void:
 
 
 ## How [param slot] made at [param at] sounds from [param from]: {heard,
-## muffled, db}, by the sim's rule (World._hear): heard within
+## muffled, db}, by the one hearing rule (World.heard, 952): heard within
 ## [param radius] cells (Chebyshev), half that with no clear line, falling
 ## from 0 dB at a cell to EDGE_DB at the edge. [param radius] -1 is the
 ## slot's own (SoundKit.reach). Rain and wind shorten it under the sky
@@ -155,16 +155,13 @@ static func _set_bus_volume(index: int, linear: float, duck := 0.0) -> void:
 ## the line as clear whatever stands on it (920 amended (1): a tavern's
 ## hearth heard inside its own room, a fire carrying over the tables).
 static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1, clear := false) -> Dictionary:
-	var reach := radius if radius >= 0 else SoundKit.reach(slot)
-	if reach > 0 and SoundKit.noise_kind(slot) != "speech":
-		# Rain and wind cover it as World.noise has them cover a noise.
-		var cover := World.weather_hearing_at(at)
-		if cover < 1.0:
-			reach = maxi(1, roundi(reach * cover))
-	var d := maxi(absi(at.x - from.x), absi(at.y - from.y))
+	# Rain and wind cover it as World.noise has them cover a noise; a voice whole.
+	var reach := World.carried_reach(radius if radius >= 0 else SoundKit.reach(slot), at, SoundKit.noise_kind(slot) != "speech")
+	var d := World.distance(at, from)
 	var muffled := d > 0 and not clear and not World.has_hearing_line(at, from)
 	var carries := reach / 2.0 if muffled else float(reach)
-	if reach <= 0 or d > reach or (muffled and d * 2 > reach):
+	# The one rule (952): World.heard, as a server's ear asks it with its own line.
+	if not World.heard(reach, at, from, not muffled, false):
 		return {"heard": false, "muffled": muffled, "db": -80.0}
 	var db := 0.0 if d <= 1 or carries <= 1.0 else EDGE_DB * clampf((d - 1.0) / (carries - 1.0), 0.0, 1.0)
 	return {"heard": true, "muffled": muffled, "db": db + (MUFFLED_DB if muffled else 0.0)}
