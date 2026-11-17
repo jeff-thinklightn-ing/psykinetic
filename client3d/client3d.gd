@@ -4143,17 +4143,20 @@ func _size_lantern(light: OmniLight3D) -> void:
 
 
 ## Where a carried lantern's light stands (451 amended, the coordinator's ruling on the dusk face,
-## 11-16): ahead of the face, LANTERN_AHEAD along the body's drawn facing and LANTERN_OVER over
-## the head's top, so a face takes it. Straight over the head (LANTERN_OVER_LYING, the old place)
-## the face's own plane took none of it: by night the face fell to 35 to 45 % of its noon
-## lightness while the lit crown kept 75 %. The drawn facing is the Body's yaw as last drawn (its
+## 11-16): ahead of the face, LANTERN_AHEAD along the body's drawn facing and LANTERN_OVER from
+## the head's top (under it: at the eyes' height), so a face takes it. Straight over the head
+## (LANTERN_OVER_LYING, the old place) the face's own plane took none of it: by night the face fell
+## to 35 to 45 % of its noon lightness while the lit crown kept 75 %. A first take 0.3 over the top
+## (facelight_f0fbfd9ea) lifted the face to about 0.7 of noon but lit it from steeply above: a
+## hard line at the nose, the mouth and chin dark, and a brimmed hat's brim shading the whole
+## face; at the eyes' height it lights the face from the front and passes under a brim. The drawn facing is the Body's yaw as last drawn (its
 ## turn eased, a standing turn's shuffle), never the entity's: the light never leads the body.
 ## Lying (asleep, knocked down, downed) it stands over the head as before. Short of a wall: where
 ## the cell ahead is closed to light (lantern_reach), the light stops LANTERN_WALL_GAP inside the
 ## carrier's own cell, never in the wall or the room behind it. Only the light moves: the pane
 ## at the belt, emit_light and the sim's light (Fields, at the carrier's tile) are as they were.
 const LANTERN_AHEAD := 0.45
-const LANTERN_OVER := 0.3
+const LANTERN_OVER := -0.15
 const LANTERN_OVER_LYING := 0.6
 const LANTERN_WALL_GAP := 0.15
 func _place_lantern_light(puppet: Node3D, light: OmniLight3D) -> void:

@@ -3331,7 +3331,7 @@ func _test_lantern_ahead() -> void:
 	var shut := func(cell: Vector2i, step: Vector2i) -> bool: return _rig._shuts_light(cell, step, puppet.position.y + top + Client3D.LANTERN_OVER)
 	var reach := Client3D.lantern_reach(Vector2(puppet.position.x, puppet.position.z), way, ahead, shut)
 	var want := Vector3(way.x * reach, top + Client3D.LANTERN_OVER, way.y * reach)
-	_check(light.position.is_equal_approx(want), "along the body's drawn yaw, %.2f m ahead, %.2f over the head's top (%s)" % [reach, Client3D.LANTERN_OVER, light.position])
+	_check(light.position.is_equal_approx(want), "along the body's drawn yaw, %.2f m ahead, %+.2f from the head's top (%s)" % [reach, Client3D.LANTERN_OVER, light.position])
 	# The face's plane takes it: from the eyes (a tenth ahead of the head's axis, 0.12 under its top).
 	var face := Vector3(way.x * 0.1, top - 0.12, way.y * 0.1)
 	var old := Vector3(0.0, top + Client3D.LANTERN_OVER_LYING, 0.0)
