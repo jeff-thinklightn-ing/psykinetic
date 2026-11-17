@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When someone runs, you, your companion or a townsperson, their arms pump forward and back beside the body, opposite each other, with shoulders square and head steady, sword in hand or not (953 amended (2)).
 - Towns: every stair in the Mughouse, from the common room up to the attic, is a wooden flight with rails; upstairs, the attic stair stands beside the way down, candle stands light the stairs, and the way down glows with the light of the room below (589 amended (3), 589 amended (4)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).

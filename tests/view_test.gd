@@ -230,6 +230,7 @@ func _ready() -> void:
 		await _test_tell_killed()  # 780 amended (36): after wind_flinch, its player still standing.
 		await _test_told_hurts()  # 390 amended (4): after wind_flinch, its player still standing.
 		await _test_gait_holds()  # It lets frames run (the hold's rows).
+		_test_run_arms_held()
 		await _test_shield_seen()
 		await _test_reel_clock()
 		await _test_barrow_deaths()
@@ -19503,6 +19504,116 @@ func _toes_ahead(puppet: Node3D) -> Vector2:
 ## jogging within 0.5 s; a 0.25 s pause mid-jog keeps the jog, no clip change through it; speeds
 ## alternating across the walk's and the sprint's changes every 0.25 s change gait at most once each;
 ## a real stop stands, not before STOP_HOLD and by 0.4 s; a burst from a walk jogs within 0.1 s.
+## The run's arms on the player as drawn (the coordinator's terms for Jeff's report on v0.1.226, "the arms swinging
+## left to right together": the joined player's hand had swept 0.76 m across against the clip's 0.24). The player
+## with the starting sword in hand and with nothing, run straight at 4 m/s through Client3D's own _animate (its gait,
+## its rate, its carry), its rig stepped at 1/60 s, RUN_HELD_FRAMES read after RUN_HELD_SETTLE: each hand from the
+## Hips in the root's own heading frame (forward from its rest's toes) travels RUN_HELD_TRAVEL fore and aft or more,
+## passes RUN_HELD_BEHIND behind the hips and moves RUN_HELD_SIDE across at most; the two hands opposite (r at most
+## RUN_HELD_R). anim_rig_test _test_run_arms holds the clips' own paths; this, what the view adds to them.
+const RUN_HELD_SETTLE := 60
+const RUN_HELD_FRAMES := 66
+const RUN_HELD_TRAVEL := 0.40
+const RUN_HELD_BEHIND := 0.15
+const RUN_HELD_SIDE := 0.10
+const RUN_HELD_R := -0.85
+func _test_run_arms_held() -> void:
+	print("
+== the run's arms as drawn: the hands pump fore and aft, opposite, beside the body, sword or none ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to run")
+		return
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was_slots := slots.duplicate()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var kept := {}
+	for key: String in ["busy_until", "speed", "gait_speed", "last_at", "last_ms", "still_since", "gait_want", "gait_want_at"]:
+		kept[key] = puppet.get_meta(key) if puppet.has_meta(key) else null
+	var was_at := puppet.position
+	for held: String in ["sword", ""]:
+		slots[Items.RIGHT_HAND] = held
+		slots[Items.LEFT_HAND] = ""
+		player.slots = slots
+		player.raised = ""
+		_rig._process(0.0)
+		puppet = _rig._puppets[player.get_instance_id()]
+		var rig := puppet.get_meta("rig") as AnimRig
+		var pace: float = puppet.get_meta("pace", 1.0)
+		var sk := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var rest := func(n: String) -> Vector3: return sk.global_transform * sk.get_bone_global_rest(sk.find_bone(n)).origin
+		var left: Vector3 = rest.call("LeftUpperLeg") - rest.call("RightUpperLeg")
+		left = Vector3(left.x, 0.0, left.z).normalized()
+		var fwd := Vector3.UP.cross(left).normalized()
+		if (rest.call("LeftToes") - rest.call("LeftFoot")).dot(fwd) < 0.0:
+			fwd = -fwd
+		AnimRig._clock_movie = 1
+		AnimRig._clock_frame = Engine.get_process_frames()
+		AnimRig._clock_msec = Time.get_ticks_msec()
+		puppet.set_meta("busy_until", 0)
+		for key: String in ["speed", "gait_speed", "still_since", "gait_want"]:
+			puppet.remove_meta(key)
+		puppet.set_meta("last_at", puppet.position)
+		puppet.set_meta("last_ms", AnimRig._clock_msec)
+		rig.loop(Client3D.CLIP_IDLE, 1.0)
+		var s := {"Lf": [], "Ls": [], "Rf": [], "Rs": []}
+		for i in RUN_HELD_SETTLE + RUN_HELD_FRAMES:
+			AnimRig._clock_frame = Engine.get_process_frames()
+			AnimRig._clock_msec += 16
+			puppet.position += fwd * 4.0 * pace / 60.0
+			_rig._animate(puppet)
+			rig._process(1.0 / 60.0)
+			if i < RUN_HELD_SETTLE:
+				continue
+			var hips := sk.global_transform * sk.get_bone_global_pose(sk.find_bone("Hips")).origin
+			for side in ["L", "R"]:
+				var hand := sk.global_transform * sk.get_bone_global_pose(sk.find_bone(("Left" if side == "L" else "Right") + "Hand")).origin - hips
+				s[side + "f"].append(hand.dot(fwd))
+				s[side + "s"].append(hand.dot(left))
+		var clip := rig.base_clip()
+		var reads: Array[String] = []
+		var ok: bool = clip == str(Client3D.paced(puppet.get_meta("gaits", Client3D.GAITS))[1][0])
+		for side in ["L", "R"]:
+			var fore: Array = s[side + "f"]
+			var across: Array = s[side + "s"]
+			reads.append("%s fore-aft %+.3f to %+.3f, across %.3f" % [side, fore.min(), fore.max(), across.max() - across.min()])
+			ok = ok and fore.max() - fore.min() >= RUN_HELD_TRAVEL and fore.min() <= -RUN_HELD_BEHIND and across.max() - across.min() <= RUN_HELD_SIDE
+		var r := _run_pearson(s["Lf"], s["Rf"])
+		_check(ok and r <= RUN_HELD_R, "running with %s (%s, %s): each hand fore and aft past the hip, beside the body (%s), the hands opposite (r %+.2f)" % [
+				"the sword" if held != "" else "nothing in hand", clip, rig.as_played(clip), "; ".join(reads), r])
+	AnimRig._clock_movie = -1
+	AnimRig._clock_frame = -1
+	puppet.position = was_at
+	for key: String in kept:
+		if kept[key] == null:
+			puppet.remove_meta(key)
+		else:
+			puppet.set_meta(key, kept[key])
+	player.slots = was_slots
+	_rig._process(0.0)
+	(puppet.get_meta("rig") as AnimRig).loop(Client3D.CLIP_IDLE, 1.0)
+
+
+static func _run_pearson(a: Array, b: Array) -> float:
+	var n := a.size()
+	var ma := 0.0
+	var mb := 0.0
+	for i in n:
+		ma += float(a[i]) / n
+		mb += float(b[i]) / n
+	var va := 0.0
+	var vb := 0.0
+	var c := 0.0
+	for i in n:
+		va += (float(a[i]) - ma) ** 2
+		vb += (float(b[i]) - mb) ** 2
+		c += (float(a[i]) - ma) * (float(b[i]) - mb)
+	return c / sqrt(va * vb) if va > 0.0 and vb > 0.0 else 0.0
+
+
 func _test_gait_holds() -> void:
 	print("\n== 869: the gait holds through a pause, never flaps, stops and bursts at once ==")
 	var player := _player()

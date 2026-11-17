@@ -44,6 +44,7 @@ func _ready() -> void:
 	await _test_people_feet()
 	_test_people_jog()
 	await _test_gait_phases()
+	await _test_run_arms()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
 	await _test_hand_relax()
@@ -2628,9 +2629,10 @@ func _test_no_upper() -> void:
 ## foot as it blends in or out); through each, a foot on the ground (within 1 cm of its height at rest)
 ## moves no more than PEOPLE_SLIDE in a 1/30 s, five builds. The ground sit's own slides (the UAL's,
 ## its feet drawn in while sat) are not ours to judge.
-## The people's gaits (People_Jog_Short): their feet run on the ground at the gait's pace, never
-## stood, so the stance's ends and slide are not theirs (_test_people_jog has them).
-const PEOPLE_GAITS: Array[String] = ["Jog_Short"]
+## The people's gaits (People_Jog_Short, People_Sprint_Short): their feet run on the ground at the gait's pace, never
+## stood, so the stance's ends and slide are not theirs (_test_people_jog has the jog's, _test_run_arms the sprint's
+## legs as Sprint_Short's).
+const PEOPLE_GAITS: Array[String] = ["Jog_Short", "Sprint_Short"]
 const PEOPLE_FEET_NEAR := 0.03
 const PEOPLE_SLIDE := 0.02
 const PEOPLE_START_ELSEWHERE: Array[String] = ["Counter_Low_Idle", "Counter_Low_Show", "Counter_Low_Give", "Counter_Low_Exit",
@@ -2882,7 +2884,6 @@ const JOG_LEAN_STOCK := 22.0
 const PEOPLE_JOG_HEAD := 5.0
 const PEOPLE_JOG_FEET := 0.04
 const PEOPLE_JOG_UNDER := 0.005
-const PEOPLE_JOG_HANDS := 0.05
 const PEOPLE_JOG_ACROSS := 0.03
 const PEOPLE_JOG_BOB_MOST := 0.15
 ## The stride row (Jeff, 11-11: "the walk looks like skipping"; the coordinator's (b), 11-16: the skip was the
@@ -2959,6 +2960,151 @@ func _test_gait_phases() -> void:
 		STANCE_SOLE, START_NEAR, "; ".join(bad.slice(0, 6))])
 
 
+## The people's run arms (Jeff on v0.1.226: "the running animation, the arms swinging left to right together is
+## incorrect. it needs a rework stat"; the coordinator's terms, 11-16). The pack's jog twisted the shoulders on the hips
+## 88 degrees a cycle (People_Jog_Short), carrying both hands 0.24 m across the body together, held high and ahead (up
+## to 0.30 m over the hips' head, 0.52 m before it); its sprint never took a hand behind the hip. Read in the root's
+## heading frame on the man and the woman, RUN_ARM_SAMPLES across each clip, each hand from the hips' head: it travels
+## RUN_HAND_TRAVEL fore and aft or more, moves RUN_HAND_SIDE across at most and keeps RUN_HAND_MIDLINE off the middle,
+## and pumps astride the hip, not ahead of it (the coordinator, 11-16: "it is done when the hands pump"): its path's
+## back RUN_HAND_BEHIND or more behind the hips' head, its front RUN_HAND_AHEAD at most before it, at the back no
+## higher than RUN_HAND_BACK_UP over it, and never over the bottom of the ribs (the Chest bone's rest height over the
+## Hips', read straight up). The jog's path is read so in the heading frame and in its trunk's (fore-aft square to the
+## hips-to-shoulders line, its mean over the cycle, and up along it), the sprint's in its trunk's alone (its shoulders
+## lead its hips 0.28 m: a sprinter's hand behind the hip is behind the leaning back, at that back's hip). The hands opposite each other (r at most RUN_HANDS_R) and each opposite its own
+## foot (RUN_FOOT_R); the shoulders' line on the hips' and on the heading, RUN_TWIST degrees of range at most; the head's
+## yaw on the heading RUN_HEAD at most. People_Sprint_Short's legs are Sprint_Short's (the foes keep that), within 1 mm.
+const RUN_ARM_SAMPLES := 48
+const RUN_HAND_TRAVEL := 0.45
+const RUN_HAND_BEHIND := 0.18
+const RUN_HAND_AHEAD := 0.30
+const RUN_HAND_BACK_UP := 0.20
+const RUN_HAND_SIDE := 0.10
+const RUN_HAND_MIDLINE := 0.12
+const RUN_HANDS_R := -0.9
+const RUN_FOOT_R := -0.8
+const RUN_TWIST := 25.0
+const RUN_HEAD := 3.0
+func _test_run_arms() -> void:
+	print("== the people's run arms ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var bad: Array[String] = []
+	var read: Array[String] = []
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		rig.stood_as = "People_"
+		if rig.as_played("Sprint_Short") != "People_Sprint_Short" or rig.as_played("Jog_Short") != "People_Jog_Short":
+			bad.append("%s plays %s and %s" % [build[0], rig.as_played("Jog_Short"), rig.as_played("Sprint_Short")])
+		var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var at := func(n: String) -> Vector3: return sk.get_bone_global_pose(sk.find_bone(n)).origin
+		var rest := func(n: String) -> Vector3: return sk.get_bone_global_rest(sk.find_bone(n)).origin
+		var left: Vector3 = rest.call("LeftUpperLeg") - rest.call("RightUpperLeg")
+		left = Vector3(left.x, 0.0, left.z).normalized()
+		var fwd := Vector3.UP.cross(left).normalized()
+		if (rest.call("LeftToes") - rest.call("LeftFoot")).dot(fwd) < 0.0:
+			fwd = -fwd
+		var head_bone := sk.find_bone("Head")
+		var head_rest := sk.get_bone_global_rest(head_bone).basis
+		var head_axis := 0
+		for c in 3:
+			if absf(head_rest[c].dot(fwd)) > absf(head_rest[head_axis].dot(fwd)):
+				head_axis = c
+		var head_sign := signf(head_rest[head_axis].dot(fwd))
+		var yaw := func(v: Vector3) -> float: return atan2(v.dot(left), v.dot(fwd))
+		var legs := {}
+		for clip: String in ["People_Jog_Short", "People_Sprint_Short", "Sprint_Short"]:
+			var length := lib.get_animation(clip).length
+			var s := {}
+			for k in ["Lf", "Ls", "Lu", "Rf", "Rs", "Ru", "Lfoot", "Rfoot", "twist", "on_heading", "head", "trunk"]:
+				s[k] = []
+			legs[clip] = []
+			for i in RUN_ARM_SAMPLES:
+				rig.base_at(clip, length * i / RUN_ARM_SAMPLES)
+				await _frames(2)
+				var hips: Vector3 = at.call("Hips")
+				var shoulders: Vector3 = at.call("LeftUpperArm") - at.call("RightUpperArm")
+				var thighs: Vector3 = at.call("LeftUpperLeg") - at.call("RightUpperLeg")
+				s["twist"].append(rad_to_deg(angle_difference(yaw.call(thighs), yaw.call(shoulders))))
+				s["on_heading"].append(rad_to_deg(angle_difference(yaw.call(left), yaw.call(shoulders))))
+				s["head"].append(rad_to_deg(yaw.call(sk.get_bone_global_pose(head_bone).basis[head_axis] * head_sign)))
+				var trunk: Vector3 = (at.call("LeftUpperArm") + at.call("RightUpperArm")) * 0.5 - hips
+				s["trunk"].append(Vector2(trunk.dot(fwd), trunk.y))
+				for side in ["L", "R"]:
+					var hand: Vector3 = at.call(("Left" if side == "L" else "Right") + "Hand") - hips
+					s[side + "f"].append(hand.dot(fwd))
+					s[side + "s"].append(hand.dot(left))
+					s[side + "u"].append(hand.y)
+					s[side + "foot"].append((at.call(("Left" if side == "L" else "Right") + "Foot") - hips).dot(fwd))
+				for bone in ["Hips", "LeftFoot", "RightFoot", "LeftToes", "RightToes"]:
+					legs[clip].append(at.call(bone))
+			if clip == "Sprint_Short":
+				continue
+			var span := func(a: Array) -> float: return a.max() - a.min()
+			var lean := Vector2.ZERO
+			for v: Vector2 in s["trunk"]:
+				lean += v
+			lean = lean.normalized()  # (fore, up) of the trunk's mean line; its fore-aft is square to it.
+			var ribs: float = rest.call("Chest").y - rest.call("Hips").y
+			for side in ["L", "R"]:
+				var fore: Array = s[side + "f"]
+				var across: Array = s[side + "s"]
+				var up: Array = s[side + "u"]
+				var in_trunk := []
+				var trunk_up := []
+				for i in fore.size():
+					in_trunk.append(float(fore[i]) * lean.y - float(up[i]) * lean.x)
+					trunk_up.append(float(fore[i]) * lean.x + float(up[i]) * lean.y)
+				var back_up: float = up[fore.find(fore.min())]
+				var trunk_back_up: float = trunk_up[in_trunk.find(in_trunk.min())]
+				var off_middle: float = across.min() if side == "L" else -across.max()
+				read.append("%s %s %s: fore-aft %+.3f to %+.3f, up %+.3f to %+.3f (%+.3f at the back); in the trunk's frame %+.3f to %+.3f, up to %+.3f (%+.3f at the back); the ribs' bottom %+.3f; across %.3f, %.3f off the middle" % [
+					build[0], clip, side, fore.min(), fore.max(), up.min(), up.max(), back_up, in_trunk.min(), in_trunk.max(), trunk_up.max(), trunk_back_up, ribs, span.call(across), off_middle])
+				var astride: bool = in_trunk.min() <= -RUN_HAND_BEHIND and in_trunk.max() <= RUN_HAND_AHEAD and trunk_back_up <= RUN_HAND_BACK_UP and up.max() <= ribs
+				if clip == "People_Jog_Short":
+					astride = astride and fore.min() <= -RUN_HAND_BEHIND and fore.max() <= RUN_HAND_AHEAD and back_up <= RUN_HAND_BACK_UP
+				if span.call(fore) < RUN_HAND_TRAVEL or not astride or span.call(across) > RUN_HAND_SIDE or off_middle < RUN_HAND_MIDLINE:
+					bad.append("%s %s %s hand: fore-aft %+.3f to %+.3f m (trunk's %+.3f to %+.3f), up to %+.3f (%+.3f at the back), across %.3f m, %.3f m off the middle" % [
+						build[0], clip, side, fore.min(), fore.max(), in_trunk.min(), in_trunk.max(), up.max(), back_up, span.call(across), off_middle])
+				var to_foot := _pearson(fore, s[side + "foot"])
+				if to_foot > RUN_FOOT_R:
+					bad.append("%s %s %s hand against its foot r %+.2f" % [build[0], clip, side, to_foot])
+			var hands := _pearson(s["Lf"], s["Rf"])
+			if hands > RUN_HANDS_R or span.call(s["twist"]) > RUN_TWIST or span.call(s["on_heading"]) > RUN_TWIST or span.call(s["head"]) > RUN_HEAD:
+				bad.append("%s %s: hands r %+.2f, twist %.0f, shoulders on the heading %.0f, head %.1f deg" % [build[0], clip, hands, span.call(s["twist"]), span.call(s["on_heading"]), span.call(s["head"])])
+			read.append("%s %s: hands r %+.2f, twist %.0f, on the heading %.0f, head %.1f" % [build[0], clip, hands, span.call(s["twist"]), span.call(s["on_heading"]), span.call(s["head"])])
+		var drift := 0.0
+		for k in (legs["Sprint_Short"] as Array).size():
+			drift = maxf(drift, ((legs["Sprint_Short"] as Array)[k] - (legs["People_Sprint_Short"] as Array)[k]).length())
+		if drift > 0.001:
+			bad.append("%s People_Sprint_Short's legs %.4f m off Sprint_Short's" % [build[0], drift])
+		read.append("%s People_Sprint_Short's legs on Sprint_Short's within %.4f m" % [build[0], drift])
+		model.queue_free()
+	print("  " + "
+  ".join(read))
+	_check(bad.is_empty(), "the people's jog and sprint: the hands pump fore and aft, past the hip, not across; the trunk and head steady (%s)" % ["; ".join(bad.slice(0, 6))])
+
+
+static func _pearson(a: Array, b: Array) -> float:
+	var n := a.size()
+	var ma := 0.0
+	var mb := 0.0
+	for i in n:
+		ma += float(a[i])
+		mb += float(b[i])
+	ma /= n
+	mb /= n
+	var va := 0.0
+	var vb := 0.0
+	var c := 0.0
+	for i in n:
+		va += (float(a[i]) - ma) ** 2
+		vb += (float(b[i]) - mb) ** 2
+		c += (float(a[i]) - ma) * (float(b[i]) - mb)
+	return c / sqrt(va * vb) if va > 0.0 and vb > 0.0 else 0.0
+
+
 func _test_people_jog() -> void:
 	print("== the people's jog held up ==")
 	var lib := load(CLIPS) as AnimationLibrary
@@ -3002,9 +3148,9 @@ func _test_people_jog() -> void:
 		model.free()
 	# The feet where Jog_Short puts them across the ground (side to side, at the same share of the cycle) but never under
 	# Walk's floor (Jog_Short's toe sinks 5.6 cm for 0.15 s of each step, ui-design's jogA_3f76ef27e); the
-	# hips' path near the same, their rise at most PEOPLE_JOG_BOB_MOST; each hand's height over the hips
-	# within PEOPLE_JOG_HANDS of Jog_Short's, never over the shoulder (a back held up takes the arms up with
-	# it: the coordinator, on jog_strip_ABC).
+	# hips' path near the same, their rise at most PEOPLE_JOG_BOB_MOST; each hand never over the shoulder (a back
+	# held up takes the arms up with it: the coordinator, on jog_strip_ABC). Each hand's height had been held within
+	# PEOPLE_JOG_HANDS of Jog_Short's (kept_hands); the run's arms (_test_run_arms) bring them down astride the hip.
 	var model := (load(SWORD_BUILDS[0][1]) as PackedScene).instantiate() as Node3D
 	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	var at := func(anim: Animation, t: float, bone: String) -> Vector3:
@@ -3075,8 +3221,7 @@ func _test_people_jog() -> void:
 		off.append("the hips rise %.3f m" % bob)
 	_check(off.is_empty(), "its feet within %.3f m of Jog_Short's across the ground (%.3f), no toe under Walk's floor by more than %.3f (%.3f), the hips' path within %.3f (%.3f), their rise %.3f m against %.3f (%s)" % [
 			PEOPLE_JOG_FEET, most["feet"], PEOPLE_JOG_UNDER, most["under"], PEOPLE_JOG_ACROSS, most["across"], bob, rise[0].y - rise[0].x, off])
-	_check(most["hands"] <= PEOPLE_JOG_HANDS and most["over"] < 0.0,
-			"each hand's height over the hips within %.3f m of Jog_Short's (%.3f), the highest %.3f m under the shoulder" % [PEOPLE_JOG_HANDS, most["hands"], -float(most["over"])])
+	_check(most["over"] < 0.0, "each hand under the shoulder, the highest %.3f m under it (%.3f m off Jog_Short's height over the hips)" % [-float(most["over"]), most["hands"]])
 	# Who plays it: a person's rig for "Jog_Short", read back as Jog_Short; a body without the stance, Jog_Short.
 	var made := _sword_body(self, SWORD_BUILDS[0])
 	var rig: AnimRig = made[2]
