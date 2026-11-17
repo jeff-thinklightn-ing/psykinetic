@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When your companion stands between you and a store's counter, a click on them over the counter opens its wares, and a click on them clear of it goes to them (935 amended (11)).
 - In the crypt, a wall niche answers a click the moment you stop in front of it, so the one the fallen knight told you of opens to your first click however quickly you make it (608 amended (9)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
