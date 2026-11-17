@@ -8483,12 +8483,17 @@ func _want_answered(outcome: String) -> void:
 ## Her first words to a new player (decision 929): FIRST_WORDS with where
 ## they stand, then her untold want in her plain words, held by 917's floor
 ## FLOOR_TICKS after it (NEEDED, never dropped as idle). Fixed lines, her
-## model's or not; a "quiet" row in the mind log for each.
+## model's or not; a "quiet" row in the mind log for each. Greeted before the
+## line goes out (929 amended (2)): _say emits said, and Main._on_companion_said
+## drops the record's "greeted" only while first_words is false; set after, it
+## was never dropped on her first words, and every respawn (each change of
+## level) greeted again until some other line of hers went out.
 func _say_first_words() -> void:
 	var line := FIRST_WORDS % here_name()
-	if not _say(line, true, false, Weight.NEEDED):
-		return
 	first_words = false
+	if not _say(line, true, false, Weight.NEEDED):
+		first_words = true  # Not said (downed, a fight's hush): still to come.
+		return
 	_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": first words", "outcome": "plain line",
 		"say": line, "note": "her player new to her"})
 	if first_steps != null and FirstSteps.on() and first_steps.chain_running():

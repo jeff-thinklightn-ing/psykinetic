@@ -180,6 +180,7 @@ func _ready() -> void:
 	_test_lead_to_near_water()  # Loads the wilds and back.
 	_test_return_cell_his_side()  # Loads the wilds and back.
 	_test_fight_leash()  # Loads the wilds and back.
+	_test_greets_once_across_zones()  # Moves by the console to sample and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_speech_floor()  # Late: its five calm quarter hours move the clock on (917).
 	_test_last_words()  # She dies in it: keep it last of those that need her.
@@ -4863,6 +4864,76 @@ func _test_first_words() -> void:
 			record.companion[key] = kept[key]
 	_main._set_want_words(record)
 	_settle(pet)
+
+
+## 929 amended (2): her first words drop the record's "greeted" as they go out, so a change of
+## level (each respawns her beside her player) never greets again. On 929 the record kept it till
+## some other line of hers went out, and ui-design's Mughouse tour (main f71c32a66) heard "Well,
+## here we are in Umbrage" after each of its seven console moves in 165 s. Her greeting alone here:
+## no wish follows it (told), as indoors where a yes could do nothing.
+func _test_greets_once_across_zones() -> void:
+	print("\n== her first words once: a change of level does not greet her player again (929 amended (2)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var was: String = _main.map_name
+	var from := owner.tile
+	var greets_was := Companion.greets
+	var floor_was := Companion.speech_floor
+	Companion.greets = true
+	Companion.speech_floor = true
+	var kept_want: Variant = record.companion.get("want")
+	if kept_want is Dictionary:
+		record.companion["want"] = (kept_want as Dictionary).duplicate(true)
+		record.companion["want"]["told"] = true
+	pet.want_told = true
+	record.companion["greeted"] = false
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	pet.first_words = true
+	pet._first_words_at = -1
+	pet._quiet_next_tick = -1
+	pet._keeper_spoke_tick = -100000
+	pet._last_unasked_tick = -100000
+	World.step()
+	_main._view_ready(owner, owner.zone)
+	var greet := Companion.FIRST_WORDS % pet.here_name()
+	_step_until(func() -> bool: return greet in spoken, Companion.FIRST_WORDS_S * World.TICK_RATE + 60)
+	pet.said.disconnect(on_said)
+	_check(spoken == [greet], "she greets, and says nothing after it (%s)" % [spoken])
+	_check(not pet.first_words and not record.companion.has("greeted"),
+		"her greeting alone drops the record's \"greeted\" (%s)" % [record.companion.get("greeted")])
+	# Out and back by the console, as the tour moved: each change of level respawns her from the record.
+	var opening: String = Companion.FIRST_WORDS.split("%s")[0]
+	var heard: Array[String] = []
+	var on_heard := func(line: String) -> void: heard.append(line)
+	for leg: Array in [["sample", Vector2i(13, 15)], [was, from]]:
+		var reply: String = _main.admin_command("move %s %d %d %s" % [record.name, leg[1].x, leg[1].y, leg[0]])
+		var mover := _player()
+		var her := _companion()
+		_check(mover != null and mover.zone == leg[0] and her != null, "moved to %s, she with them (%s)" % [leg[0], reply])
+		if mover == null or her == null:
+			break
+		_check(not her.first_words, "in %s she is not new to her player" % leg[0])
+		her.said.connect(on_heard)
+		_main._view_ready(mover, mover.zone)
+		for i in (Companion.FIRST_WORDS_S + 3) * World.TICK_RATE:
+			World.step()
+		her.said.disconnect(on_heard)
+	_check(heard.filter(func(line: String) -> bool: return line.begins_with(opening)).is_empty(),
+		"out and back: no second greeting (%s)" % [heard])
+	_check(not record.companion.has("greeted"), "and no \"greeted\" left in her record")
+	if kept_want == null:
+		record.companion.erase("want")
+	else:
+		record.companion["want"] = kept_want
+	_main._set_want_words(record)
+	Companion.greets = greets_was
+	Companion.speech_floor = floor_was
+	if _companion() != null:
+		_settle(_companion())
 
 
 func _test_guide_refuses() -> void:

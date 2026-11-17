@@ -60060,6 +60060,26 @@ _test_yes_to_her_offer, Mara standing nearer than she does: "Yes." and "Sure, le
 offer open, hers; a yes after it lapsed, "Yes, Mara.", a yes with Mara's standing offer up, and a
 question, Mara's. Server only; protocol unchanged; no new class_name; no bullet (929's covers a
 "yes" setting her off).
+929 amended (2): her first words drop the record's "greeted" as they go out (the script's label; the
+coordinator's yes, 2026-11-17, on ui-design's joined look C:/dev/review/ui-design/looks/mug946main_f71c32a66:
+"Well, here we are in Umbrage. I'll walk with you a while, if you'll have me." seven times in 165 s, once
+after each console move between the wilds and the Mughouse's floors). Companion._say_first_words set
+first_words false only after _say returned, but _say emits said inside itself, so Main._on_companion_said,
+whose guard drops the record's "greeted" only while first_words is false, never dropped it on her first
+words. The record kept "greeted": false; every respawn reads first_words back from it (Main's companion
+spawn), and every change of level respawns her, so each one greeted again, 10 s after the view was built,
+until some other line of hers went out. Her wish 5 s after (917's floor) usually cleared it, so most players
+heard it once. It repeated where the wish was not said: indoors where a yes could do nothing (the Mughouse),
+a want told or none, 945's chain running, or a change of zone inside the 5 s, the held wish lost with her
+despawn. A newcomer up the Mughouse's stairs in the first minute heard it on each floor. A fault of v0.1.218
+to v0.1.229, on Jeff's checklist. Now _say_first_words sets first_words false before _say, and back to true
+when _say says nothing (downed, a fight's hush), so the handler drops "greeted" with the line. A record
+saved by those builds with "greeted": false and no line of hers since greets once more at her next spawn,
+and that greeting drops it. companion_test _test_greets_once_across_zones: a new companion with no wish to
+follow greets, says nothing after it, and her record keeps no "greeted"; her player moved by the console
+to sample and back, she is not new to them in either and no second greeting comes. Server only; protocol
+unchanged; no new class_name; no line changes; no levels file; no bullet (the coordinator: a fault a player
+should never have met).
 ## 928. The bow's draw is one snap pull; the time after it is the aim's (combat; Jeff's report, 2026-11-14)
 
 Jeff, 21:20, as a real player: "drawing shouldnt take a long time, its a fast twitch pull, you dont really
