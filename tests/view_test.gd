@@ -3370,6 +3370,30 @@ func _test_lantern_ahead() -> void:
 	var lit_after := cells.map(func(c: Vector2i) -> float: return World.fields.light_at(World, c, true, false))
 	_check(lit_before == lit_after and lit_after.any(func(v: float) -> bool: return v > 0.0 and v < 1.0), "the sim's light (its sources and carried lights, no sky) the same, the drawn light turned (%s)" % [lit_after])
 
+	# The floor's end with no wall on its edge (a room's void, a cave's rock): shut in a room or
+	# underground, open out of doors. On the Mughouse's upstairs room, the view's own terrain.
+	var room := Level.load_level("umbrage_tavern_up")
+	_rig.rebuild(room["terrain"], room["spawn_points"].values()[0])
+	var open_cells: Dictionary = {}
+	for cell: Vector2i in room["terrain"].get("floor", []) + room["terrain"].get("water", []):
+		open_cells[cell] = true
+	var end := Vector2i(-1, -1)
+	var toward := Vector2i.ZERO
+	for cell: Vector2i in room["terrain"].get("floor", []):
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if toward == Vector2i.ZERO and not open_cells.has(cell + step) and open_cells.has(cell - step) 					and not World.edge_blocks_sight(cell, step) and not World.edge_blocks_sight(cell, -step):
+				end = cell
+				toward = step
+	var high := 99.0
+	_rig._outdoor = false
+	var shut_inside: bool = toward != Vector2i.ZERO and _rig._shuts_light(end, toward, high)
+	var open_behind: bool = toward != Vector2i.ZERO and not _rig._shuts_light(end, -toward, high)
+	_rig._outdoor = true
+	var shut_outside: bool = toward != Vector2i.ZERO and _rig._shuts_light(end, toward, high)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_check(toward != Vector2i.ZERO and shut_inside and open_behind and not shut_outside,
+			"the floor's end with no wall on it (the upstairs room's %s going %s): shut indoors, the floor behind open, open out of doors" % [end, toward])
+
 
 ## The cells within [param r] of [param at], nearest rows first.
 func _cells_round(at: Vector2i, r: int) -> Array:

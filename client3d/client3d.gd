@@ -3717,6 +3717,8 @@ var _enclosed_dirty := true
 ## built, a wall felled): only the spaces beside them are worked out again.
 var _enclosed_changed: Array[Vector3i] = []
 var _floor_lookup: Dictionary[Vector2i, bool] = {}
+## The view's floor and water cells, for a carried light's room (_shuts_light; built when first read).
+var _light_open: Dictionary[Vector2i, bool] = {}
 var _inside_rect := Rect2i()
 ## Town id -> {kind: {state, level}}, as Main was told (set_town).
 var town_states := {}
@@ -4174,9 +4176,22 @@ func _place_lantern_light(puppet: Node3D, light: OmniLight3D) -> void:
 
 ## Whether light from [param cell] is stopped going [param step] (one cell, orthogonal) at a height
 ## of [param at] (the rig's y): a wall or a shut door on the edge (World.edge_blocks_sight, a
-## field's fence open), or the ground of the cell beyond rising past it (a cliff's face).
+## field's fence open), the ground of the cell beyond rising past it (a cliff's face), or, in a
+## room or underground, a cell beyond that is neither floor nor water (the void past a room's
+## outer wall, a cave's rock: there the wall is the floor's end, not always an edge's;
+## environment's read of the first build).
 func _shuts_light(cell: Vector2i, step: Vector2i, at: float) -> bool:
-	return World.edge_blocks_sight(cell, step) or _tile_position(cell + step).y > at - LANTERN_WALL_GAP
+	var beyond := cell + step
+	return World.edge_blocks_sight(cell, step) or _tile_position(beyond).y > at - LANTERN_WALL_GAP \
+			or not _outdoor and not _lets_light_over(beyond)
+
+
+## Whether [param cell] is this view's floor or water (its terrain's, as _height reads it).
+func _lets_light_over(cell: Vector2i) -> bool:
+	if _light_open.is_empty():
+		for open: Vector2i in _terrain.get("floor", []) + _terrain.get("water", []):
+			_light_open[open] = true
+	return _light_open.has(cell)
 
 
 ## How far along [param way] (a unit vector, the rig's x and z) from [param at] (the rig's frame:
@@ -8135,6 +8150,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_roofs_off.clear()
 	_enclosed_dirty = true
 	_floor_lookup.clear()
+	_light_open.clear()
 	_runs.clear()
 	_water_bodies.clear()
 	_stream_ribbons.clear()
