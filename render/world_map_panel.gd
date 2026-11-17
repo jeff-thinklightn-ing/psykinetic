@@ -88,8 +88,6 @@ var _groups: Array[Dictionary] = []
 ## click on a row, further is the drag it always was.
 var _press_at := Vector2(-1.0e9, -1.0e9)
 const CLICK_SLOP := 4.0
-## The mark after a row she knows the way to, in canvas units.
-const GUIDE_MARK := 5.0
 ## A click on the ask box or Enter: ask her to lead the player to [param to]
 ## (Main sends the "guide" command, 551).
 signal guide_asked(to: String)
@@ -687,12 +685,6 @@ func _clicked(at: Vector2) -> void:
 		town_clicked.emit(row)  # 624, ui's side: the town's sheet (the ask box stays under it).
 
 
-## The mark after a row she knows the way to (551): a small friend-coloured
-## dot past the words' end.
-func _mark_row(c: Control, at: Vector2, words_width: float, height: float) -> void:
-	c.draw_circle(Vector2(at.x + words_width + 12.0, at.y - height * 0.32), GUIDE_MARK, UiTheme.color("friend"))
-
-
 ## Words on a backing (KnownWorld label_back, the label's padding), the backing's top left at
 ## [param top_left]; the rect it takes.
 func _backed_text(c: Control, words: String, top_left: Vector2, font: Font, font_size: int, colour: Color) -> Rect2:
@@ -703,10 +695,11 @@ func _backed_text(c: Control, words: String, top_left: Vector2, font: Font, font
 	return rect
 
 
-## A place's ring: KnownWorld ring, filled ring_fill, ringed in the dim text.
-func _draw_ring(c: Control, at: Vector2) -> void:
+## A place's ring: KnownWorld ring, filled ring_fill, ringed in the dim text; in the friend colour for a place
+## she knows the way to (551: the guide's mark, no dot beside it any more: ui-design's ruling on the look).
+func _draw_ring(c: Control, at: Vector2, guided := false) -> void:
 	c.draw_circle(at, _k(&"ring"), _kc(&"ring_fill"))
-	c.draw_arc(at, _k(&"ring"), 0.0, TAU, 24, UiTheme.color("text_dim"), _k(&"ring_line"), true)
+	c.draw_arc(at, _k(&"ring"), 0.0, TAU, 24, UiTheme.color("friend") if guided else UiTheme.color("text_dim"), _k(&"ring_line"), true)
 
 
 ## A "?" in its circle at [param at]: KnownWorld ask, filled backing_deep, ringed in the edge.
@@ -753,6 +746,12 @@ func _dashes_outside(c: Control, a: Vector2, b: Vector2, covered: Array[Rect2], 
 		at += dash * 2.0
 
 
+## [param rect] drawn in by [param inset] on each side, never to a negative size (a map not yet laid out has boxes smaller than the inset).
+func _inner(rect: Rect2, inset: float) -> Rect2:
+	var inside := (rect.size - Vector2.ONE * inset * 2.0).max(Vector2.ZERO)
+	return Rect2(rect.position + (rect.size - inside) * 0.5, inside)
+
+
 ## The dim behind the window (KnownWorld dim).
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), _kc(&"dim"))
@@ -787,7 +786,7 @@ func _draw_content(c: Control) -> void:
 	var you_rect := Rect2(you_px - Vector2.ONE * _k(&"you_clear"), Vector2.ONE * _k(&"you_clear") * 2.0) if you_px != Vector2.INF else Rect2()
 	# The boxes: backing, then the picture.
 	for area_name: String in areas:
-		var inner: Rect2 = (rects[area_name] as Rect2).grow(-inset)
+		var inner: Rect2 = _inner(rects[area_name], inset)
 		c.draw_rect(inner, UiTheme.color("backing"))
 		if area_name == own_area and pictured:
 			c.draw_texture_rect(picture, inner, false, _kc(&"picture_tint"))
@@ -818,7 +817,7 @@ func _draw_content(c: Control) -> void:
 			_draw_ask(c, from + Vector2(0.0, _k(&"mouth") + _k(&"ask_gap") + _k(&"ask")))
 	# The names and rows over the rings (each row on a plate where a ring lies under it), then each edge.
 	for area_name: String in areas:
-		var inner: Rect2 = (rects[area_name] as Rect2).grow(-inset)
+		var inner: Rect2 = _inner(rects[area_name], inset)
 		var own := area_name == own_area
 		if own and pictured:
 			_backed_text(c, str(world.areas[area_name].get("display_name", area_name)), inner.position + Vector2(_k(&"name_left"), _k(&"name_top")), serif, heading, UiTheme.color("text"))
@@ -834,13 +833,21 @@ func _draw_content(c: Control) -> void:
 		var words := _area_words(str(chip["level"]))
 		var chip_size := sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + chip_pad * 2.0
 		var drop := _k(&"chip_drop") + float(chip["depth"]) * (chip_size.y + 4.0)
+		var own_box: Rect2 = rects.get(str(chip.get("area", "")), Rect2(Vector2.ZERO, _canvas.size))
 		var rect := Rect2(at + Vector2(-chip_size.x * 0.5, drop), chip_size)
+		var fitted := false
 		for candidate: Rect2 in [rect, Rect2(at + Vector2(_k(&"mouth") + _k(&"chip_drop"), -chip_size.y * 0.5 + float(chip["depth"]) * (chip_size.y + 4.0)), chip_size),
 				Rect2(at + Vector2(-_k(&"mouth") - _k(&"chip_drop") - chip_size.x, -chip_size.y * 0.5 + float(chip["depth"]) * (chip_size.y + 4.0)), chip_size),
 				Rect2(at + Vector2(-chip_size.x * 0.5, -drop - chip_size.y), chip_size)]:
-			rect = candidate
-			if not (you_rect.size != Vector2.ZERO and you_rect.intersects(candidate)) and not keep_off.any(func(taken: Rect2) -> bool: return taken.intersects(candidate)):
+			if own_box.encloses(candidate) and not (you_rect.size != Vector2.ZERO and you_rect.intersects(candidate)) \
+					and not keep_off.any(func(taken: Rect2) -> bool: return taken.intersects(candidate)):
+				rect = candidate
+				fitted = true
 				break
+		if not fitted:
+			# None fits inside its own box: above the ring, held inside the box.
+			rect = Rect2(at + Vector2(-chip_size.x * 0.5, -drop - chip_size.y), chip_size)
+			rect.position = rect.position.clamp(own_box.position, own_box.end - chip_size)
 		c.draw_rect(rect, _kc(&"label_back"))
 		c.draw_rect(rect, UiTheme.color("brass"), false, _k(&"chip_line"))
 		c.draw_string(sans, rect.position + Vector2(chip_pad.x, chip_pad.y + sans.get_ascent(caption)), words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption, UiTheme.color("text"))
@@ -849,7 +856,7 @@ func _draw_content(c: Control) -> void:
 		keep_off.append(you_rect)
 	# The player's picture: a ring at each known place, its label, folded where they would overlap.
 	if pictured:
-		_draw_picture_places(c, (rects[own_area] as Rect2).grow(-inset), keep_off, sans, caption)
+		_draw_picture_places(c, _inner(rects[own_area], inset), keep_off, sans, caption)
 	_draw_feet(c, rects, serif, sans, caption)
 	# The caravans over the boxes.
 	for route: Dictionary in trade:
@@ -889,19 +896,23 @@ func _draw_content(c: Control) -> void:
 ## An area's box that is not the player's picture: its name, a row for each known place (a ring in the
 ## slot left of the words, the words after it), a town's read-out dim under them.
 func _draw_box_rows(c: Control, area_name: String, rect: Rect2, serif: Font, sans: Font, heading: int, caption: int, rings: Array[Vector2] = []) -> void:
+	# A box part way out of the window keeps its name and rows where they can be seen: laid from the box's
+	# visible part, not from a corner that is out of the window.
+	var shown := rect.intersection(Rect2(Vector2.ZERO, _canvas.size))
+	if shown.size.x < _k(&"slot") * 2.0 or shown.size.y < heading:
+		return
 	var area: Dictionary = world.areas[area_name]
-	var left := rect.position.x + _k(&"name_left")
-	var at := Vector2(left, rect.position.y + _k(&"name_top") + serif.get_ascent(heading))
+	var left := shown.position.x + _k(&"name_left")
+	var at := Vector2(left, shown.position.y + _k(&"name_top") + serif.get_ascent(heading))
 	var area_words := str(area.get("display_name", area_name))
-	c.draw_string(serif, at, area_words, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - _k(&"name_left") * 2.0, heading, UiTheme.color("text"))
+	var name_colour := UiTheme.color("friend") if knows_way(area_name) else UiTheme.color("text")  # She knows the way to the area itself (551).
+	c.draw_string(serif, at, area_words, HORIZONTAL_ALIGNMENT_LEFT, shown.size.x - _k(&"name_left") * 2.0, heading, name_colour)
 	var width := serif.get_string_size(area_words, HORIZONTAL_ALIGNMENT_LEFT, -1, heading).x
-	_rows[area_name] = Rect2(at.x, at.y - heading, width + 20.0, heading * 1.3)
-	if knows_way(area_name):  # She knows the way to the area itself (551).
-		_mark_row(c, at, width, heading)
+	_rows[area_name] = Rect2(at.x, at.y - heading, width, heading * 1.3)
 	var step := caption * 1.3
 	at.y += heading * 0.5 + step
 	for id: String in known_place_ids(area_name):
-		if at.y > rect.end.y - step:
+		if at.y > shown.end.y - step:
 			break
 		var look := place_look(id, UiTheme.color("text_dim"))
 		var words := str(look["words"])
@@ -911,15 +922,13 @@ func _draw_box_rows(c: Control, area_name: String, rect: Rect2, serif: Font, san
 		var row_rect := Rect2(left, at.y - caption, text_x - left + words_width, step)
 		if rings.any(func(ring: Vector2) -> bool: return row_rect.grow(_k(&"mouth")).has_point(ring)):
 			c.draw_rect(row_rect.grow(_k(&"label_pad_y")), _kc(&"label_back"))
-		_draw_ring(c, Vector2(left + _k(&"slot") * 0.5, at.y - caption * 0.32))
-		c.draw_string(sans, Vector2(text_x, at.y), words, HORIZONTAL_ALIGNMENT_LEFT, rect.end.x - text_x - _k(&"name_left"), caption, look["colour"])
-		_rows[id] = Rect2(left, at.y - caption, text_x - left + words_width + 20.0, step)
-		if knows_way(id):
-			_mark_row(c, Vector2(text_x, at.y), words_width, caption)
+		_draw_ring(c, Vector2(left + _k(&"slot") * 0.5, at.y - caption * 0.32), knows_way(id))
+		c.draw_string(sans, Vector2(text_x, at.y), words, HORIZONTAL_ALIGNMENT_LEFT, shown.end.x - text_x - _k(&"name_left"), caption, look["colour"])
+		_rows[id] = Rect2(left, at.y - caption, text_x - left + words_width, step)
 		at.y += step
 	var note := str(notes.get(area_name, ""))
 	if not note.is_empty():
-		c.draw_multiline_string(sans, at, note, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - _k(&"name_left") * 2.0, int(caption * 0.85), -1, UiTheme.color("text_dim"))
+		c.draw_multiline_string(sans, at, note, HORIZONTAL_ALIGNMENT_LEFT, shown.size.x - _k(&"name_left") * 2.0, int(caption * 0.85), -1, UiTheme.color("text_dim"))
 
 
 ## The player's picture's places: a ring at each known place's cell and its label, labels folded
@@ -943,7 +952,7 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 		if chip_mouths.any(func(mouth: Vector2) -> bool: return mouth.distance_to(world_cell) <= radius):
 			continue
 		var at := rect.position + (cell + Vector2(0.5, 0.5)) * cell_px
-		_draw_ring(c, at)
+		_draw_ring(c, at, knows_way(id))
 		var look := place_look(id, UiTheme.color("text"))
 		looks[id] = look
 		labels.append({"id": id, "at": at, "size": sans.get_string_size(str(look["words"]), HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + pad * 2.0})
@@ -951,17 +960,44 @@ func _draw_picture_places(c: Control, rect: Rect2, keep_off: Array[Rect2], sans:
 		return _fold_name(ids, at, rect, cell_px)
 	var measure := func(words: String) -> Vector2:
 		return sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, caption) + pad * 2.0
-	for group: Dictionary in WorldMapModel.fold(labels, keep_off, _k(&"ring") + pad.x, name_of, measure):
+	var groups := WorldMapModel.fold(labels, keep_off, _k(&"ring") + pad.x, name_of, measure, rect)
+	_name_towns_once(groups, rect, cell_px)
+	for group: Dictionary in groups:
 		var ids: Array = group["ids"]
 		var folded := bool(group["folded"])
 		var look: Dictionary = {"words": group["name"], "colour": UiTheme.color("text")} if folded else looks[ids[0]]
 		var label_rect := _backed_text(c, str(look["words"]), (group["rect"] as Rect2).position, sans, caption, look["colour"])
-		if ids.any(func(id: Variant) -> bool: return knows_way(str(id))):
-			_mark_row(c, Vector2(label_rect.position.x + pad.x, label_rect.end.y - pad.y), label_rect.size.x - pad.x * 2.0, caption)
-			label_rect.size.x += 20.0
 		_groups.append({"ids": ids, "rect": label_rect, "folded": folded})
 		if not folded:
 			_rows[str(ids[0])] = label_rect
+
+
+## A town's name is said once in the window: of the folded labels that read the same town name, the first keeps it
+## and each later one reads its nearest place's name alone (ui-design's look of cec148ba5: "Umbrage" twice).
+func _name_towns_once(groups: Array[Dictionary], rect: Rect2, cell_px: Vector2) -> void:
+	var said := {}
+	for group: Dictionary in groups:
+		if not bool(group["folded"]):
+			continue
+		var words := str(group["name"])
+		if said.has(words):
+			group["name"] = _nearest_place_name(group["ids"], group["at"], rect, cell_px)
+		else:
+			said[words] = true
+
+
+## The name of the nearest of [param ids]' places to [param at] (the map's points), alone.
+func _nearest_place_name(ids: Array, at: Vector2, rect: Rect2, cell_px: Vector2) -> String:
+	var places: Dictionary = world.areas[own_area].get("places", {})
+	var nearest := ""
+	var best := INF
+	for id: Variant in ids:
+		var place: Dictionary = places[str(id).get_slice("/", 1)]
+		var there := rect.position + (Vector2(place.get("cell", Vector2i.ZERO)) + Vector2(0.5, 0.5)) * cell_px
+		if there.distance_to(at) < best:
+			best = there.distance_to(at)
+			nearest = str(place.get("name", id))
+	return nearest
 
 
 ## The words of a folded label: the town's own name (where_name, the HUD's place words) when every
@@ -980,15 +1016,7 @@ func _fold_name(ids: Array, at: Vector2, rect: Rect2, cell_px: Vector2) -> Strin
 		var named := str(where_name.call(middle))
 		if shared and not named.is_empty():
 			return named
-	var nearest := ""
-	var best := INF
-	for id: Variant in ids:
-		var place: Dictionary = places[str(id).get_slice("/", 1)]
-		var there := rect.position + (Vector2(place.get("cell", Vector2i.ZERO)) + Vector2(0.5, 0.5)) * cell_px
-		if there.distance_to(at) < best:
-			best = there.distance_to(at)
-			nearest = str(place.get("name", id))
-	return nearest
+	return _nearest_place_name(ids, at, rect, cell_px)
 
 
 ## The feet: under each box (the picture's under its edge) the area's read-out, dim, and the party

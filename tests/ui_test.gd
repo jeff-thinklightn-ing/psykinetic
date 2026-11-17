@@ -2117,7 +2117,7 @@ func _test_world_map_model() -> void:
 			and mouths[0]["at"] == Vector2(10.5, 10.5),
 		"a ring at each way down or out a player sees; none for a hidden, closed or unseen (cue none) way (%s)" % [mouths])
 	var chips := WorldMapModel.chips(layout, mouths, known)
-	_check(chips.size() == 2 and chips[0] == {"level": "crypt", "at": Vector2(10.5, 10.5), "depth": 0} and chips[1]["level"] == "deep" and chips[1]["depth"] == 1,
+	_check(chips.size() == 2 and chips[0] == {"level": "crypt", "at": Vector2(10.5, 10.5), "depth": 0, "area": "a"} and chips[1]["level"] == "deep" and chips[1]["depth"] == 1,
 		"a chip for each known level below, the one under it beneath")
 	var stubs := WorldMapModel.stubs(layout, ways, mouths, known, "a", areas)
 	_check(stubs.size() == 2 and stubs[0] == {"at": Vector2(50, 0), "dir": Vector2(0, -1), "kind": "edge"} and stubs[1]["kind"] == "link" and stubs[1]["dir"] == Vector2(0, -1),
@@ -2141,6 +2141,10 @@ func _test_world_map_model() -> void:
 	var shut := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(-500, -500, 2000, 2000)] as Array[Rect2], 10.0, name_of, measure)
 	_check(beside.size() == 1 and beside[0]["rect"] == Rect2(10, 90, 80, 20) and shut.is_empty(),
 		"a label keeps off a chip or the you mark: the other side of its ring, or none at all")
+	var boxed := WorldMapModel.fold([labels[0]] as Array[Dictionary], [] as Array[Rect2], 10.0, name_of, measure, Rect2(0, 0, 150, 200))
+	var too_small := WorldMapModel.fold([labels[0]] as Array[Dictionary], [] as Array[Rect2], 10.0, name_of, measure, Rect2(0, 0, 60, 200))
+	_check(boxed.size() == 1 and boxed[0]["rect"] == Rect2(10, 90, 80, 20) and too_small.is_empty(),
+		"a label stays inside its own box: the side that fits, or none where nothing does (the ring stays)")
 	var crowded := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(85, 85, 30, 30)] as Array[Rect2], 10.0, name_of, measure)
 	_check(crowded.size() == 1 and crowded[0]["rect"] == Rect2(120, 90, 80, 20),
 		"a ring crowded by the you mark keeps its label, stepped out to twice the gap (a newcomer's two places keep their names)")
@@ -2251,6 +2255,33 @@ func _test_world_map_window() -> void:
 	_check(one_name != "Umbrage" and one_name in names, "places not all in the room: the nearest place's name alone (%s of %s)" % [one_name, names])
 	panel.where_name = Callable()
 	panel.room_of = Callable()
+	# A box part way out of the window keeps its name and rows in the part that shows; a town's name is said once; the guide's ring.
+	panel.own_area = "castle"
+	panel._model_dirty = true
+	panel._view_centre = WorldMapModel.box_of(panel.layout, "wilds").position + Vector2(WorldMapModel.box_of(panel.layout, "wilds").size.x * 0.1, 40.0)
+	panel.zoom_step = 2
+	panel._panned = true
+	panel._redraw()
+	for i in 3:
+		await get_tree().process_frame
+	var in_window := panel._rows.has("wilds")
+	var kept := 0
+	for id: String in ids:
+		if panel._rows.has(id):
+			kept += 1
+			var row: Rect2 = panel._rows[id]
+			in_window = in_window and row.position.x >= 0.0 and row.position.y >= 0.0 and row.position.y <= canvas.size.y
+	_check(in_window and (panel._rows["wilds"] as Rect2).position.x >= 0.0 and kept >= 3,
+		"the wilds' box part way out of the window: its name and rows laid in the part that shows (%d of %d rows)" % [kept, ids.size()])
+	panel.zoom_step = 0
+	panel._panned = false
+	panel.own_area = "wilds"
+	panel._model_dirty = true
+	var groups_in: Array[Dictionary] = [{"folded": true, "name": "Umbrage", "ids": [ids[0]], "at": Vector2(100, 100)},
+		{"folded": true, "name": "Umbrage", "ids": [ids[1]], "at": Vector2(400, 400)}]
+	panel._name_towns_once(groups_in, Rect2(Vector2.ZERO, Vector2(cells) * 4.0), Vector2(4.0, 4.0))
+	_check(groups_in[0]["name"] == "Umbrage" and groups_in[1]["name"] == str(panel.world.areas["wilds"]["places"][ids[1].get_slice("/", 1)]["name"]),
+		"a town's name is said once: the second fold reads its nearest place's name alone (%s)" % [groups_in[1]["name"]])
 	# The HUD's labels give way to the map while Main's is open.
 	_main.open_world_map()
 	_check(is_zero_approx(_main.compass.modulate.a) and is_zero_approx(_main.minimap.modulate.a) and (_main.name_plates == null or is_zero_approx(_main.name_plates.modulate.a))

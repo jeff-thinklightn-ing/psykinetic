@@ -88,7 +88,7 @@ static func chips(layout: Dictionary, mouths_drawn: Array[Dictionary], known_are
 	for mouth: Dictionary in mouths_drawn:
 		if not bool(mouth["known"]):
 			continue
-		out.append({"level": mouth["level"], "at": mouth["at"], "depth": 0})
+		out.append({"level": mouth["level"], "at": mouth["at"], "depth": 0, "area": mouth["area"]})
 		var deeper: Array[String] = []
 		for level: String in doors:
 			if level == mouth["level"] or not is_known(level, known_areas, ""):
@@ -100,7 +100,7 @@ static func chips(layout: Dictionary, mouths_drawn: Array[Dictionary], known_are
 					deeper.append(level)
 		deeper.sort_custom(func(a: String, b: String) -> bool: return _depth_of(doors, a) < _depth_of(doors, b))
 		for i in deeper.size():
-			out.append({"level": deeper[i], "at": mouth["at"], "depth": i + 1})
+			out.append({"level": deeper[i], "at": mouth["at"], "depth": i + 1, "area": mouth["area"]})
 	return out
 
 
@@ -202,10 +202,10 @@ static func fit_scale(world: Rect2, room: Vector2, margin: float) -> float:
 ## keep_off; none clear: it is left out, the ring staying). Returns [{ids, rect, at, name, folded}]:
 ## a lone label as it was, a folded group's rect under the words name_of gave, and the groups
 ## whose rects meet joined until none do.
-static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, name_of: Callable, measure: Callable) -> Array[Dictionary]:
+static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, name_of: Callable, measure: Callable, inside := Rect2()) -> Array[Dictionary]:
 	var groups: Array[Dictionary] = []
 	for label: Dictionary in labels:
-		var rect := _placed(label["at"], label["size"], keep_off, gap)
+		var rect := _placed(label["at"], label["size"], keep_off, gap, inside)
 		if rect.size == Vector2.ZERO:
 			continue
 		groups.append({"ids": [label["id"]], "rect": rect, "at": label["at"], "name": str(label.get("name", "")), "folded": false,
@@ -216,7 +216,7 @@ static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, 
 		for i in groups.size():
 			for j in range(i + 1, groups.size()):
 				if (groups[i]["rect"] as Rect2).intersects(groups[j]["rect"]):
-					groups[i] = _join(groups[i], groups[j], keep_off, gap, name_of, measure)
+					groups[i] = _join(groups[i], groups[j], keep_off, gap, name_of, measure, inside)
 					groups.remove_at(j)
 					merged = true
 					break
@@ -226,28 +226,31 @@ static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, 
 
 
 ## One group of two, its words from [param name_of] and its rect beside the middle of their rings.
-static func _join(a: Dictionary, b: Dictionary, keep_off: Array[Rect2], gap: float, name_of: Callable, measure: Callable) -> Dictionary:
+static func _join(a: Dictionary, b: Dictionary, keep_off: Array[Rect2], gap: float, name_of: Callable, measure: Callable, inside: Rect2) -> Dictionary:
 	var ids: Array = (a["ids"] as Array) + (b["ids"] as Array)
 	var weight_a := float((a["ids"] as Array).size())
 	var weight_b := float((b["ids"] as Array).size())
 	var at: Vector2 = ((a["at"] as Vector2) * weight_a + (b["at"] as Vector2) * weight_b) / (weight_a + weight_b)
 	var words := str(name_of.call(ids, at))
 	var size: Vector2 = measure.call(words)
-	var rect := _placed(at, size, keep_off, gap)
+	var rect := _placed(at, size, keep_off, gap, inside)
 	if rect.size == Vector2.ZERO:
 		rect = Rect2(at + Vector2(gap, -size.y * 0.5), size)
 	return {"ids": ids, "rect": rect, "at": at, "name": words, "folded": true, "ring_size": size}
 
 
 ## The rect a label of [param size] takes beside a ring at [param at]: right, left, above, below,
-## the first that covers none of [param keep_off], at [param gap] from the ring and, none clear
-## there, stepped out to twice and then three times the gap (a newcomer's two places keep their
-## names beside the "you" mark); an empty rect for none.
-static func _placed(at: Vector2, size: Vector2, keep_off: Array[Rect2], gap: float) -> Rect2:
+## the first that covers none of [param keep_off] and, where [param inside] is given, lies inside it
+## (a label stays inside its own box), at [param gap] from the ring and, none clear there, stepped out
+## to twice and then three times the gap (a newcomer's two places keep their names); an empty rect
+## for none.
+static func _placed(at: Vector2, size: Vector2, keep_off: Array[Rect2], gap: float, inside := Rect2()) -> Rect2:
 	for step in [1.0, 2.0, 3.0]:
 		var away: float = gap * step
 		for rect: Rect2 in [Rect2(at + Vector2(away, -size.y * 0.5), size), Rect2(at + Vector2(-away - size.x, -size.y * 0.5), size),
 				Rect2(at + Vector2(-size.x * 0.5, -away - size.y), size), Rect2(at + Vector2(-size.x * 0.5, away), size)]:
+			if inside.size != Vector2.ZERO and not inside.encloses(rect):
+				continue
 			if not keep_off.any(func(off: Rect2) -> bool: return off.intersects(rect)):
 				return rect
 	return Rect2()

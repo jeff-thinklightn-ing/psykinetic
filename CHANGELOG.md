@@ -7,7 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
-- The world map draws only the world's own places, one line between any two that join, and an unclaimed place by its name alone (445 amended (3)).
+- The world map shows the area you're in as the corner map's picture with its known places ringed, and the other areas you know as boxes laid out as the world lies, a gate where two meet, a ring by each place, an unclaimed place by its name alone, and a question mark where a way leads somewhere you haven't been (445 amended (3), 968).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - Up close by day, hair near a face's own colour is a shade darker at its hairline, so it reads as hair (419 amended (12)).
 - Anyone who slouches, a companion or a townsperson, runs with arms beside the body too (953 amended (3)).
