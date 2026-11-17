@@ -835,6 +835,14 @@ func _test_answer() -> void:
 	answer_pane.queue_free()
 	_check(theme.get_type_variation_base(&"WorkingDots") == &"Label" and theme.get_color(&"font_color", &"WorkingDots") == UiTheme.color("brass_bright"),
 		"WorkingDots: a Label in brass_bright")
+	_check(theme.get_type_variation_base(&"KeyColumns") == &"HBoxContainer" and theme.get_constant(&"separation", &"KeyColumns") == 40,
+		"KeyColumns: an HBoxContainer with separation 40 (the Options window's two key columns, 731 amended (2))")
+	var known_world_ok := theme.get_color(&"dim", &"KnownWorld").a > 0.5 and theme.get_color(&"you_halo", &"KnownWorld").is_equal_approx(Color(UiTheme.color("brass_bright"), 0.45))
+	for c: StringName in [&"window_width", &"window_height", &"fit_margin", &"zoom_step", &"zoom_most", &"ring", &"slot", &"slot_gap", &"ask", &"you_ring", &"you_clear"]:
+		known_world_ok = known_world_ok and theme.get_constant(c, &"KnownWorld") > 0
+	_check(known_world_ok and theme.get_constant(&"slot", &"KnownWorld") == 2 * theme.get_constant(&"ring", &"KnownWorld")
+		and theme.get_constant(&"zoom_most", &"KnownWorld") > theme.get_constant(&"zoom_step", &"KnownWorld"),
+		"KnownWorld: the world map window's measures (a row's mark slot as wide as the ring, zoom steps under the most) and colours (731 amended (3))")
 	var quiet := ScrollContainer.new()
 	quiet.theme_type_variation = &"QuietScroll"
 	quiet.custom_minimum_size = Vector2(800.0, 400.0)
