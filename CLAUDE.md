@@ -67,12 +67,17 @@ that the walk looks like skipping and the people look like "bad claymation place
   nearest zoom) and brings the coordinator its three worst things: one line each, with a still
   or a number, and what it would do. A report of Jeff's goes first, then queued work, then this.
 - Passing tests and a far-camera still are not "it looks right". Art and animation are shown at
-  the nearest zoom beside Jeff's goblin before they land. A look names its camera distance and
+  the nearest zoom beside Jeff's goblin before they land. A look names its camera (out of doors
+  the low camera, a new player's own, or the high one, with its zoom: the playing zoom is low at
+  1.0, the nearest 0.4; inside a walled space the overhead "inside view", 671), its distance, and
   is shot with the player standing in the place: a panned lens shows what no player sees
   (2026-11-14: a "tipped fir" was a branch round a panned lens). A tour's click or key goes in
   as an input event (`Input.parse_input_event`), never as a direct call to Main's handler: a
   direct call is not a player's press, and beside a parsed Shift it failed where no player
-  could (11-15, the bow's taps). A check that reads the same
+  could (11-15, the bow's taps). A tour's click is the bot's own (`tests/tour/bot.gd`'s `click`,
+  aimed by `Client3D.screen_point_of`; 935 amended (8), (9)): the press is picked at the event's
+  own position, on the cell, and no pointer is warped per click (on a laptop one warp to the game
+  window's centre a run at most, on the coordinator's terms). A check that reads the same
   for the right pose and the wrong one is no watch: a stance is read by its clip's name, and a
   still's time comes from the run's log (11-14: an axe's edge direction passed for the ready
   and the rest alike). A still that needs the town's people settles on the town's step
@@ -97,7 +102,9 @@ that the walk looks like skipping and the people look like "bad claymation place
   one met a broken main and one a true clash with another tree's new check
   (`C:/dev/review/perf/flakes.md`). Also run `bash tests/land.sh --checks` (`land.ps1 -Checks`)
   on the rebased take before you queue (278 amended (5)): the checks a landing makes before the
-  gate (the CHANGELOG's bullets, Godot launches' logs, the voice inventory), with no lock and no Godot,
+  gate (the CHANGELOG's bullets, Godot launches' logs, the lists' lines, the server prints' names
+  (284 amended (2): a server print never names a companion or a player, and
+  `tools/print_names_budget.txt` only falls), the voice inventory), with no lock and no Godot,
   in seconds; it prints `LANDING CHECKS: PASS` or `FAIL (why)`, and a FAIL there would have
   failed your landing after its wait in the queue. A tool test (not a Godot part) that fails
   on a temp-folder fault (Permission denied, unable to write file, Access is denied, no failed
@@ -113,7 +120,14 @@ that the walk looks like skipping and the people look like "bad claymation place
   `client3d/room_fields.gd`'s VIEW or ROOM and runs in view_world_test: a take that ran
   view_test alone failed its landing on it, 11-14), and land.sh names any suite
   scene over 220 s as a warning ("slow scene: ..."), never a failure: its tree splits it at its
-  next row.
+  next row. Since 278 amended (10) level_test is two scenes too, two scripts over
+  `tests/level_test_base.gd`: level_dungeons_test holds the laid levels (the barrow and its deep,
+  the crypts, camps and bands, the castle), level_test the rest; a new row goes in its half.
+  Never run the same scene twice at once from one checkout: both take one port.
+  After any rebase that brings in other trees' landings, a take that changes a `.gd` runs `bash
+  tools/load_check.sh` again before its gate take, and a FAIL is not queued: two takes that each
+  add the same name merge cleanly and no longer parse (economy's and ui's `const RACK_REACH` in
+  main.gd, 11-17). A mend for a report of Jeff's never waits on a bench to queue: the bench follows.
 - Take the landing lock for your final retest and push, so nobody lands between them, with
   the resource gate taken first (decision 394): `kind=$(bash tools/remote_tests.sh kind)`,
   `sh tools/heavy_job.sh take <tree> $kind`
@@ -155,7 +169,29 @@ that the walk looks like skipping and the people look like "bad claymation place
   gate's take and requeue. Every try is logged in `C:/dev/land.lock.log`.
   At a cut release first runs `land_lock.sh freeze`: from then a take answers exit 3, "main
   frozen (pending)", while the landing holding the lock finishes; treat it as a held freeze
-  (release your gate take, requeue after the unfreeze) (667 amended (4)).
+  (release your gate take, requeue after the unfreeze) (667 amended (4)). A land script waits
+  the freeze out itself, by the freeze's own mark and never by status's words ("freeze pending"
+  passed a waiter grepping "frozen", 11-16): `while [ -n "$(find
+  "${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}.freeze/beat" -mmin -26 2>/dev/null)" ]; do sleep
+  60; done`, then it queues again; a take refused by a freeze gets that script at once, not a
+  wait for word of the unfreeze.
+  Since 394 amended (65) (b9cc225a2) a land script's fetch and rebase is `bash
+  tools/land_rebase.sh <tree>` in place of its own `git rebase origin/main`: it runs the
+  resolvers itself (the CHANGELOG, the generated pages, the lists) and at anything else aborts,
+  leaves the checkout as it was and names the files (exit 1). `bash tools/land_rebase.sh --would
+  [--no-fetch] <tree>` says whether that rebase would stop, touching no working tree: "clean",
+  "resolvable: <files>" or "CONFLICT: <files>" (exit 1). A waiter runs it when it queues and
+  when main's tip moves, and a CONFLICT is rebased by hand before its turn, not at it (a real
+  conflict sat ninety minutes unseen in the queue, 11-16).
+  A lock that reads free with takes waiting on it is short of room, not untried: `<lock>.log`'s
+  "kept for <tree>: free, and N GB short" line says so (394 amended (63)). `heavy_job.sh
+  status` prints "older room check: N of M landing takes" (394 amended (64)); while N is over 0
+  no tree starts a solo scene, an import or a load_check of its own while the lock reads free
+  with takes waiting: wait until a landing holds it. A waiter that steps out (stopped, or its
+  take dropped) removes its own `<lock>.waiters/<tree>.json`. A take that changes the gate
+  queues under main's gate code (a copy of `origin/main`'s `tools/heavy_job.py`), never its own
+  unlanded code, and its diff is answered by the coordinator first (an unlanded gate change's
+  own waiter stalled the queue an hour, a cut's export with it, 11-16).
   Since 878 (Jeff, 2026-11-11: "go ahead and move landings' test runs to saturn") a landing's
   Godot tests (the suite, state_test, net_test) run on saturn through `tools/remote_tests.sh`,
   in about 8 minutes, with server_boot_test and the tool tests here: `kind` prints
@@ -206,6 +242,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   the next `## vX.Y.Z` heading under `## Unreleased` (decision 324), runs the release script, deploys the server,
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. The cadence (coordinator, 2026-10-21, after a day's work sat unreleased): release cuts once a day in the morning, and sooner when Jeff asks or a fix he has seen is in. A mend for a report of Jeff's is cut the day it lands, not held for the morning, and a regression that blocks that cut is reverted, not waited on (Jeff, 2026-11-14, reporting the same four things a second time: "if the lag between feedback and change it is very difficult to give feedback"); its row in `C:/dev/review/your_reports.md` names the build to check and is fixed only when seen joined in the released build. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
+  A joined client draws its own pack's levels: levels are not in `Net.protocol()` and are not
+  sent at a join. So say in your landing message if a `levels/` file changed and whether it is
+  drawn decor only; before a cut that would put a client ahead of the box, release lists the
+  level files changed since the box's tag, and the server goes out with the client unless every
+  one is decor (v0.1.227: a client-only cut would have drawn a stair the server did not have).
   Every cut comes with a checklist for Jeff (Jeff, 2026-10-23: "for every cut i need a change
   log of things to check"): when release says the box is up, the coordinator writes
   `C:/dev/review/cuts/<version>.md` from the cut's CHANGELOG section, grouped by where to go, each
@@ -338,6 +379,21 @@ that the walk looks like skipping and the people look like "bad claymation place
   from a checkout older than that waits its turn, so rebase before running one.
   net_test run alone is the `net` kind (394 amended (24)): it starts several Godots (about 12 GB at
   once), so it runs one at a time, never beside a bench, and the gate refuses it under any other kind.
+- Disk (2026-11-16: C: filled to 0.58 GB free and every landing stopped). A scratch worktree is
+  removed by the session that made it (`git worktree remove`) when its take lands or is dropped,
+  never one a live waiter or queued take runs in. Read the free space before any write over
+  1 GB; under 40 GB free start nothing new on disk and tell the coordinator. Nobody runs `git
+  worktree prune`, `gc` or `repack`: the shared store's upkeep is release's, at a freeze. A keep
+  branch stays local; a branch goes to origin only when a laptop or saturn must build it, and
+  its tree deletes it there after.
+- Models (2026-11-17: a 10.5 GB model in this PC's Ollama left 4.4 GB of commit, and the land
+  lock stood free two minutes with three takes kept for it). No model loads on this PC's Ollama
+  unless `heavy_job.sh status` shows about 22 GB of commit free, never beside a cut's local
+  suite, and only on a slot the coordinator gives. A Godot scene that asks the game's own mind
+  is a model load (it sends keep_alive -1 and never unloads): a test or tour that is not that
+  run points `PSYKINETIC_LLM_URL` at nothing (`http://127.0.0.1:9/api/chat`). A run that loads
+  a model unloads it on every way out, a gate stop included, and never unloads one it did not
+  load (the desktop's Ollama answers other work of Jeff's). A model's name stays off pushed pages.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
   Stopping a background task can leave its shell script and Godot children running: after
