@@ -3904,6 +3904,8 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--look-watch=") and not OS.has_feature("template"):
 			look_watch = arg.trim_prefix("--look-watch=")  # 916's look hook: one resident drawn watching.
+		if arg.begins_with("--look-inside-lift=") and not OS.has_feature("template"):
+			inside_day_lift = arg.trim_prefix("--look-inside-lift=").to_float()  # 451 amended (9)'s sweep.
 		if arg.begins_with("--look-hands=") and arg.contains(":") and not OS.has_feature("template"):
 			var spec := arg.trim_prefix("--look-hands=")
 			var held_ids := spec.get_slice(":", 1).split(",")
@@ -30994,6 +30996,10 @@ const INSIDE_PANE_FADED := 0.1
 ## by night the zone's look as before (the hearth and candles carry it; the
 ## Mughouse's 0.48).
 const INSIDE_DAY_LIFT := 1.6
+## A look's knob for the lift (451 amended (9)'s sweep): set by the client flag
+## --look-inside-lift=<f>; INSIDE_DAY_LIFT by default, ignored in a release build
+## (OS.has_feature("template")); it changes only the drawn room's ambient.
+static var inside_day_lift := INSIDE_DAY_LIFT
 const INSIDE_DAY_WARM := 0.35
 ## The patches (additive, unshaded): the sun's through a window, warm white,
 ## at INSIDE_SUN_PATCH of the sun's height share; the sky's at a window's
@@ -31463,7 +31469,7 @@ static func inside_look(look: Dictionary, day: float, night_colour: Color, night
 	var day_ambient := (look["ambient"] as Color).lerp(night_colour, INSIDE_DAY_WARM)
 	var horizon: Color = look["horizon"]
 	return {"ambient": night_colour.lerp(day_ambient, day),
-		"ambient_energy": lerpf(night_energy, night_energy * INSIDE_DAY_LIFT, day),
+		"ambient_energy": lerpf(night_energy, night_energy * inside_day_lift, day),
 		"pane": INSIDE_PANE_NIGHT.lerp(horizon.lerp(INSIDE_PANE_SKY, INSIDE_PANE_BLUE), day), "pane_energy": lerpf(INSIDE_PANE_NIGHT_ENERGY, INSIDE_PANE_DAY, day),
 		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, INSIDE_HAZE_DAY), day),
 		"apron": INSIDE_APRON_NIGHT.lerp(INSIDE_APRON_DAY, day),
