@@ -13944,7 +13944,9 @@ the face's own hue reads as hair against the face at the nearest zoom.
   its names read from take 2's run, the coordinator's allowance, each choice as root 3 draws it there).
 - view_test _test_hair_root (the layer on the caps alone, both bodies, the imports) and _test_hair_root_by_day (the
   share none with the sun 1 degree up and at night, full at noon, a ramp between; hair_root_day the look's daylight
-  out of doors, 0 in the tavern's upstairs room and back; the character window's every part held full). Client only,
+  out of doors, 0 in the tavern's upstairs room and back; the character window's every part held full). That row's
+  first draft compared on the test's own map, which has no sky, so its two out-of-doors checks passed without
+  reading anything; it now loads the wilds level and reads Umbrage at noon (1.000) and at midnight (0). Client only,
   protocol unchanged, no new class_name.
 
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
