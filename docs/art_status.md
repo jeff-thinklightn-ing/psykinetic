@@ -439,7 +439,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `wall.cave.end` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `wall.cave.pillar` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `wall.cave.rubble` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.chapel.buttress_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
+| `wall.chapel.buttress_tall` | 1 | art-gen, fitted by art-kit | own | 2026-11-16 |
 | `wall.chapel.end_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
 | `wall.chapel.end_ruined` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
 | `wall.chapel.post_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |

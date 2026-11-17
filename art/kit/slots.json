@@ -467,8 +467,8 @@
 			"kind": "edge",
 			"size": [1.05, 4.2, 0.64],
 			"middle": [0.725, 0, 0],
-			"budget": 100,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "blender", "license": "own", "date": "2026-10-29", "notes": "art-gen's STANDING piece (734; Jeff approved the chapel look 2026-10-29), N:/assets/candidates/wall.chapel.buttress_tall/wall.chapel.buttress_tall.blend, fitted by art-kit (C:/dev/review/building_kits/fit_chapel.py): its flat colours and textures moved to the nearest palette swatches, one palette material; 64 tris"},
+			"budget": 140,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "blender", "license": "own", "date": "2026-11-16", "notes": "C:/dev/review/buttress3/make_buttress3.py on 22537f442's blend (the coordinator's go, 11-16, item (2) of art-kit's streets audit: from 1 cell off the temple's long walls the buttresses read as plain square posts beside the coursed wall, C:/dev/review/ui-design/looks/streets2_4a3d0d152/c_temple_south_wall_194_206_yaw315_nearest.png; its plinth and two sloped set-offs were there, in two near greys with no joints): mortar joints at the wall's own course heights (material.wall.chapel, every 0.5 m), 3 cm 8f8f8a bands 2 mm proud on the front and sides of both stages with one staggered upright joint a course; the two drip courses under the set-offs in c9c7c0; 136 tris (budget 100 -> 140). Before that: art-gen's STANDING piece (734; Jeff approved the chapel look 2026-10-29), N:/assets/candidates/wall.chapel.buttress_tall/wall.chapel.buttress_tall.blend, fitted by art-kit (C:/dev/review/building_kits/fit_chapel.py): its flat colours and textures moved to the nearest palette swatches, one palette material; 64 tris"},
 			"uses": "a chapel buttress (734), stepped, 4.2 m: on every second vertex of the main block's long sides, its origin the vertex on the ground, standing out at +x",
 			"grey": [{"at": [0.725, 2.1, 0], "size": [1.05, 4.2, 0.64]}]
 		},

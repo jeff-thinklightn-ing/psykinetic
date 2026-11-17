@@ -4915,7 +4915,7 @@
 			"kind": "edge",
 			"category": "walls",
 			"size": "1.05 x 4.2 x 0.64",
-			"budget": 100
+			"budget": 140
 		},
 		{
 			"slot": "wall.chapel.end_low",
