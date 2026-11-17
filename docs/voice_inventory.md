@@ -2341,6 +2341,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You would lead them as far as %s, and no further. | `main.gd` _as_far_words() |
 |  | %s stops leading the way to %s: it isn't safe. | `main.gd` _guide_check() |
 |  | You stopped leading %s to %s: it isn't safe: %s.%s | `main.gd` _guide_check() |
+|  | The stone is cold, and it doesn't give. | `main.gd` NICHE_SHUT_LINE |
 |  | The dead bar the way. | `main.gd` DEAD_LINE |
 |  | Beyond this door waits one who wants back the gold stolen from this place. | `main.gd` HALL_AHEAD_LINE |
 |  | %s asked you to go home for a while, and you part as friends: you go home to %s, and will travel with them again when they ask. | `main.gd` _begin_leaving() |
@@ -2405,7 +2406,6 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | laid on the knight's bier | `main.gd` _lay_remains() |
 |  | %s laid the remains of %s on the bier in the crypt's First Hall. | `main.gd` _tell_priests_laid() |
 |  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
-|  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draught coming from one of the niches. | `main.gd` _tell_draft() |
 |  | The fresh mortar crumbles under your hands, and the niche comes open. | `main.gd` LOOSE_NICHE_LINE |
 |  | a sealed tomb opened | `main.gd` TOMB_OPENED |
