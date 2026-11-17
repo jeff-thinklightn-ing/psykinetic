@@ -4185,6 +4185,8 @@ const FACE_AHEAD_OF_AXIS := 0.1
 const FACE_UNDER_TOP := 0.12
 ## The least range, times the light's distance to its carrier's face (the window there 0.27).
 const FACE_RANGE_LEAST := 1.2
+## How long a carrier's face light keeps its range while it stands still (s).
+const FACE_RANGE_AGAIN := 0.5
 
 
 ## How far [param light_at] (the rig's x and z) a face light may reach: FACE_LIGHT_RANGE, or the
@@ -4194,9 +4196,15 @@ const FACE_RANGE_LEAST := 1.2
 static func face_light_range(light_at: Vector2, least: float, shut: Callable) -> float:
 	var home := Vector2i(roundi(light_at.x), roundi(light_at.y))
 	var most := FACE_LIGHT_RANGE
-	for dx in range(-2, 3):
-		for dy in range(-2, 3):
-			var cell := home + Vector2i(dx, dy)
+	# Nearest rings first (Chebyshev 0, 1, 2), so a near wall cuts `most` and the farther edges skip
+	# their _shuts_light on `d < most`; a ring whose nearest edge is past `most` is not tried at all.
+	for ring in 3:
+		if ring - 1 >= most:
+			break
+		for cell_off: Vector2i in _RING_CELLS[ring]:
+			var dx := cell_off.x
+			var dy := cell_off.y
+			var cell := home + cell_off
 			for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 				# Outward only: away from the light's cell along the step's axis, or across its own row.
 				if (step.x != 0 and dx * step.x < 0) or (step.y != 0 and dy * step.y < 0):
@@ -4208,6 +4216,15 @@ static func face_light_range(light_at: Vector2, least: float, shut: Callable) ->
 				if d < most and bool(shut.call(cell, step)):
 					most = d
 	return clampf(most, minf(least, FACE_LIGHT_RANGE), FACE_LIGHT_RANGE)
+
+
+## The cells of each Chebyshev ring round a cell, 0 to 2 (face_light_range).
+const _RING_CELLS := [
+	[Vector2i(0, 0)],
+	[Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)],
+	[Vector2i(-2, -2), Vector2i(-1, -2), Vector2i(0, -2), Vector2i(1, -2), Vector2i(2, -2), Vector2i(-2, -1), Vector2i(2, -1), Vector2i(-2, 0),
+		Vector2i(2, 0), Vector2i(-2, 1), Vector2i(2, 1), Vector2i(-2, 2), Vector2i(-1, 2), Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2)],
+]
 
 
 ## An omni light's falloff window at [param d] in a range of [param r] (Godot's: (1 - (d/r)^4)^2).
@@ -4237,9 +4254,16 @@ func _place_face_light(puppet: Node3D, light: OmniLight3D) -> bool:
 	# Its range clipped short of a wall's far side, its energy lifted so its carrier's face takes the same.
 	var face := Vector3(way.x * FACE_AHEAD_OF_AXIS, over - FACE_LIGHT_OVER - FACE_UNDER_TOP, way.y * FACE_AHEAD_OF_AXIS)
 	var to_face := want.distance_to(face)
-	var at := Vector2(puppet.position.x + want.x, puppet.position.z + want.z)
-	var lit := face_light_range(at, to_face * FACE_RANGE_LEAST,
-			func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+	# Found again only when the light has moved, or every FACE_RANGE_AGAIN (a door near a carrier at rest
+	# shut or opened); a room's rebuild makes its puppets anew (environment's ask on its cost).
+	var where := puppet.position + want
+	var now := Time.get_ticks_msec()
+	var lit := light.omni_range
+	if not where.is_equal_approx(light.get_meta("range_at", Vector3.INF)) or now >= int(light.get_meta("range_until", 0)):
+		lit = face_light_range(Vector2(where.x, where.z), to_face * FACE_RANGE_LEAST,
+				func(cell: Vector2i, step: Vector2i) -> bool: return _shuts_light(cell, step, puppet.position.y + over))
+		light.set_meta("range_at", where)
+		light.set_meta("range_until", now + int(FACE_RANGE_AGAIN * 1000.0))
 	if not is_equal_approx(light.omni_range, lit):
 		light.omni_range = lit
 	light.set_meta("lift", omni_window(to_face, FACE_LIGHT_RANGE) / maxf(omni_window(to_face, lit), 0.01))

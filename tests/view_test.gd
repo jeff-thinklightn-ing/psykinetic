@@ -3514,6 +3514,14 @@ func _test_face_light() -> void:
 				var same := absf(Client3D.omni_window(to_face, light.omni_range) * lift_here - Client3D.omni_window(to_face, Client3D.FACE_LIGHT_RANGE)) < 0.001
 				rows[kind] = [cell, step, light.omni_range, heads, opened, same]
 				clear = clear and same and heads.all(func(d: float) -> bool: return d > light.omni_range and d < opened)
+	# Its range kept while the light stands still (found again only once it moves, or after FACE_RANGE_AGAIN).
+	var kept_until := int(light.get_meta("range_until", 0))
+	_rig._place_face_light(puppet, light)
+	var kept := int(light.get_meta("range_until", 0)) == kept_until
+	puppet.position += Vector3(0.1, 0.0, 0.0)
+	_rig._place_face_light(puppet, light)
+	var found_again := (light.get_meta("range_at", Vector3.INF) as Vector3).is_equal_approx(puppet.position + light.position)
+	_check(kept and found_again, "its range kept while the light stands still (%s), found again once it moves (%s)" % [kept, found_again])
 	puppet.position = place_was
 	body.rotation.y = yaw_was
 	_rig._process(0.0)
