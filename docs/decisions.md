@@ -11672,6 +11672,19 @@ start; a mark unbeaten 1600 s, a landing's own lock, and the mark gone, each hel
 test points PSYKINETIC_LAND_LOCK at a scratch path for every row (49's import row read the real cut's freeze while
 this was built). RESULT: PASS. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (60) (perf, 2026-11-16; art-kit's report of its stairs5 landing; label from tools/decision_number.sh):
+heavy_job_test's in-process runs read a free figure of the test's own. Its rows from "a gated run inside a gated
+run" to "RAM and commit told apart" (the nested run, over its --expect, hung, busy, and mem's measured import)
+start real children through gate.run in the test's own process, whose watcher stops the newest job when free RAM
+or commit falls under the margin; 394 amended (50)'s HEAVY_JOB_TEST_FREE_GB covers only the test's takes run as
+processes of their own. At 17:06 art-kit's landing (art only) met a short PC: the busy row's 20 s sleeper was
+stopped three times ("free commit under 2 GB, the newest job"), the run gave up with exit 75 (MAX_RESTARTS), and
+both "busy the whole window: left to finish" and "a clean run's time recorded" failed, a 16-minute lock turn
+lost. Those rows test limits, nesting and measuring, not room: gate._memory reads (64, 64) for them and is given
+back after (a row checks). Until this take the busy, over-limit and hung rows read the PC's real commit,
+so a landing run while free commit dipped under 2 GB failed on them (C:/dev/review/perf/flakes.md lists 17:06's
+failure under this cause). The gate itself is unchanged. Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

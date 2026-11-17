@@ -1022,6 +1022,14 @@ except PermissionError:
 os.open = real_open
 check(locked and denials[0] == 0, "a denied state lock is waited on, as a held one")
 
+# 394 amended (60): the runs from here to "a scene that died at launch" start real children in this
+# process, and run()'s watcher stops the newest job when free RAM or commit falls under the margin.
+# They test limits, nesting and measuring, not room, so they read a free figure of the test's own, as
+# a real take does by HEAVY_JOB_TEST_FREE_GB (394 amended (50)): art-kit's stairs5 landing (11-16
+# 17:06) met a short PC, the busy row's own sleeper was stopped three times ("free commit under
+# 2 GB"), and it failed with exit 75 (MAX_RESTARTS) and no run recorded.
+real_memory_runs = gate._memory
+gate._memory = lambda: (64.0, 64.0)
 print("== a gated run inside a gated run ==")
 # ui's bench script run through the gate, and frame_budget.ps1 inside it
 # asking for a bench again: bench is at most 1, so it queued behind its own
@@ -1097,6 +1105,9 @@ code = gate.run("mem", "godot_import", [sys.executable, "-c", "x = bytearray(300
 row = gate.kinds()["godot_import"]
 check(code == 0 and row.get("last_peak_gb", 0) >= 0.25 and row.get("last_commit_gb", 0) >= 0.25,
     "a run measures both: RAM %s, commit %s" % (row.get("last_peak_gb"), row.get("last_commit_gb")))
+
+gate._memory = real_memory_runs
+check(gate._memory is real_memory_runs, "the runs' own free figure given back (394 amended (60))")
 
 print("== a scene that died at launch ==")
 # Decision 530: tests/run.sh notes each in the gate's log, and the summary counts them.
