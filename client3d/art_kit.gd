@@ -57,7 +57,7 @@ const KIT_ROOF_PREFIX := "roof."
 ## How far a kit roof's texture is brought to its faces' own palette colour
 ## (966): 0 draws it raw, exactly the composer's roofs' colour; 1 scales the
 ## texture so its mean is the face's palette colour; between, part way.
-const KIT_ROOF_TINT := 0.0
+const KIT_ROOF_TINT := 1.0
 ## Where a creature's blow lands in its clip when the slot's clip names no
 ## "contact": this far through it (CreatureView strikes it so; ArtCheck
 ## checks a named one).
