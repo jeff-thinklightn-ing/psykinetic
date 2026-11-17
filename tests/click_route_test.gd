@@ -104,6 +104,25 @@ func _test_press_behind() -> void:
 		var attackable: bool = World.can_target(player, foe) and foe.is_creature() and not _main.is_friend(foe)
 		_check(attackable == (_main.press_behind(player, rhea, foe, foe.tile).get("target") == foe),
 			"a foe behind her wins where a click on it would attack with her not there (%s attackable: %s)" % [foe.name, attackable])
+	# Rhea's cell beside the chest: the player diagonal to it, a body on the one orthogonal cell between (ui-design's behind2 run).
+	var held_here: GridEntity = World.get_entity_at(Vector2i(197, 202))
+	if held_here != null and held_here != player:
+		World.despawn(held_here)
+	World._relocate(player, Vector2i(197, 202))
+	var body_there: GridEntity
+	for entity: GridEntity in World.get_entities():
+		if entity != player and entity.spawned and not entity is Player and not entity is Chest:
+			body_there = entity
+			break
+	World._relocate(body_there, Vector2i(198, 202))
+	_main._free_taken_over(player)
+	var reaches_now: bool = World.reaches(player, chest)
+	_main._open_pack(player, chest)
+	_check(reaches_now and _main.pack_panel != null and _main.pack_panel.other == chest and _main._pack_wanted == null,
+		"the chest picked behind her opens from the diagonal with a body on the one cell between (reaches %s; its row opens at once)" % reaches_now)
+	_main.close_other()
+	_main._free["path"] = []
+	World._relocate(body_there, Vector2i(190, 225))
 	_check(_main.press_behind(player, null, chest, chest.tile) == none and _main.press_behind(player, chest, chest, chest.tile) == none,
 		"nothing picked, or something that is no companion picked: untouched")
 	# A door cell and a link cell answer; the barrow's First Hall niche stone answers under the click scheme and not under the keys'.
