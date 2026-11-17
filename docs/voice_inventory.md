@@ -3110,7 +3110,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [a-z,] ([A-Z][a-z']+(?:-[a-z]+)*) | `sim/hearsay.gd` is_name() |
 |  | [A-Z][a-z']+ | `sim/hearsay.gd` is_name() |
 |  | ^[A-Z][a-z']+$ | `sim/hearsay.gd` is_name() |
-|  | ^([A-Z][a-z']+) the [A-Z] | `sim/hearsay.gd` is_name() |
+|  | ^([A-Z][a-z']+) the [A-Z][a-z']+$ | `sim/hearsay.gd` is_name() |
 |  | (?:^\|(?<=[ ("]))([a-z][a-z']+)(?=[ ,.;:!?)"]\|$) | `sim/hearsay.gd` is_name() |
 |  | (?<=[a-z,] )([A-Z][a-z']+(?: (?:of the \|of \|the )?[A-Z][a-z']+)+) | `sim/hearsay.gd` is_name() |
 |  | ^[A-Z][a-z']+(?: (?:of the \|of \|the )?[A-Z][a-z']+)+$ | `sim/hearsay.gd` is_name() |
@@ -4235,7 +4235,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The medicine man in the healer's hut brings the fallen back. | `entries[1].facts[0].text` |
 |  | The medicine man gathers herbs near his hut and makes remedies, stamina potions, the bear's-claw charm and the bear's-grease draught, remedies first while anyone is sick. | `entries[1].facts[1].text` |
 |  | The medicine man takes someone into his care for ten gold, or five herbs or five antlers, or for doing his first errand; only those in his care are brought back at his hut. | `entries[1].facts[2].text` |
-|  | The medicine man visits the sick in town, and mends his hut with wood and cloth from the town's store. | `entries[1].facts[3].text` |
+|  | The medicine man visits the sick in town, and mends his hut with wood from the town's store. | `entries[1].facts[3].text` |
 |  | The town's smith, who went below the castle after a rumoured great dwarven forge with hired guards; ambushed and captured, he is held at the forge, forced to work goblin weapons for the Blood Rot's raids (docs/lore/castle.md). | `entries[2].summary` |
 | L | Rumour tells of a great dwarven forge deep below the castle. | `entries[2].facts[0].text` |
 | L | The smith went down after the great dwarven forge, bringing an expedition of hired guards to protect him and carry out what they found. | `entries[2].facts[1].text` |
