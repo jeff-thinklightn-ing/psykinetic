@@ -11853,6 +11853,22 @@ a take changes the tool, the two resolvers or the test), a scratch remote and cl
 - no merge config and no attributes written;
 - an older script's own rebase meets the same stop as before and its own abort leaves it clean.
 RESULT: PASS. Stacked on 394 amended (64). Tools and tests only; protocol unchanged; no class_name; no bullet.
+394 amended (69) (perf, 2026-11-17; the coordinator's ask after release's v0.1.229 cut; label from
+tools/decision_number.sh): a reclaimed place is queued now, its old time kept as its ticket. Every judge drops an
+entry whose "queued" is before the machine's boot (_entries: from before a reboot). 61 wrote a reclaimed take's
+carried time as its "queued", so a place kept across a reboot (Jeff's 11-17 reboot: twenty kept at the 09:35 freeze
+with tickets from 04:15 to 08:49, the PC up at 09:50) was dropped the moment it was claimed, its record already gone,
+and the take queued again at the back. And heavy_job_test's 61 block, whose made-up place is three hours old, failed
+on main's code (read with this machine's real boot) for three hours after any boot: the cut's suite failed five checks.
+Now take writes "queued" as now and the carried time as "ticket"; the order is the ticket file's name, as since 25, so
+the place sorts where it stood for this code and older code alike, and older code reads the entry as live. keep_place
+keeps the ticket, not "queued", so a place given back again keeps its first time. GATE_REVISION unchanged: no judge's
+rule moves, and older code reads the new entry right. Two readers of "queued" now count from the claim, not the
+first ticket: due_row's wait toward a local suite going lean (a suite_remote landing has no lean form), and status's
+queued time for a reclaimed row. heavy_job_test: main's code in the 61 block reads the test's boot,
+not the machine's; a new row boots the machine after the ticket and before the claim and finds the reclaimed take still
+queued by this code and main's (it fails on main's code, with its cascade, 7 rows); the place kept again carries its
+first ticket. RESULT: PASS. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
 ## 395. UI sounds
 

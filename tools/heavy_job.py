@@ -934,7 +934,7 @@ def keep_place(tree, entry, owner, now=None):
     now = time.time() if now is None else now
     os.makedirs(_path(PLACES), exist_ok=True)
     _write(_path(PLACES, "%s.json" % tree), {"tree": tree, "kind": entry.get("asked") or entry["kind"],
-        "queued": float(entry["queued"]), "kept_at": now, "frozen_seen": now, "owner": owner})
+        "queued": float(entry.get("ticket", entry["queued"])), "kept_at": now, "frozen_seen": now, "owner": owner})
 
 
 def places():
@@ -2321,8 +2321,11 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         log("refused", tree, kind, "%.1f + %.0f GB over %.0f GB of RAM" % (row["ram_gb"], MARGIN_GB, total))
         raise SystemExit(4)
     kept = claim_place(tree, kind)
-    queued = kept if kept is not None else time.time()
-    # A kept place's queue time is its ticket (394 amended (61)): it sorts where it stood.
+    queued = time.time()
+    # A kept place's queue time is its ticket (394 amended (61)): it sorts where it stood. Its
+    # "queued" is now, the old time kept as "ticket": every judge drops an entry queued before
+    # the machine's boot (_entries), and a place kept across a reboot is not from before it.
+    carried = {"ticket": kept} if kept is not None else {}
     ticket = "%019d-%s-%s.json" % (int(round(kept * 1e9)) if kept is not None else time.time_ns(), tree, pid or os.getpid())
     if kept is not None:
         log("place_kept", tree, kind, "queued again at its place from before the freeze (%s, %.0f min ago) (394 amended (61))" % (
@@ -2339,7 +2342,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         asker_since = started_at(asker) if asker else None
         ticket_entry = dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
             "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued,
-            "gate": GATE_REVISION, "checkout": CHECKOUT, "lock_rule": LOCK_RULE},
+            "gate": GATE_REVISION, "checkout": CHECKOUT, "lock_rule": LOCK_RULE}, **carried,
             **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {}),
             **({"asker": asker, "asker_since": asker_since} if asker else {}))
         # A kind that starts past the queue (394 amended (48)) writes its row only once it
@@ -2499,7 +2502,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 entry = {"tree": tree, "kind": "suite_remote", "asked": kind, "pid": pid, "pid_since": started_at(pid),
                     "queued": queued, "started": time.time(), "ram_gb": swapped["ram_gb"], "commit_gb": commit_of(swapped),
                     "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": watched, "estimate": "suite_remote",
-                    "gate": GATE_REVISION, "checkout": CHECKOUT}
+                    "gate": GATE_REVISION, "checkout": CHECKOUT, **carried}
                 if not watched:
                     # 394 amended (37): a swapped take is guarded as any other.
                     guard(entry, *guard_holder(pid, caller))
@@ -2524,7 +2527,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 entry = {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
                     "using_commit_gb": 0.0, "watched": watched, "estimate": estimate,
-                    "gate": GATE_REVISION, "checkout": CHECKOUT}
+                    "gate": GATE_REVISION, "checkout": CHECKOUT, **carried}
                 if not watched:
                     guard(entry, *guard_holder(pid, caller))
                 if past:

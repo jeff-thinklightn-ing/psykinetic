@@ -2896,6 +2896,10 @@ spec61 = importlib61.spec_from_file_location("heavy_job_main61", os.path.join(ma
 old61 = importlib61.module_from_spec(spec61)
 spec61.loader.exec_module(old61)
 print("  main's gate code: revision %s beside this one's %d" % (old61.GATE_REVISION, gate.GATE_REVISION))
+# Main's code reads this machine's boot as well: entries made up as hours old would be dropped
+# as from before it for three hours after any boot (v0.1.229's cut, 11-17).
+boot61 = old61.boot_time
+old61.boot_time = gate.boot_time
 for each in (gate, old61):
     each.MARGIN_GB, each.COMMIT_MARGIN_GB = 8.0, 4.0
     each._memory = lambda: (free61[0], free61[0])
@@ -3031,8 +3035,17 @@ free61[0] = 5.0
 claimed61 = taker61("enemy-ai-digger")
 until61(lambda: "enemy-ai-digger" in trees61("queue"))
 entry61 = next(each for each in gate._entries("queue") if each["tree"] == "enemy-ai-digger")
-check(abs(entry61["queued"] - (now61 - 3 * 3600)) < 1.0 and not gate.places(),
-    "the tree's next take reclaims its place: the record gone, its first queue time carried")
+check(abs(entry61.get("ticket", 0.0) - (now61 - 3 * 3600)) < 1.0 and abs(int(entry61["file"].split("-")[0]) / 1e9 - (now61 - 3 * 3600)) < 1.0
+    and abs(entry61["queued"] - time.time()) < 60.0 and not gate.places(),
+    "the tree's next take reclaims its place: the record gone, its first queue time carried as its ticket, queued now")
+# 394 amended (61)'s reboot row: the machine started after the place's ticket and before the claim
+# (11-17: places kept at the 09:35 freeze carried tickets from 04:15, the PC booted at 09:50).
+# Each judge drops an entry queued before the boot; the reclaimed one is queued now.
+gate.boot_time = old61.boot_time = lambda: now61 - 3600
+check([each["tree"] for each in gate._entries("queue")] == ["enemy-ai-digger"]
+    and [each["tree"] for each in old61._entries("queue")] == ["enemy-ai-digger"],
+    "booted after its ticket and before its claim: the reclaimed take stays queued, this code and main's alike")
+gate.boot_time = old61.boot_time = lambda: 0.0
 behind61 = [queued61("maps", "scene", old61), queued61("psykinetic-release", "godot_export", old61)]
 check(trees61("queue") == ["enemy-ai-digger", "maps", "psykinetic-release"] and not trees61("running"),
     "short of room: the reclaimed landing first, main's-code scene and export behind it (%s)" % trees61("queue"))
@@ -3043,7 +3056,8 @@ with contextlib.redirect_stdout(io.StringIO()):
 claimed61.join(5)
 check(until61(lambda: {"maps", "psykinetic-release"} <= set(trees61("running")), 15.0),
     "the scene and the cut's export queued behind it on main's code start, as they do today (%s)" % trees61("running"))
-check([each["tree"] for each in gate.places()] == ["enemy-ai-digger"], "the landing given back at the lock keeps its place again")
+check([(each["tree"], round(each["queued"])) for each in gate.places()] == [("enemy-ai-digger", round(now61 - 3 * 3600))],
+    "the landing given back at the lock keeps its place again, at its first ticket")
 old61.release("maps", "scene")
 old61.release("psykinetic-release", "godot_export")
 for each in behind61:
@@ -3095,6 +3109,7 @@ for each in held61:
 clear61()
 unfreeze61()
 gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = mem61, total61, poll61
+old61.boot_time = boot61
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = margins61
 shutil.rmtree(main_dir61, ignore_errors=True)
 if local61 is None:
