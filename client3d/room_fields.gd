@@ -329,6 +329,7 @@ const ROOM: Array[StringName] = [
 	&"_far_root",
 	&"_fire_lights",
 	&"_fire_panes",
+	&"_flood_solid",  # 751 amended (10).
 	&"_floor_bytes",
 	&"_floor_lookup",
 	&"_floor_mask",

@@ -97,10 +97,14 @@ static func camp_fires(client) -> Array[Vector2i]:
 	return _camp_fires
 
 
-## The rain falling on [param cell] (0..1): the weather's, outdoors, not walled in.
+## The rain falling on [param cell] (0..1): the weather's, outdoors, unless
+## walled in and sheltered (775 amended (2), Client3D.sheltered): the cell
+## enclosed and no drawn building over it roofless, in ruin or gone. A
+## roofless ruin walled in is wet; a walled room with no building drawn over
+## it (the castle's) is dry, as before.
 static func rain_on(client, cell: Vector2i) -> float:
 	var weather = client._weather_view  # WeatherView
-	if weather == null or not weather.outdoor or client._enclosed.has(cell):
+	if weather == null or not weather.outdoor or client._enclosed.has(cell) and client.sheltered(cell):
 		return 0.0
 	return float(weather.weather.get("rain", 0.0))
 

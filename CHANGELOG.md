@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The temple and the healers' huts are indoors: step inside one and the camera takes its inside view and the rain stays off you, while a ruin with no roof lets the rain in (751 amended (10), 775 amended (2)).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - Up close by day, hair near a face's own colour is a shade darker at its hairline, so it reads as hair (419 amended (12)).
 - Anyone who slouches, a companion or a townsperson, runs with arms beside the body too (953 amended (3)).

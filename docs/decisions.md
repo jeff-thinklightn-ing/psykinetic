@@ -45203,6 +45203,40 @@ stall or a field not); on a map not out of doors (the tavern's rooms) the rect a
 keep interiors as they are). view_test, on the real wilds: under W1, M2 and M3 out of doors, in the hut
 H2 and the forge H1 indoors. Drawing only, protocol unchanged, no new class_name.
 
+751 amended (10) (a solid piece in a building closes its room; maps, in buildings' place on the coordinator's
+ruling of 2026-11-17, its session stopped; ui-design's bed strips: Aldous the priest asleep on an out-of-doors
+bedroll inside the temple, C:\dev\review\ui-design\looks\bedroll2_add6023bd\; the label from
+decision_number.sh). Out of doors, Client3D._find_enclosed's flood took a step onto a cell off the floor as the
+open ground, so a solid piece standing in a building opened its room: the temple's altar T3 ((199,201..202), off
+the floor) let the flood out of T1 through four open edges, and none of its 58 floor cells were walled in,
+Aldous's (199,204) neither; and _walled is false outdoors for an edge with a side off the floor, so the healer's
+hut T2 (building.turf_house, art-walled: its walls are edges between its 13 floor cells and its own bank,
+furnishings and furnished bed) closed nothing either. Every reader of _enclosed was wrong there: the bedroll,
+671's inside view (_tell_inside), and rain (WetLook.rain_on). Now the flood has its own test,
+Client3D._flood_bounds: _walled, or out of doors an edge beside a cell off the floor in the rect of a drawn
+building whose rect holds floor (_flood_solid, made by _find_flood_solid on each full work-out), never a cell of
+the inn's shell (_shell_at: its doorway cells stay out of doors) nor a gone building's. _closes (its gap rule
+too) and the seeds read it; _walled is unchanged, and nothing but the flood calls _walled or _closes (git grep,
+every script). Such a cell is off the floor, so never indoors itself; a solid piece in the open (the cairn,
+stones, the woodpiles, the well, the stalls, the mound) is in no rect with floor and closes nothing. The two
+laid ruins C3 and B2 are as before: their ways in are open edges (489: C3's corner pair, B2's two-wide gaps),
+not cells. The wilds, walled in: 72 cells in 5 spaces before (H1, H4, H2, H3, S1), 143 in 10 after (T1's 58 in
+one; T2's 13 in four, as a one-cell neck between its solid pieces closes as a lone gap between walls does,
+ENCLOSED_GAP: its door cell (152,232) and the cells at (150,233) and (150,235), all indoors). Aldous: indoors
+with no bed every branch of _sync_bedroll fell through to the bare floor, so the wilds lays the temple a decor
+"bedroll" at (199,204) (the camp trader's kind, 799 amended (3)), which _decor_bedroll lies him on at its 0.09:
+the level changes by drawn decor only, the server needs nothing. Out of the wilds the forest's healer's hut H1
+(641, the same building.turf_house, faced south) walls in its 13 floor cells the same way (a room of 10 and
+three one-cell necks; out of doors before); maps' probe over every outdoor level (the wilds, forest, foothills,
+hills, Towerside, castle, bear yard) finds no other space walled in or let out. Rain kept off a walled-in cell
+unless a drawn building over it is roofless, in ruin or gone is 775 amended (2), in this commit. view_test
+_test_indoors_round_pieces (on the real wilds): the temple's 58 cells walled in and indoors and the altar's two
+not; T2's 13; the inn shell's four doorway cells out of doors; C3, B2 and the pieces in the open none; the whole
+map 143 in 10 (T2 four), each in a house, hut, shed, the temple or T2; _walled false on the altar's four edges
+and T2's walls, _flood_bounds true; Aldous on the level's bedroll; the forest's healer's hut's 13 walled in,
+indoors and dry in rain; the castle's two hand-walled rooms walled in and dry. Client and level decor; protocol
+unchanged; no new class_name.
+
 ## 749. Spawn safety: the nearest safe cell first
 
 750, combat's side (2). The heavy axes too. The coordinator: Jeff's
@@ -48475,6 +48509,28 @@ CPUParticles3D. view_test _test_wet: soaked to the waist with the camera 7 m off
 WetLook.update's steps leave eight drips going from the hem's height (it read 0 before, and the
 suite's error rule fails the scene on the old line). Client only, protocol unchanged, no new
 class_name; a bullet through voice.
+
+775 amended (2): rain let in where a building over a walled-in cell has no roof (environment's, the
+coordinator's ruling of 2026-11-17 on maps' find in its indoors take: Client3D._find_enclosed flooded past a
+solid piece standing in a building, the temple's altar, so the temple's 58 cells and the healer's hut T2 read as
+out of doors, and rain fell on the priest at his altar; and the reader's own latent fault, that any ruin whose
+wall stubs did close read dry in rain with no roof over it). WetLook.rain_on gives a cell no rain when it is
+walled in (_enclosed) and sheltered (Client3D.sheltered, maps': the cell's _building_at entry, neither in ruin
+nor gone by its _show_state decline, and either a level's roof (364, an entry with "roof_index": the builder's
+roof over a room walled by hand, or an open shelter on posts) or a drawn building whose rect holds the cell and
+is not Level.roofless; a walled space with no building drawn over it is sheltered, as 775 read every walled-in
+space). A roofless building and a ruin take the rain as the open ground does. A level that wants an open walled
+yard marks it so, and none does today (the coordinator, on maps' probe over every outdoor level: walled yards
+with no building over them exist on no level, and the castle's two hand-walled rooms, the keep's east chamber
+(23..27, 4..8) and the room of the stair down to the Dwarven Halls (11..13, 17..19), are rooms a player takes
+for indoors, so they stay dry). The castle's keep hall, open to the south, and its west chamber, whose west wall
+stands beside the pond (an edge with a side off the floor is no wall out of doors), are not walled in, and are
+wet in rain before this and after. view_test rows: in rain the temple, Aldous's corner, the healer's hut, H2 and
+the forest's healer's hut dry, outside the temple's doors wet; the wilds' and the forest's healer's huts told a
+ruin by Client3D.set_huts (the "huts" message's own path, 733) wet, told standing again dry; on _test_roofs'
+walled room, under its "roofs" rect dry, the roofed one in ruin wet, the same walls with no building over them
+dry; the castle's two rooms dry; _test_wet's walled cell dry, as on 2026-11-03. Drawn only, as 775: nothing
+sent.
 
 ## 778. Filling the hills, phase 2: landmarks, roadside sights, stories (bare)
 
