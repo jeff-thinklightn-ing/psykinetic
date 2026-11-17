@@ -846,10 +846,11 @@ func _test_bandaging() -> void:
 ## at the line. Every other part, a beard, the bun, the tail, long hair's fall, a hood, a hat and the body with its brows,
 ## is (0, 0): no root. And the import keeps light baking off UV2 (meshes/light_baking 1): at 2 Godot unwraps into UV2
 ## over the hairline without a word (art-kit's watch point).
-## The darker root by day (419 amended (12); the coordinator's ruling (iv) on root3_69ca53c76): full under an open
-## midday sky (while the carried lantern is hidden), none by dusk (take 3's 19:00) and at night, a ramp between, from the
-## shader global hair_root_day that Client3D writes beside look_day; 0 in a room or underground; the
-## character window's body held full (hair_root_full) whatever the hour.
+## The darker root by day (419 amended (12); the coordinator's ruling (iv) on root3_69ca53c76, tied to the lantern):
+## full while the carried lantern is hidden, none once it shows at half its strength (and so at take 3's 19:00 and at
+## night), a straight ramp between, from the shader global hair_root_day that Client3D writes beside look_day; 0 in
+## a room or underground; the character window's body held full (hair_root_full) whatever the hour. The shader's two
+## ends are 1 less Client3D's LANTERN_DAY_LEAST and ROOT_GONE_LANTERN, so neither is retuned without the other.
 func _test_hair_root_by_day() -> void:
 	print("
 == the hair's darker root follows the daylight; the character window's held full (419 amended (12)) ==")
@@ -858,10 +859,11 @@ func _test_hair_root_by_day() -> void:
 	var full := _shader_const(code, "ROOT_DAY_FULL")
 	var dusk := Client3D.day_share(0.21)  # Take 3's 19:00: the sim's daylight 0.21 (its tour log).
 	var noon := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, 50.0)
-	_check(smoothstep(none, full, dusk) == 0.0 and smoothstep(none, full, noon) == 1.0 and smoothstep(none, full, 0.0) == 0.0
-		and smoothstep(none, full, (none + full) * 0.5) > 0.0 and smoothstep(none, full, (none + full) * 0.5) < 1.0
-		and is_equal_approx(full, 1.0 - Client3D.LANTERN_DAY_LEAST),
-		"the root's share: full while the carried lantern is hidden (from %.2f, 1 - LANTERN_DAY_LEAST), none at take 3's 19:00 (daylight %.3f) and at night, full at noon (%.3f), a ramp between (%.2f..%.2f)" % [full, dusk, noon, none, full])
+	var share := func(day: float) -> float: return clampf((day - none) / (full - none), 0.0, 1.0)  # The shader's by_day.
+	_check(is_equal_approx(full, 1.0 - Client3D.LANTERN_DAY_LEAST) and is_equal_approx(none, 1.0 - Client3D.ROOT_GONE_LANTERN),
+		"the root's ends are the lantern's: full from %.2f (1 - LANTERN_DAY_LEAST, the lantern hidden), none from %.2f (1 - ROOT_GONE_LANTERN, at half its strength)" % [full, none])
+	_check(share.call(dusk) == 0.0 and share.call(0.0) == 0.0 and share.call(noon) == 1.0 and is_equal_approx(share.call((none + full) * 0.5), 0.5),
+		"the root's share: none at take 3's 19:00 (daylight %.3f) and at night, full at noon (%.3f), straight between (half at %.2f)" % [dusk, noon, (none + full) * 0.5])
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
 	var had_hour := DayNight.hour(DayNight.now())

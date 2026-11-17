@@ -865,6 +865,11 @@ const LANTERN_ENERGY := 1.2
 const LANTERN_BY_DAY := true
 static var lantern_by_day := LANTERN_BY_DAY
 const LANTERN_DAY_LEAST := 0.02
+## The carried lantern's share of its strength (lantern_dark) from which the hair's darker root is gone
+## (419 amended (12)): the root answers the lantern that lights a crown and not its face at dusk, full
+## while it is hidden (LANTERN_DAY_LEAST), none from here, straight between; human_body.gdshader's
+## ROOT_DAY_FULL and ROOT_DAY_NONE are 1 less these two (view_test holds it).
+const ROOT_GONE_LANTERN := 0.5
 ## The lantern hung (451 amended (4), pc-character's side): art-kit's gear.lantern in the room the
 ## two code boxes filled, its ring's top LANTERN_RING under its socket (belt_r's, its frame turned)
 ## or LANTERN_RING + LANTERN_TALL over a hung one's anchor (a post's arm, a hand's CARRIED_HANG).

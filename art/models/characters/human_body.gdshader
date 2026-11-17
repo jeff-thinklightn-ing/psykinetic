@@ -23,17 +23,18 @@ instance uniform vec4 dye : source_color = vec4(0.0);
 // show, the cap's quads coarser than the band; "deep", the coordinator's pick on root3_69ca53c76 over 9 cm at 0.5).
 // Only hair near the face's own light needs it: the full root while the hair's light is at most ROOT_FULL_TO of the
 // skin's, none from ROOT_NONE_FROM (blond and grey on the pale skins, drawn close to the face's light by heads by day,
-// keep their crown as it was). And only by day: by dusk the carried lantern lights the crown and not the face, so a
-// darker hairline moved the crown toward the face (take 3 at 19:00, the sim's daylight 0.21); the root is full from
-// ROOT_DAY_FULL of the open sky's daylight (hair_root_day, Client3D's look_day on an outdoor level, 0 in a room or
-// underground), where the lantern begins to show (1 - Client3D.LANTERN_DAY_LEAST), none at or under ROOT_DAY_NONE
-// (the sun about 1 degree up), between them a ramp. hair_root_full 1 holds it full whatever the hour
+// keep their crown as it was). And only while the carried lantern is weak: by dusk it lights the crown and not the
+// face, so a darker hairline moved the crown toward the face (take 3 at 19:00, the sim's daylight 0.21). The root
+// answers the lantern's own curve through the open sky's daylight (hair_root_day, Client3D's look_day on an outdoor
+// level, 0 in a room or underground; the lantern's strength is 1 - it): full from ROOT_DAY_FULL, while the lantern
+// is hidden (1 - Client3D.LANTERN_DAY_LEAST), none from ROOT_DAY_NONE down, the lantern at half its strength
+// (1 - Client3D.ROOT_GONE_LANTERN), a straight ramp between (view_test holds both equalities). hair_root_full 1 holds it full whatever the hour
 // (the character window's body, where a hair colour is picked to read as it will by day).
 const float ROOT_BAND = 0.07;
 const float ROOT_DARK = 0.55;
 const float ROOT_FULL_TO = 0.55;
 const float ROOT_NONE_FROM = 0.85;
-const float ROOT_DAY_NONE = 0.64;
+const float ROOT_DAY_NONE = 0.5;
 const float ROOT_DAY_FULL = 0.98;
 global uniform float hair_root_day;
 instance uniform float hair_root_full = 0.0;
@@ -47,7 +48,7 @@ void fragment() {
 	float root = UV2.y * (1.0 - smoothstep(0.0, ROOT_BAND, UV2.x));
 	float near_face = light_of(hair.rgb) / max(light_of(skin.rgb), 0.01);
 	float spared = smoothstep(ROOT_FULL_TO, ROOT_NONE_FROM, near_face);
-	float by_day = smoothstep(ROOT_DAY_NONE, ROOT_DAY_FULL, max(hair_root_day, hair_root_full));
+	float by_day = clamp((max(hair_root_day, hair_root_full) - ROOT_DAY_NONE) / (ROOT_DAY_FULL - ROOT_DAY_NONE), 0.0, 1.0);
 	vec3 hair_seen = hair.rgb * mix(1.0, ROOT_DARK, root * (1.0 - spared) * by_day);
 	vec3 own = skin.rgb * part.r + hair_seen * part.g + tunic.rgb * part.b + trousers.rgb * part.a;
 	float tinted = clamp(part.r + part.g + part.b + part.a, 0.0, 1.0);
