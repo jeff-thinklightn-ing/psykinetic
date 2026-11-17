@@ -461,6 +461,11 @@
 		},
 		"apart": {
 			"robber": [10, 7]
+		},
+		"knot": {
+			"_": "870 amended (1): the robbers that find no room apart laid in pairs first, then threes only as the room asks; Brand's knot him and one (Crypt._lay_knot).",
+			"leader": "robber_brute",
+			"with": 1
 		}
 	},
 	"rooms": {

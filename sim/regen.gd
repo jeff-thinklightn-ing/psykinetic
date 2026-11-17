@@ -475,6 +475,16 @@ static func layout_options(config: Dictionary) -> Dictionary:
 ## he sees or hears), when the block holds or prefers "first"; else [] (the
 ## rule off). Read from the AI's constants, never a copy in level.json, so
 ## the layout's promise and the rally stay one measure.
+## 870 amended (1): the block's "knot" {leader (a kind), with (how many may
+## stand in the leader's join reach)}, for Crypt._lay_knot; {} when it has
+## none (the band laid as Labyrinth._lay lays it).
+static func knot(config: Dictionary) -> Dictionary:
+	var knot: Variant = config.get("knot")
+	if not knot is Dictionary or str((knot as Dictionary).get("leader", "")).is_empty():
+		return {}
+	return {"leader": str((knot as Dictionary)["leader"]), "with": int((knot as Dictionary).get("with", 1))}
+
+
 static func first_alone(config: Dictionary) -> Array:
 	var rules: Array = (config.get("held", []) as Array) + (config.get("prefer", []) as Array)
 	return [Monster.RALLY_SEE, Monster.RALLY_HEAR] if "first" in rules else []

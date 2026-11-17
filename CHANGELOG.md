@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
 - In a fight your companion stays near you, chasing a foe farther only when you're fighting it too (957).
 - Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).
 - In the crypt, clicking a wall niche walks you to it and presses it, even from right in front of it, so once the fallen knight has told you of the way down, the niche that hides it opens to a click, and the stair behind it takes you down at the first click (608 amended (8)).

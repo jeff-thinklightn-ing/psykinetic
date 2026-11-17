@@ -17,8 +17,11 @@ const BARROW_BREACH := Vector2i(160, 160)
 ## Where the crypt's door (BARROW_DOOR) sets one down in the wilds: the
 ## temple's from_crypt.
 const TEMPLE_ARRIVAL := Vector2i(198, 199)
-## Felled before the quest is taken, for the count at the taking.
-const FELLED_FIRST := "tull"
+## Felled before the quest is taken, for the count at the taking: the
+## band's first name, its first post in cell order, far from Brand's (870
+## amended (1): Tull, the last, is often Brand's man, and felling him left
+## the knot's count at Brand's post one).
+const FELLED_FIRST := "crake"
 const BARROW_ARRIVAL := Vector2i(40, 2)
 ## The fallen knight's post, by the First Hall's bier (747 amended (8); the
 ## Low Hall, his old room, gone since 747 amended (13)).
@@ -276,6 +279,8 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 	var deaths := 0
 	var bosses := {}
 	var to_camp := false
+	_crowd = {"on": true, "most": 0, "most_at": "", "at_post": 0, "at_post_at": "", "post": null, "met": [], "known": {}}
+	_watch_crowd(bot, since)  # 870 amended (1): runs beside the fights, every quarter second.
 	while bot.now_msec() < end:
 		for boss: GridEntity in bot.seen("robber").filter(func(e: GridEntity) -> bool: return e.get("boss") == true):
 			bosses[boss.get_instance_id()] = str(boss.get("given_name"))
@@ -319,10 +324,55 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 			await bot.seconds(1.0)
 			bot.expect(not given in _unticked(bot), "%s is ticked on the tracker once felled" % given, "left: %s" % [_unticked(bot)])
 	bot.log_line("fights over: %d times down; left %s" % [deaths, _unticked(bot)])
+	_crowd["on"] = false
+	bot.log_line("who came first, each the first time he stood within 2 cells of me: %s" % [_crowd["met"]])
+	bot.log_line("the most of the band within 2 cells of me at once: %d (%s)" % [_crowd["most"], _crowd["most_at"]])
+	bot.log_line("at Brand's post %s (within 5 cells of it), the most at once: %d (%s)" % [_crowd["post"], _crowd["at_post"], _crowd["at_post_at"]])
+	bot.expect(_crowd["post"] != null and int(_crowd["at_post"]) >= 1 and int(_crowd["at_post"]) <= 2,
+		"at Brand's post at most two of the band come at me at once (870 amended (1): his knot him and one)", "%d (%s)" % [_crowd["at_post"], _crowd["at_post_at"]])
 	# Brand's swings as the client saw them, whoever he swung at.
 	bot.expect(not bosses.is_empty(), "a boss was seen in the barrow")
 	for id: int in bosses:
 		_sledge(bot, bosses[id], id, since)
+
+
+## How many of the band came at once (870 amended (1), the coordinator's
+## ruling, 11-16: the sim's knot of two shown on a joined client): while
+## [member _crowd]'s "on", every quarter second, the band the client sees
+## standing within 2 cells of me (enemy-ai's "on her" by place: a client
+## sees no foe's target); the most at once anywhere, and within 5 cells of
+## Brand's post (his tile when first seen); each one's first time there,
+## in order ("who came first"), with the run's second and my cell.
+var _crowd := {}
+
+
+func _watch_crowd(bot: Node, since: int) -> void:
+	while bool(_crowd.get("on", false)):
+		var me: Player = bot.me()
+		if me != null and bot.zone() == "barrow" and int(me.hp) > 0:
+			var band: Array = bot.seen("robber").filter(func(e: GridEntity) -> bool: return e is Monster and (e.get("hp") == null or int(e.get("hp")) > 0))
+			for one: GridEntity in band:
+				if one.get("boss") == true and _crowd["post"] == null:
+					_crowd["post"] = one.tile
+			var near: Array = band.filter(func(e: GridEntity) -> bool: return World.distance(e.tile, me.tile) <= 2)
+			var at := "%.1f s, me at %s: %s" % [(bot.now_msec() - since) / 1000.0, me.tile, near.map(func(e: GridEntity) -> String: return "%s %s" % [str(e.get("given_name")), e.tile])]
+			for one: GridEntity in near:
+				var key := str(_band_name(one))
+				if not (_crowd["known"] as Dictionary).has(key):
+					_crowd["known"][key] = true
+					(_crowd["met"] as Array).append("%s %.1f s" % [key, (bot.now_msec() - since) / 1000.0])
+			if near.size() > int(_crowd["most"]):
+				_crowd["most"] = near.size()
+				_crowd["most_at"] = at
+			if _crowd["post"] != null and World.distance(me.tile, _crowd["post"]) <= 5 and near.size() > int(_crowd["at_post"]):
+				_crowd["at_post"] = near.size()
+				_crowd["at_post_at"] = at
+		await bot.seconds(0.25)
+
+
+func _band_name(one: GridEntity) -> String:
+	var given := str(one.get("given_name"))
+	return given if not given.is_empty() else String(one.name)
 
 
 ## The knight's line after a fall (747 amended (15), voice's words): after the first fall

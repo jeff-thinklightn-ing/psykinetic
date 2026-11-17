@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_torches_seen()
 	_test_chest_guardable()
 	_test_crypt_spacing()
+	_test_band_knot()
 	_test_hall_shortcut()
 	await _test_throne_way_held()
 	await _test_draugr_hall_is_his_room()
@@ -1538,6 +1539,101 @@ func _test_crypt_spacing() -> void:
 ## ranks worst, so each lays every chest guarded: three, or fewer where too
 ## few rooms can hold a guard (191 lays two; the saturn sweep, 6 of 300 short,
 ## main 2).
+## 870 amended (1) (rung 3, "none+"; enemy-ai's seeded run, the starting
+## sword, 32 seeds: three or more of the band on a newcomer before the dig 22
+## to 1, the knot's falls from 15 hp or more 5 to 3): the band's posts that
+## find no room apart laid in pairs first (Crypt._lay_knot), Brand's knot
+## him and one. Read from the chapel stair over the barrow's generations 1-8
+## as the rally reaches (LayoutSense.band_walks): Brand's knot two at most,
+## no knot over two met before him; without the block's "knot" the old lay's
+## knot at Brand of three or four (the fault). A forced-tight barrow (more
+## robbers than pairs make room for): threes laid, Brand's still two.
+func _test_band_knot() -> void:
+	print("
+== 870 amended (1): Brand's knot two, the band's overflow in pairs first ==")
+	var reach := [Monster.RALLY_SEE, Monster.RALLY_HEAR]
+	var kinds := ["robber", "robber_brute"]
+	var read := func(prepared: Dictionary, generation: int) -> Dictionary:
+		var made := Regen.generate_prepared(prepared, generation)
+		if made.is_empty():
+			return {}
+		var level := Level.parse(made["layout"], made["height"], made["config"])
+		var brand := Vector2i(-1, -1)
+		var band := 0
+		for spec: Dictionary in level.get("entities", []):
+			if str(spec.get("kind", "")) in kinds:
+				band += 1
+			if str(spec.get("kind", "")) == "robber_brute":
+				brand = spec["tile"]
+		var met: Array = LAYOUT_SENSE.band_walks(level, kinds, reach, "from_breach").get("from_chapel", [])
+		var callers := {}
+		for post: Dictionary in met:
+			callers[post["at"]] = post["callers"]
+		var knot_of := func(at: Vector2i) -> Array:
+			var knot: Array = [at]
+			var i := 0
+			while i < knot.size():
+				for other: Vector2i in callers.get(knot[i], []):
+					if not knot.has(other):
+						knot.append(other)
+				i += 1
+			return knot
+		var before := 0
+		for post: Dictionary in met:
+			if post["at"] == brand:
+				break
+			before = maxi(before, (knot_of.call(post["at"]) as Array).size())
+		var biggest := 0
+		for post: Dictionary in met:
+			biggest = maxi(biggest, (knot_of.call(post["at"]) as Array).size())
+		return {"brand": brand, "band": band, "knot": (knot_of.call(brand) as Array).size(), "before": before, "biggest": biggest, "met": met.size()}
+	var prepared := Regen.prepare("barrow")
+	var config: Dictionary = prepared.get("config", {})
+	var carried: bool = Regen.knot(config) == {"leader": "robber_brute", "with": 1} and Regen.knot({}).is_empty()
+	_check(carried, "the barrow's block carries the knot, Brand and one (%s)" % [Regen.knot(config)])
+	if not carried:
+		return
+	var rows: Array[String] = []
+	var bad: Array[String] = []
+	var old_knots: Array[int] = []
+	var kept: Variant = config["knot"]
+	for generation in range(1, 9):
+		var now: Dictionary = read.call(prepared, generation)
+		config.erase("knot")
+		var was: Dictionary = read.call(prepared, generation)
+		config["knot"] = kept
+		if now.is_empty() or was.is_empty():
+			bad.append("%d not laid" % generation)
+			continue
+		old_knots.append(int(was["knot"]))
+		rows.append("  gen %d: Brand %s, his knot %d (the old lay's %d), the biggest met before him %d (the old lay's %d), %d of the band met" % [generation, now["brand"], now["knot"], was["knot"], now["before"], was["before"], now["met"]])
+		if int(now["knot"]) > 2 or int(now["before"]) > 2 or int(now["band"]) != int(was["band"]):
+			bad.append("%d: %s" % [generation, now])
+	for row in rows:
+		print(row)
+	_check(bad.is_empty(), "the barrow's generations 1-8: Brand's knot two at most, no knot over two met before him, the band whole (%s)" % [bad])
+	_check(old_knots.any(func(n: int) -> bool: return n > 2), "without the block's knot the old lay's knot at Brand passes two (the fault this mends: %s)" % [old_knots])
+	# Forced tight: more robbers than the barrow's room makes pairs for.
+	var tight := prepared.duplicate(true)
+	(tight["config"]["monsters"] as Dictionary)["robber"] = 14
+	var tight_rows: Array[String] = []
+	var tight_bad: Array[String] = []
+	var threes := 0
+	for generation in [1, 2, 3]:
+		var now: Dictionary = read.call(tight, generation)
+		if now.is_empty():
+			tight_bad.append("%d not laid" % generation)
+			continue
+		tight_rows.append("  tight gen %d: band %d, Brand's knot %d, the biggest knot %d" % [generation, now["band"], now["knot"], now["biggest"]])
+		if int(now["biggest"]) > 2:
+			threes += 1
+		if int(now["knot"]) > 2 or int(now["band"]) != 15:
+			tight_bad.append("%d: %s" % [generation, now])
+	for row in tight_rows:
+		print(row)
+	_check(tight_bad.is_empty() and threes > 0, "a forced-tight barrow (14 robbers and Brand): all laid, knots past two where pairs run out (%d of 3), Brand's still two at most (%s)" % [threes, tight_bad])
+
+
 func _test_chest_guardable() -> void:
 	print("
 == a chest only where its guard can stand (806 amended (15)) ==")

@@ -1396,7 +1396,65 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 			for other: String in kinds.slice(0, kinds.find(kind)):
 				if str(near.get(other, near.get("_all", ""))) == anchor_name:
 					with.append("monster_" + other)
+		# 870 amended (1): the block's "knot", the leader's knot him and one.
+		var knot := Regen.knot(config)
+		if not knot.is_empty() and gap is Array and kind != str(knot["leader"]) and with.has("monster_" + str(knot["leader"])):
+			_lay_knot(map, anchors, "monster_" + kind, int(left[kind]), spots, gap, with, "monster_" + str(knot["leader"]), int(knot["with"]))
+			continue
 		Labyrinth._lay(map, anchors, "monster_" + kind, int(left[kind]), spots, int(gap[0]) if gap is Array else int(gap), int(gap[1]) if gap is Array else -1, with)
+
+
+## 870 amended (1) (rung 3, the coordinator's "none+", 11-16: a newcomer
+## needs Brand's knot two, never four): the band laid as ever, each post
+## [param gap] ([clear, walled]) from every other and every [param with];
+## but where Labyrinth._lay's second pass laid those that found no room
+## apart at no gap, nearest the camp, so beside the leader (Brand with one
+## to three calling each other, met together), here they are laid in knots
+## of two first, then of three only as the room asks, and so on: a knot
+## being the posts joined through each other's reach (_knot_of). A
+## [param leader]'s knot is never past him and [param allow], whatever the
+## room.
+static func _lay_knot(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], gap: Array, with: Array, leader: String, allow: int) -> void:
+	var placed: Array[Vector2i] = []
+	var leaders: Array[Vector2i] = []
+	for cell: Vector2i in map.cells:
+		if map.cells[cell] == marker or with.has(map.cells[cell]):
+			placed.append(cell)
+		if map.cells[cell] == leader:
+			leaders.append(cell)
+	var near := func(a: Vector2i, b: Vector2i) -> bool: return Labyrinth._too_near(map, a, b, int(gap[0]), int(gap[1]))
+	var laid := 0
+	# Knots of cap at most, nearest first: 1 is the apart rule itself.
+	for cap in range(1, count + placed.size() + 2):
+		for cell in spots:
+			if laid >= count:
+				return
+			if map.cell(cell) != FLOOR or Labyrinth._beside_anchor(anchors, cell) or placed.has(cell):
+				continue
+			var knot := _knot_of(placed, cell, near)
+			var most := mini(cap, allow + 1) if knot.any(func(other: Vector2i) -> bool: return leaders.has(other)) else cap
+			if knot.size() > most:
+				continue
+			map.set_cell(cell, marker)
+			placed.append(cell)
+			laid += 1
+		if laid >= count:
+			return
+
+
+## The knot [param cell] would stand in (870 amended (1)): itself and every
+## one of [param placed] joined to it through each other's reach
+## ([param near]).
+static func _knot_of(placed: Array[Vector2i], cell: Vector2i, near: Callable) -> Array[Vector2i]:
+	var knot: Array[Vector2i] = [cell]
+	var i := 0
+	while i < knot.size():
+		var at := knot[i]
+		i += 1
+		for other in placed:
+			if not knot.has(other) and near.call(at, other):
+				knot.append(other)
+	return knot
 
 
 ## The block's "packs" (823; 832 lays them in the crypt): each lead kind's
