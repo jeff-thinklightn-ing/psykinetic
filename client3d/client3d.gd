@@ -4104,7 +4104,7 @@ func _apply_sky() -> void:
 		_sun.light_color = SUN
 		_sun.light_energy = SUN_ENERGY * share
 		# An inside's night look, the clock's day lifted from it (946).
-		_inside_night = [_environment.ambient_light_color, _environment.ambient_light_energy]
+		_inside_night = [_environment.ambient_light_color, _environment.ambient_light_energy, _sun.light_energy]
 		_inside_step = -1
 		# A cave's floor (304 amended): drawn no darker than CAVE_FLOOR of its
 		# own colour (the sim's cell light left as it is), so its edge reads
@@ -30772,6 +30772,16 @@ const INSIDE_PANE_FADED := 0.1
 ## Mughouse's 0.48).
 const INSIDE_DAY_LIFT := 1.6
 const INSIDE_DAY_WARM := 0.35
+## The room's key light by day (946; the coordinator, 11-17, on ui-design's Keeper's-room row: a pale
+## face facing the key at noon clipped a fifth of its disc, two warm lights summed, the day's ambient
+## and the room's fixed key, 769 amended (6)'s _sun at SUN_ENERGY times the level's share): eased down
+## by INSIDE_KEY_DAY of itself as the day comes, so the windows' ambient carries the room by day and
+## the key is main's by night. The static mirrors the const for tests and stills (a tour sweeps it).
+const INSIDE_KEY_DAY := 0.75
+static var inside_key_day := INSIDE_KEY_DAY
+## The key light's energy on an inside at [param day] (0 night .. 1 day) from its night's [param night].
+static func inside_key_energy(night: float, day: float) -> float:
+	return night * (1.0 - clampf(inside_key_day, 0.0, 1.0) * clampf(day, 0.0, 1.0))
 ## The patches (additive, unshaded): the sun's through a window, warm white,
 ## at INSIDE_SUN_PATCH of the sun's height share; the sky's at a window's
 ## foot (INSIDE_SKY_PATCH, INSIDE_SKY_REACH m in) and at the way out
@@ -31273,6 +31283,8 @@ func _update_inside() -> void:
 	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1])
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
+	# The room's key light by day (inside_key_energy): the windows carry the room then.
+	_sun.light_energy = inside_key_energy(float(_inside_night[2]), day)
 	_environment.background_color = look["haze"]
 	if _inside_pane_material != null:
 		_inside_pane_material.albedo_color = look["pane"]

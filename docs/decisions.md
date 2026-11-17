@@ -61243,3 +61243,19 @@ spacing rule and laid 11 panes and their patches in its walls, unmeasured by per
 "windows" whenever its spec has the key, an empty list too, and the attic's spec says "windows": []: marked, none.
 Its dark (ambient 0.05 against upstairs' 0.15, 811's numbers for a loft under the thatch; 946 lifts each floor's by
 the same INSIDE_DAY_LIFT) stays: lit by the player's lantern alone, by day and night. view_test: panes 4, 4 and 0.
+946 amended (2): the room's key light eased down by day (environment's, the coordinator's approval of 2026-11-17 on
+ui-design's Keeper's-room row of 946's queued commit: skin 1 at noon facing east clipped 21.3% of its face disc, with no
+face light at all). The window's floor patch is a decal (INSIDE_PATCH_SHADER: unshaded, added onto the boards) and lights
+nothing; a face indoors at noon took two warm lights summed, 946's day ambient (the zone's look times INSIDE_DAY_LIFT,
+warmed by INSIDE_DAY_WARM) and the room's fixed key (769 amended (6): the scene's _sun on a room level at SUN_ENERGY times
+the level's share, the same by day and night), so the red channel filled though the face's lightness stayed under its
+outdoor noon (skin 1 out of doors at noon L* 71.1, nothing clipped; indoors at 21:00 L* 29 to 37, nothing clipped). On
+an inside 946 lights (_inside_lit) the key now eases down with the room's own day: its energy the night's times
+(1 - INSIDE_KEY_DAY x day), day the same clock _update_inside reads (the night's key kept in _inside_night beside its
+ambient), so the windows' ambient carries the room by day and the key is main's by night; underground and plane-less
+rooms unchanged. INSIDE_KEY_DAY is set from ui-design's sweep (Client3D.inside_key_day, a static for looks and tests
+only) on skins 1 and 3 in the Keeper's room and a common-room cell at noon and 15:00, beside the base, to the
+coordinator's bars: no skin clips at any facing, a face indoors at noon at or under its own outdoor noon, and the boards'
+and walls' mean beside the base's (a floor more than a tenth darker is said, the ambient then given a little rather than
+the key all of it). view_test: the key at noon the night's times (1 - INSIDE_KEY_DAY), at 21:30 the night's. Client
+only; protocol unchanged; no new class_name.

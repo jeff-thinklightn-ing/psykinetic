@@ -4718,7 +4718,7 @@ func _test_daylight_indoors() -> void:
 		_rig._inside_step = -1
 		_rig._update_inside()
 		return [_rig._environment.ambient_light_energy, _rig._inside_pane_material.emission, _rig._environment.background_color,
-			_rig._inside_patches.multimesh.visible_instance_count]
+			_rig._inside_patches.multimesh.visible_instance_count, _rig._sun.light_energy]
 	var noon: Array = read.call(12.0)
 	var night: Array = read.call(21.5)
 	DayNight.phase = phase_was
@@ -4726,9 +4726,11 @@ func _test_daylight_indoors() -> void:
 	DayNight.update()
 	_check(is_equal_approx(float(noon[0]), float(night[0]) * Client3D.INSIDE_DAY_LIFT) and is_equal_approx(float(night[0]), float(_rig._inside_night[1]))
 			and (noon[1] as Color).v > 0.7 and (night[1] as Color).b > 0.2 and (night[1] as Color).v < 0.4
-			and (noon[2] as Color).v > (night[2] as Color).v and (night[2] as Color).v > 0.0 and int(noon[3]) > int(night[3]) and int(night[3]) == doors.size(),
-			"noon's ambient %.2f over 21:30's %.2f (the night's as before), its panes %s by day, %s by night, the background %s over %s, %d patches by day and the way out's %d pools at night"
-			% [noon[0], night[0], noon[1], night[1], noon[2], night[2], noon[3], night[3]])
+			and (noon[2] as Color).v > (night[2] as Color).v and (night[2] as Color).v > 0.0 and int(noon[3]) > int(night[3]) and int(night[3]) == doors.size()
+			and is_equal_approx(float(night[4]), float(_rig._inside_night[2])) and float(_rig._inside_night[2]) > 0.0
+			and is_equal_approx(float(noon[4]), float(night[4]) * (1.0 - Client3D.INSIDE_KEY_DAY)),
+			"noon's ambient %.2f over 21:30's %.2f (the night's as before), its panes %s by day, %s by night, the background %s over %s, %d patches by day and the way out's %d pools at night; the key %.3f by day, %.3f by night (main's)"
+			% [noon[0], night[0], noon[1], night[1], noon[2], night[2], noon[3], night[3], noon[4], night[4]])
 	# Past the walls: the way out's dirt and cobbles laid outward from its
 	# threshold, as wide as its doorway; by day the ground under the floor's
 	# light, by night the wilds' grass under the moon, never black.
