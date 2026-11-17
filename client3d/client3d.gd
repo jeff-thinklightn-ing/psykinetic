@@ -4312,10 +4312,8 @@ func _light_face(entity: GridEntity, puppet: Node3D, lantern: OmniLight3D) -> vo
 	var face := puppet.get_node_or_null("FaceLight") as OmniLight3D
 	if face == null:
 		return
-	# An inside the clock lights: 946's own test (its _inside_lit, once that lands).
-	var inside_lit := bool(_terrain.get("interior", false)) and not _outdoor and not _neighbour
 	var dark := face_dark(World.fields.ambient_at(entity.tile) if World.fields != null else DayNight.light, _outdoor,
-			inside_lit, DayNight.light, ambient_share(_terrain))
+			_inside_lit(), DayNight.light, ambient_share(_terrain))
 	var shown := lantern.visible and dark >= LANTERN_DAY_LEAST and not (_body_fill != null and _body_fill.visible) \
 			and _place_face_light(puppet, face)
 	face.light_energy = FACE_LIGHT_ENERGY * dark * float(face.get_meta("lift", 1.0))
