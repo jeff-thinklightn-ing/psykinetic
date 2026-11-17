@@ -4883,7 +4883,7 @@ func _test_tavern_inside() -> void:
 ## none), so none was drawn and the keeper slept on a bedroll on the boards.
 ## Each drawn as a dwelling's, prop.bed on the middle of its two cells at
 ## the floor, its head (-z) the bed's way; a sleeper on a head cell lies on
-## the bed (0.37), no bedroll.
+## the bed (LIE_HEIGHT["prop.bed"], 0.43 since 751 amended (8)), no bedroll.
 func _test_room_beds() -> void:
 	print("\n== a room level's own beds drawn and slept on (948) ==")
 	for name: String in ["umbrage_tavern_up", "umbrage_tavern"]:
@@ -4917,7 +4917,7 @@ func _test_room_beds() -> void:
 	keeper.activity = "sleep"
 	_rig._sync_bedroll(keeper, puppet)
 	_check(bed["cells"][0] == Vector2i(17, 7) and puppet.get_node_or_null("Bedroll") == null
-		and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
+		and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), Client3D.LIE_HEIGHT["prop.bed"]),
 		"the keeper asleep at (17, 7): on her bed (%.2f up), no bedroll on the boards" % float(puppet.get_meta("bed_height", 0.0)))
 	puppet.free()
 	keeper.free()
@@ -5867,9 +5867,10 @@ func _test_bedroll_drawn() -> void:
 	resident.facing = Vector2i(0, -1)
 	resident.activity = "sleep"
 	_rig._sync_bedroll(resident, puppet)
-	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
+	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), Client3D.LIE_HEIGHT["prop.bed"]),
 		"on a bed's head cell: no bedroll, the bed's height (%s)" % [puppet.get_meta("bed_height", 0.0)])
-	_check(not puppet.has_meta("lie_at"), "(a plain bed: no lie_at)")
+	_check(not puppet.has_meta("lie_at") and is_equal_approx(float(puppet.get_meta("bed_back", 0.0)), Client3D.SLEEP_BED_BACK["prop.bed"]),
+		"(a plain bed: no lie_at; laid SLEEP_BED_BACK farther toward its foot, 751 amended (8): %s)" % [puppet.get_meta("bed_back", null)])
 	# 799 amended (3): on the level's own bedroll (a camp trader's), no second one, the bedroll's height.
 	var decor: Array = _rig._terrain.get("decor", [])
 	var had_decor := _rig._terrain.has("decor")
@@ -14859,6 +14860,7 @@ func _test_visible_work() -> void:
 	show.call("sleep")
 	var lain_down := rig.base_clip()
 	puppet.set_meta("busy_until", 0)  # The lie-down (751) done.
+	puppet.set_meta("lay_done", true)  # Its lay played out with it (751 amended (8)).
 	show.call("sleep")
 	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
 	var body := puppet.get_node("Body") as Node3D
@@ -14870,6 +14872,7 @@ func _test_visible_work() -> void:
 	show.call("dig_for_treasure")
 	puppet.set_meta("busy_until", 0)  # Got up (751).
 	puppet.set_meta("rising_until", 0)
+	puppet.set_meta("lay_done", true)  # Its lay played out with it (751 amended (8)).
 	show.call("dig_for_treasure")
 	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
 	_check(rig.upper_clip() == "" and (sockets["shoulder"] as Node3D).get_node_or_null("Load") == null and body.position == Vector3.ZERO
@@ -15112,10 +15115,274 @@ func _test_sleeper() -> void:
 	_rig._lay(puppet, body, 0.0)
 	_check(is_equal_approx(model.rotation.y, PI), "and is still turned as it lay while it gets up")
 	puppet.set_meta("rising_until", 0)
+	puppet.set_meta("lay_done", true)  # Its lay played out with it (751 amended (8)).
 	_rig._lay(puppet, body, 0.0)
 	_check(is_zero_approx(model.rotation.y) and body.position == Vector3.ZERO, "stood: as it stands (%s)" % body.position)
 	puppet.free()
 	_test_sleeper_posture()
+	_test_sleeper_on_bed()
+	_test_sleeper_lies_down()
+
+
+## 751 amended (8) (pc-character's measure for art-kit's cover; the coordinator's go): on a drawn
+## prop.bed the curled body lies clear of the headboard and on the mattress, as Client3D lays it
+## (_sync_bedroll on the bed's head cell, _lay), Sleep_Side at three times on its AnimRig, every drawn mesh skinned
+## with its blend shapes: in the bed's frame (its -z end -1.0) nothing nearer the head than the
+## board's face (art-kit's -0.94; laid SLEEP_MIDDLE back alone a tall heavy man's head reached
+## -1.09, out behind the board), nothing past the foot posts (+0.92), and its lowest point within
+## 2 cm of the mattress's top (0.42; at 0.37 it sank 3 to 5 cm). The largest sleeper, a tall heavy
+## man at 1.08 in a brimmed hat (the hat's brim reaches farthest toward the head end), and a
+## middling woman at 1.0.
+const BED_BOARD_FACE := -0.94
+const BED_FOOT_POSTS := 0.92
+const BED_MATTRESS := 0.42
+func _test_sleeper_on_bed() -> void:
+	print("\n== a sleeper on a drawn plain bed: clear of the headboard, on the mattress (751 amended (8)) ==")
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var plots: Array = _rig._terrain.get("plot_buildings", [])
+	var had := _rig._terrain.has("plot_buildings")
+	var head_cell := Vector2i(-620, -620)
+	var house := {"rect": Rect2i(-621, -621, 3, 4), "beds": [{"cells": [head_cell, head_cell + Vector2i(0, 1)], "head": Vector2i(0, -1), "prop": "prop.bed"}]}
+	_rig._terrain["plot_buildings"] = plots + [house]
+	var to_bed := Transform3D(Basis.IDENTITY, -Vector3(head_cell.x, 0.0, head_cell.y + 0.5))  # The bed's middle, its head -z.
+	for case: Array in [["a tall heavy man in a brimmed hat", "seed=11 body=male build=heavy stature=tall age=grown hair=cropped beard=full headwear=hat", 1.08],
+			["a middling woman", "seed=11 body=female build=middling stature=middling age=grown hair=bound", 1.0]]:
+		var look := PersonLook.make(str(case[1]))
+		var kind: Dictionary = Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN
+		var size := float(case[2])
+		var resident := Resident.new()
+		resident.tile = head_cell
+		resident.facing = Vector2i(0, -1)
+		resident.activity = "sleep"
+		var puppet := Node3D.new()
+		var body := Node3D.new()
+		body.name = "Body"
+		puppet.add_child(body)
+		var model := (load(kind["scene"]) as PackedScene).instantiate() as Node3D
+		model.name = "Model"
+		body.add_child(model)
+		model.rotation.y = float(kind.get("faces", 0.0))
+		model.scale = Vector3.ONE * size
+		add_child(puppet)
+		puppet.position = Vector3(head_cell.x, 0.0, head_cell.y)
+		puppet.set_meta("model_scale", size)
+		puppet.set_meta("faces", model.rotation.y)
+		puppet.set_meta("work", "sleep")
+		_rig._sync_bedroll(resident, puppet)
+		var yaw := PI * 0.5  # Facing the bed's head (-z).
+		body.rotation.y = yaw
+		_rig._lay(puppet, body, yaw)
+		look.apply(model)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		rig.loop("Idle", 0.0)
+		var reach := [INF, -INF, INF, INF]  # The least z, the most z, the least y (the body and hair), the least y of a hat, in the bed's frame.
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		for t: float in [0.0, 1.7, 3.4]:
+			rig.base_at("Sleep_Side", t)  # As the game poses it (AnimRig's tree), not the clip's raw tracks.
+			rig.tree.advance(0.0)
+			for mesh_node: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				if mesh_node.is_visible_in_tree() and mesh_node.skin != null and mesh_node.get_parent() is Skeleton3D:
+					_bed_reach(mesh_node, to_bed, reach, String(mesh_node.name) in PersonLook.HEADWEAR_PARTS.values())
+		_check(float(reach[0]) >= BED_BOARD_FACE and float(reach[1]) <= BED_FOOT_POSTS,
+			"%s (%.2f): from %.3f (the headboard's face %.2f) to %.3f (the foot posts %.2f) along the bed" % [case[0], size, reach[0], BED_BOARD_FACE, reach[1], BED_FOOT_POSTS])
+		_check(absf(float(reach[2]) - BED_MATTRESS) <= 0.02,
+			"%s: its lowest point %.3f, on the mattress's top (%.2f, within 2 cm)%s" % [case[0], reach[2], BED_MATTRESS,
+			"" if is_inf(float(reach[3])) else "; the hat's brim, stiff on a head on its side, to %.3f" % float(reach[3])])
+		puppet.free()
+		resident.free()
+	if had:
+		_rig._terrain["plot_buildings"] = plots
+	else:
+		_rig._terrain.erase("plot_buildings")
+
+
+## 751 amended (8) (the coordinator's, from the hats-off look: the sleeper jumped at the get-up, and main
+## a third of a metre and more at the lie-down and the get-up since beds went in): lying down onto a
+## drawn prop.bed and getting up from it, frame by frame at 1/30 s in Client3D's own order
+## (_sync_bedroll, _sync_work, _lay, _lying_down once the last clip is over, the rig's advance), the
+## hips' step each frame is the clip's own (the hips' move in the Model's frame) and at most
+## LAY_STEP_MOST more, from the last standing frame to the first standing again; and at every seventh
+## frame (eight of each clip) the body, CPU-skinned, lies between the headboard's face and the foot
+## posts. The tall heavy man in a brimmed hat (1.08) and a middling woman; a bedroll out of doors too,
+## its steps (the same code lays it). Main's, measured the same way (build/bedease's probe): 0.79 m at
+## Sleep_Down's first frame, 0.46 and 0.63 m at Sleep_Up's first two, 0.32 m as it stood, its head
+## 0.57 m behind the board's face for Sleep_Up's first half second.
+## The lay read from the clip (the coordinator's, 751 amended (8), after a laptop's stalls swung the
+## hips 0.2 to 0.3 m): each run again with the clock jumped STALL_MS at each clip's third frame and at its
+## middle, the rig given only a frame of it (Godot's smoothed delta: the clip falls behind busy_until, and
+## what is left is carried at the clip's pace once it passes) or all of it (each frame's bound then its
+## share, a thirtieth of a second's LAY_STEP_MOST); and once with the get-up cut short (busy_until and
+## rising_until passed a third of the way in, the rig to Idle), the rest carried with no step over.
+const LAY_STEP_MOST := 0.04
+const STALL_MS := 350
+func _test_sleeper_lies_down() -> void:
+	print("\n== a sleeper lies down onto its bed and gets up from it without a jump (751 amended (8)) ==")
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var plots: Array = _rig._terrain.get("plot_buildings", [])
+	var had := _rig._terrain.has("plot_buildings")
+	var head_cell := Vector2i(-620, -620)
+	var house := {"rect": Rect2i(-621, -621, 3, 4), "beds": [{"cells": [head_cell, head_cell + Vector2i(0, 1)], "head": Vector2i(0, -1), "prop": "prop.bed"}]}
+	_rig._terrain["plot_buildings"] = plots + [house]
+	var to_bed := Transform3D(Basis.IDENTITY, -Vector3(head_cell.x, 0.0, head_cell.y + 0.5))  # The bed's middle, its head -z.
+	for case: Array in [["the tall heavy man in a brimmed hat", "seed=11 body=male build=heavy stature=tall age=grown hair=cropped beard=full headwear=hat", 1.08, head_cell, true],
+			["a middling woman", "seed=11 body=female build=middling stature=middling age=grown hair=bound", 1.0, head_cell, true],
+			["a middling woman on a bedroll out of doors", "seed=11 body=female build=middling stature=middling age=grown hair=bound", 1.0, Vector2i(-660, -660), false]]:
+		for run: String in ["", "stalled, the rig behind", "stalled, the rig through it", "its get-up cut short"]:
+			_sleeper_run(case, run, lib, to_bed)
+	if had:
+		_rig._terrain["plot_buildings"] = plots
+	else:
+		_rig._terrain.erase("plot_buildings")
+
+
+## One of _test_sleeper_lies_down's runs: [param case] (its name, look, size, cell, on a bed) as [param run]
+## says (none: 1/30 s frames throughout).
+func _sleeper_run(case: Array, run: String, lib: AnimationLibrary, to_bed: Transform3D) -> void:
+	var name := str(case[0]) + ((", " + run) if run != "" else "")
+	var look := PersonLook.make(str(case[1]))
+	var kind: Dictionary = Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN
+	var size := float(case[2])
+	var cell: Vector2i = case[3]
+	var resident := Resident.new()
+	resident.tile = cell
+	resident.facing = Vector2i(0, -1)
+	resident.activity = ""
+	var puppet := Node3D.new()
+	var body := Node3D.new()
+	body.name = "Body"
+	puppet.add_child(body)
+	var model := (load(kind["scene"]) as PackedScene).instantiate() as Node3D
+	model.name = "Model"
+	body.add_child(model)
+	model.rotation.y = float(kind.get("faces", 0.0))
+	model.scale = Vector3.ONE * size
+	add_child(puppet)
+	puppet.position = Vector3(cell.x, 0.0, cell.y)
+	puppet.set_meta("model_scale", size)
+	puppet.set_meta("faces", model.rotation.y)
+	look.apply(model)
+	var rig := AnimRig.make(model, lib, Client3D.CLIP_BLEND, true, null)
+	puppet.set_meta("rig", rig)
+	rig.loop("Idle", 1.0)
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var hips := skeleton.find_bone("Hips")
+	var yaw := PI * 0.5  # Facing the bed's head (-z).
+	var sleep_at := 10
+	var wake_at := sleep_at + int(rig.length("Sleep_Down") * 30.0) + 10
+	var frames := wake_at + int(rig.length("Sleep_Up") * 30.0) + 20
+	var stalled := run.begins_with("stalled")
+	var prev_w := Vector3.INF
+	var prev_m := Vector3.INF
+	var worst := [0.0, -1, 0.0, 0.0, 1.0]  # The most over the clip's own per frame's share, its frame, its step, the clip's, the share.
+	var reach := [INF, -INF, INF, INF]
+	var clips := {}
+	var laid := false
+	var clock := 1000000
+	var began := -1  # The frame the last lie-down or get-up began.
+	var gaps := 0
+	for f in frames:
+		var adv := 1.0 / 30.0
+		if stalled and began >= 0 and (f == began + 2 or f == began + 27):
+			clock += STALL_MS
+			gaps += 1
+			if run.ends_with("through it"):
+				adv += STALL_MS / 1000.0
+		var now := clock
+		clock += int(1000.0 / 30.0)
+		resident.activity = "sleep" if f >= sleep_at and f < wake_at else ""
+		_rig._sync_bedroll(resident, puppet)
+		_rig._sync_work(resident, puppet)
+		body.rotation.y = yaw
+		if run.ends_with("cut short") and f == wake_at + 18:
+			puppet.set_meta("busy_until", now)
+			puppet.set_meta("rising_until", now)
+		_rig._lay(puppet, body, yaw, cell, now, adv)
+		var work: Dictionary = Client3D.ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
+		if now >= int(puppet.get_meta("busy_until", 0)):
+			if _rig._lying_down(puppet, rig, work, 0.0, now, 1.0):
+				began = f
+			else:
+				rig.loop(str(work.get("clip", "Idle")), 1.0)
+		rig.tree.advance(adv)
+		var playing := rig.playing()
+		clips[playing] = true
+		laid = laid or playing == "Sleep_Side"
+		var hw := skeleton.global_transform * skeleton.get_bone_global_pose(hips).origin
+		var hm := model.global_transform.affine_inverse() * hw
+		if prev_w != Vector3.INF:
+			var step := (hw - prev_w).length()
+			var own := (model.global_basis * (hm - prev_m)).length()
+			var share := maxf(1.0, adv * 30.0)
+			if (step - own) / share > float(worst[0]):
+				worst = [(step - own) / share, f, step, own, share]
+		prev_w = hw
+		prev_m = hm
+		if case[4] and playing in ["Sleep_Down", "Sleep_Up"] and f % 7 == 0:
+			for mesh_node: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				if mesh_node.is_visible_in_tree() and mesh_node.skin != null and mesh_node.get_parent() is Skeleton3D:
+					_bed_reach(mesh_node, to_bed, reach)
+	_check(clips.has("Sleep_Down") and laid and clips.has("Sleep_Up") and rig.playing() == "Idle" and body.position == Vector3.ZERO \
+			and bool(puppet.get_meta("lay_done", false)) and (not stalled or gaps == 4),
+		"%s: lay down, slept and stood again (%s; at the end %s, its lay played out %s, %d stalls)" % [
+		name, clips.keys(), body.position, puppet.get_meta("lay_done", false), gaps])
+	_check(float(worst[0]) <= LAY_STEP_MOST,
+		"%s (%.2f): no frame moves the hips more than the clip's own and %.2f m a thirtieth of a second (the most: frame %d, %.3f against the clip's %.3f over %.1f thirtieths, %+.3f each)" % [
+		name, size, LAY_STEP_MOST, worst[1], worst[2], worst[3], worst[4], worst[0]])
+	if case[4]:
+		_check(float(reach[0]) >= BED_BOARD_FACE and float(reach[1]) <= BED_FOOT_POSTS,
+			"%s: lying down and getting up, from %.3f (the headboard's face %.2f) to %.3f (the foot posts %.2f) along the bed" % [
+			name, reach[0], BED_BOARD_FACE, reach[1], BED_FOOT_POSTS])
+	puppet.free()
+	resident.free()
+
+
+## [param mesh_node]'s vertices skinned on the CPU with its blend shapes, into [param to_frame]:
+## [param reach]'s least z, most z and least y widened to hold them ([param worn]: a hat or hood, its
+## least y the fourth, apart from the body's).
+func _bed_reach(mesh_node: MeshInstance3D, to_frame: Transform3D, reach: Array, worn := false) -> void:
+	var skeleton := mesh_node.get_parent() as Skeleton3D
+	var mesh := mesh_node.mesh as ArrayMesh
+	var skin := mesh_node.skin
+	var poses: Array[Transform3D] = []
+	for b in skin.get_bind_count():
+		var bone := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
+		poses.append(to_frame * skeleton.global_transform * skeleton.get_bone_global_pose(bone) * skin.get_bind_pose(b))
+	for surface in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+		var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+		if bones.is_empty() or verts.is_empty():
+			continue
+		var shaped := verts.duplicate()
+		var shapes := mesh.surface_get_blend_shape_arrays(surface)
+		for k in shapes.size():
+			var w := mesh_node.get_blend_shape_value(k)
+			if w == 0.0:
+				continue
+			var sv: PackedVector3Array = shapes[k][Mesh.ARRAY_VERTEX]
+			# A relative shape may come back as offsets or as whole positions: told apart by size.
+			var size_shape := 0.0
+			var size_base := 0.0
+			for i in range(0, verts.size(), 37):
+				size_shape += sv[i].length()
+				size_base += verts[i].length()
+			var offsets := mesh.get_blend_shape_mode() == Mesh.BLEND_SHAPE_MODE_RELATIVE and size_shape < size_base * 0.3
+			for i in verts.size():
+				shaped[i] += (sv[i] if offsets else sv[i] - verts[i]) * w
+		var per := bones.size() / verts.size()
+		for i in verts.size():
+			var p := Vector3.ZERO
+			for k in per:
+				var w := weights[i * per + k]
+				if w > 0.0:
+					p += (poses[bones[i * per + k]] * shaped[i]) * w
+			reach[0] = minf(float(reach[0]), p.z)
+			reach[1] = maxf(float(reach[1]), p.z)
+			if worn:
+				reach[3] = minf(float(reach[3]), p.y)
+			else:
+				reach[2] = minf(float(reach[2]), p.y)
 
 
 ## Umbrage's townsfolk at their spots (npc's spots contract; the coordinator's Umbrage focus, Jeff:
@@ -19441,6 +19708,7 @@ func _test_asleep() -> void:
 	var yaw: float = draw.call()
 	_check(rig.base_clip() == "Sleep_Down", "falling asleep: she lies down first (751) (%s)" % rig.base_clip())
 	puppet.set_meta("busy_until", 0)  # The lie-down done.
+	puppet.set_meta("lay_done", true)  # Its lay played out with it (751 amended (8)).
 	yaw = draw.call()
 	# Her front: the model's +X (Sleep_Side lies on her left side, her front where her left hand was), flat.
 	var front := model.global_transform.basis.x
@@ -19458,6 +19726,7 @@ func _test_asleep() -> void:
 	_check(rig.base_clip() == Client3D.CLIP_SLEEP_UP, "woken: she gets up (751) (%s)" % rig.base_clip())
 	puppet.set_meta("busy_until", 0)  # The get-up done.
 	puppet.set_meta("rising_until", 0)
+	puppet.set_meta("lay_done", true)  # Its lay played out with it (751 amended (8)).
 	draw.call()
 	_check(rig.base_clip() != "Sleep_Side" and str(puppet.get_meta("work", "")) == "" and body.position == Vector3.ZERO
 			and is_equal_approx(model.rotation.y, float(puppet.get_meta("faces"))), "awake: standing again (%s)" % rig.base_clip())

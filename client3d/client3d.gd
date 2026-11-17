@@ -27945,7 +27945,16 @@ static func stand_offset(slot: String, rect: Rect2i, yaw: float, cell: Vector2i)
 ## same: its cell and facing. On a cell the level's decor lays a bedroll on (a
 ## camp trader's, 799 amended (3)), that one: none of its own, the bedroll's height.
 const BEDROLL := "prop.bedroll"
-const LIE_HEIGHT := {"prop.bed": 0.37, "prop.bed_straw": 0.37, "prop.bedroll": 0.09}
+## prop.bed's is its mattress's top (art-kit's 0.42) and a centimetre: the curled body's lowest point
+## lies within a centimetre or so of it (751 amended (8): at 0.37 it sank 3 to 5 cm into the mattress).
+const LIE_HEIGHT := {"prop.bed": 0.43, "prop.bed_straw": 0.37, "prop.bedroll": 0.09}
+## On a drawn plain bed (751 amended (8), pc-character's measure for art-kit's cover): the curled body
+## this much farther toward the foot, times its scale. Laid SLEEP_MIDDLE back from its head cell alone,
+## the head and hair of a tall heavy man (1.08) reached the bed's z -1.09, through the headboard's upper
+## board and out behind it, and every sleeper's was in the board; from here the largest head, a brimmed
+## hat's brim on a 1.08 sleeper, stops 2 cm short of the board's face (-0.94 of the bed's -1.0 end; a
+## sleeper over about 1.13 would touch it) and the toes lie well inside the foot posts.
+const SLEEP_BED_BACK := {"prop.bed": 0.20}
 func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 	var want := "%s|%s" % [body.tile, body.facing] if body.activity == "sleep" else ""
 	if want == str(puppet.get_meta("bedroll", "")):
@@ -27956,6 +27965,7 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 		puppet.remove_child(old)
 		old.queue_free()
 	puppet.remove_meta("lie_at")
+	puppet.remove_meta("bed_back")
 	var height := 0.0
 	if not want.is_empty():
 		var bed := _bed_under(body.tile)
@@ -27975,6 +27985,8 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 			height = float(LIE_HEIGHT[BEDROLL])
 		elif not bed.is_empty() and not bool(bed.get("solid", false)):
 			height = float(LIE_HEIGHT.get(str(bed.get("prop", "")), 0.0))
+			if SLEEP_BED_BACK.has(str(bed.get("prop", ""))):
+				puppet.set_meta("bed_back", float(SLEEP_BED_BACK[str(bed["prop"])]))
 	puppet.set_meta("bed_height", height)
 
 
@@ -28079,30 +28091,143 @@ const SLEEP_HEAD_BACK := SLEEP_MIDDLE + 0.46
 ## The curl reaches 0.50 m before the root (the knees) and 0.27 behind (the back): slid back by
 ## half the difference so it lies across the bed's middle (build/sleep/fit.gd, 751 amended (4)).
 const SLEEP_ASIDE := 0.11
-func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) -> void:
+## The lie-down and the get-up eased (751 amended (8), the coordinator's: the body jumped a third of a
+## metre and more at each, on main since beds went in). Sleep_Down starts standing at the body's root
+## and Sleep_Up ends there, the curl well behind it; laid at once, the standing body jumped
+## SLEEP_MIDDLE back, aside and up onto the bed at Sleep_Down's first frame, turned half round, and at
+## Sleep_Up's first stood a frame where it stood, then dropped to the floor at LIE_MIDDLE (its bed's
+## metas let go by _sync_bedroll), and jumped again as it stood. Now the lay (back, aside, bed_back or
+## the furnished bed's pillow, the bed's height) eases in from where it stands over the first
+## LAY_IN_BY of Sleep_Down, the half turn over its first LAY_TURN_IN_BY (still upright); getting up,
+## the lay it had ("lay_held") eases out after the first LAY_OUT_FROM of Sleep_Up, the turn after
+## LAY_TURN_OUT_FROM (standing again), to where it stands; straight lines, the least speed for the way.
+## Fitted on the tall heavy man (1.08) and a middling woman on a drawn prop.bed, so no frame puts the
+## body behind the headboard's face or past the foot posts: Sleep_Down falls back toward the head only
+## after its first second, so the lay is nearly in by then; Sleep_Up's curl leaves the head end in its
+## first half second, so the lay holds that long. The hips' step a frame is the clip's own and at most
+## LAY_STEP_MOST more (view_test _test_sleeper_lies_down).
+const LAY_IN_BY := 0.73
+const LAY_TURN_IN_BY := 0.3
+const LAY_OUT_FROM := 0.29
+const LAY_TURN_OUT_FROM := 0.8
+## The most the lay and the turn follow the drawn pose by (s): the rig's place read where its last frame
+## left it, a frame behind at 30 a second, as the strips the coordinator passed drew it (_lay_progress).
+const LAY_LAG := 1.0 / 30.0
+## How far [param puppet] is laid (x: 0 as it stands, 1 on its bed) and turned (y: 0 its facing, 1 half
+## round), from how far its lie-down or get-up clip is drawn (_lay_progress): asleep and not yet laid
+## (walking in), none; first seen asleep, all; a get-up played out, none.
+static func _lay_shares(puppet: Node3D, work: Dictionary, now: int, ahead: float) -> Vector2:
+	if work.has("down") and not bool(puppet.get_meta("laid", true)):
+		return Vector2.ZERO
+	if not puppet.has_meta("lay_clip"):
+		return Vector2.ONE
+	var u := _lay_progress(puppet, now, ahead)
+	if bool(puppet.get_meta("lay_rising", false)):
+		return Vector2(1.0 - clampf((u - LAY_OUT_FROM) / (1.0 - LAY_OUT_FROM), 0.0, 1.0),
+			1.0 - clampf((u - LAY_TURN_OUT_FROM) / (1.0 - LAY_TURN_OUT_FROM), 0.0, 1.0))
+	return Vector2(clampf(u / LAY_IN_BY, 0.0, 1.0), clampf(u / LAY_TURN_IN_BY, 0.0, 1.0))
+
+
+## How far through its lie-down or get-up clip [param puppet] is drawn this frame (0 to 1), never back:
+## while the clip plays (busy_until not passed, its rig on it), the rig's own place in it (base_position,
+## where its last frame left it) and whatever of the [param ahead] seconds the rig advances after this
+## _lay is over LAY_LAG, so the lay and the turn follow the drawn pose by LAY_LAG at the most whatever
+## the clock does (751 amended (8), the coordinator's: a laptop's 300 to 400 ms stall reached the rig's
+## tree shorter, Godot smoothing the frame's delta, and left the clip a tenth behind the wall clock
+## busy_until keeps, so a clock-timed turn swung hips still 0.31 m off the centre). The clip over, cut
+## short or left (busy_until passed, another clip played) with some still to go, the rest at the clip's
+## own pace from there (a get-up cut short a third in leaves nearly all its lay: over the next clip's
+## blend alone it would jump).
+static func _lay_progress(puppet: Node3D, now: int, ahead: float) -> float:
+	if bool(puppet.get_meta("lay_done", false)):
+		return 1.0
+	var u := float(puppet.get_meta("lay_u", 0.0))
+	var lasts := maxf(1.0, float(int(puppet.get_meta("lay_to", 0)) - int(puppet.get_meta("lay_from", 0))))
+	if not puppet.has_meta("lay_carry_at") and now < int(puppet.get_meta("busy_until", 0)):
+		var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+		var clip := str(puppet.get_meta("lay_clip"))
+		if rig != null and rig.as_played(rig.base_clip()) == rig.as_played(clip) and rig.length(clip) > 0.0:
+			# Read as the ease began (once()'s seek not yet played, the slot's last clip's place): its start.
+			var at := rig.base_position()
+			if at == float(puppet.get_meta("lay_unplayed", -1.0)):
+				at = 0.0
+			u = maxf(u, clampf((at + maxf(0.0, ahead - LAY_LAG) * absf(rig.speed())) / rig.length(clip), 0.0, 1.0))
+		else:
+			u = maxf(u, clampf((now - int(puppet.get_meta("lay_from", 0))) / lasts, 0.0, 1.0))
+		puppet.set_meta("lay_u", u)
+		return u
+	if not puppet.has_meta("lay_carry_at"):
+		puppet.set_meta("lay_carry_at", now)
+		puppet.set_meta("lay_carry_u", u)
+	var from_u := float(puppet.get_meta("lay_carry_u"))
+	var t := clampf((now - int(puppet.get_meta("lay_carry_at")) + ahead * 1000.0) / maxf(1.0, (1.0 - from_u) * lasts), 0.0, 1.0)
+	if t >= 1.0:
+		puppet.set_meta("lay_done", true)
+	return lerpf(from_u, 1.0, t)
+
+
+## [param puppet]'s lie-down (or, [param rising], its get-up) [param clip] plays from [param from] to
+## [param to] ms (busy_until's), from its start. Called just after the rig's once(): till its tree plays
+## a frame, the rig's place reads the slot's last clip's (kept as lay_unplayed, read as the start).
+static func _lay_ease(puppet: Node3D, from: int, to: int, rising: bool, clip: String) -> void:
+	var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+	puppet.set_meta("lay_unplayed", rig.base_position() if rig != null else -1.0)
+	puppet.set_meta("lay_from", from)
+	puppet.set_meta("lay_to", to)
+	puppet.set_meta("lay_rising", rising)
+	puppet.set_meta("lay_clip", clip)
+	puppet.set_meta("lay_u", 0.0)
+	puppet.set_meta("lay_done", false)
+	puppet.remove_meta("lay_carry_at")
+	puppet.remove_meta("lay_carry_u")
+
+
+## [param now]: the frame's clock (Time's ms; a test passes its own); [param advance]: the seconds its rig
+## advances after this (the frame's process delta; a test that advances the rig itself passes its own).
+func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1), now := -1, advance := -1.0) -> void:
+	if now < 0:
+		now = Time.get_ticks_msec()
+	if advance < 0.0:
+		advance = get_process_delta_time()
+	puppet.set_meta("lay_ahead", advance)  # The get-up's own _lay this frame (_lying_down).
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
-	var lying := bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0))
+	# Lying, getting up, or its lie-down or get-up not yet played out (woken as it lay down, its
+	# lie-down first; a get-up cut short, the rest carried over the next clip's blend).
+	var lying := bool(work.get("lying", false)) or now < int(puppet.get_meta("rising_until", 0)) \
+		or (puppet.has_meta("lay_clip") and not bool(puppet.get_meta("lay_done", false)))
 	_posture_lying(puppet, lying)
 	var offset: Vector3 = _stand_at.get(cell, Vector3.ZERO)
 	if work.has("toward") and float(puppet.get_meta("speed", 0.0)) <= WALKING:
 		# Leant in to its work (the bandage kneel), only while it is still: walking, as it stands.
 		offset += Vector3(cos(yaw), 0.0, -sin(yaw)) * float(work["toward"]) * float(puppet.get_meta("model_scale", 1.0))
-	var seated := _seated_share(puppet, Time.get_ticks_msec())
+	var seated := _seated_share(puppet, now)
 	if seated > 0.0:
 		# Sat (or sitting down, or got up): its hips over the seat under its cell (SEAT_TOWARD).
 		offset += Vector3(cos(yaw), 0.0, -sin(yaw)) * SEAT_TOWARD * seated * float(puppet.get_meta("model_scale", 1.0))
+	var shares := _lay_shares(puppet, work, now, advance) if lying else Vector2.ZERO
 	if lying:
-		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
-		offset = -ahead * (SLEEP_MIDDLE if work.has("down") else LIE_MIDDLE) * float(puppet.get_meta("model_scale", 1.0))
-		if work.has("down") and puppet.has_meta("lie_at"):
-			# On a furnished bed beside its cell (751 amended (4)): the head on its pillow end.
-			var pillow: Vector2 = puppet.get_meta("lie_at")
-			offset = Vector3(pillow.x, 0.0, pillow.y) - ahead * SLEEP_HEAD_BACK * float(puppet.get_meta("model_scale", 1.0))
-		if work.has("down"):
-			# Across the bed's or bedroll's middle, its knees not over the edge (SLEEP_ASIDE).
-			offset -= Vector3(-ahead.z, 0.0, ahead.x) * SLEEP_ASIDE * float(puppet.get_meta("model_scale", 1.0))
-		# On a bed or bedroll drawn under it (npc's and buildings' side, 751): its height.
-		offset.y = float(puppet.get_meta("bed_height", 0.0))
+		var laid_at: Vector3
+		if not work.has("down") and puppet.has_meta("lay_held"):
+			# Getting up (or its lie-down played out first): from where it lay, its bed let go of.
+			laid_at = puppet.get_meta("lay_held")
+		else:
+			var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
+			laid_at = -ahead * (SLEEP_MIDDLE if work.has("down") else LIE_MIDDLE) * float(puppet.get_meta("model_scale", 1.0))
+			if work.has("down") and puppet.has_meta("lie_at"):
+				# On a furnished bed beside its cell (751 amended (4)): the head on its pillow end.
+				var pillow: Vector2 = puppet.get_meta("lie_at")
+				laid_at = Vector3(pillow.x, 0.0, pillow.y) - ahead * SLEEP_HEAD_BACK * float(puppet.get_meta("model_scale", 1.0))
+			elif work.has("down") and puppet.has_meta("bed_back"):
+				# On a drawn plain bed (751 amended (8)): farther toward its foot, the head clear of the headboard.
+				laid_at -= ahead * float(puppet.get_meta("bed_back")) * float(puppet.get_meta("model_scale", 1.0))
+			if work.has("down"):
+				# Across the bed's or bedroll's middle, its knees not over the edge (SLEEP_ASIDE).
+				laid_at -= Vector3(-ahead.z, 0.0, ahead.x) * SLEEP_ASIDE * float(puppet.get_meta("model_scale", 1.0))
+			# On a bed or bedroll drawn under it (npc's and buildings' side, 751): its height.
+			laid_at.y = float(puppet.get_meta("bed_height", 0.0))
+			if work.has("down"):
+				puppet.set_meta("lay_held", laid_at)
+		offset = offset.lerp(laid_at, shares.x)
 	puppet.set_meta("lay_at", offset)  # Where the Body rests (_body_rest).
 	if body.position != offset:
 		body.position = offset
@@ -28112,7 +28237,7 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 	if not puppet.has_meta("faces"):
 		puppet.set_meta("faces", model.rotation.y)
 	# Plus a steadied person's twist (843: Client3D._steady's, eased by its tween).
-	var want := float(puppet.get_meta("faces")) + (PI if lying else 0.0) + float(puppet.get_meta("steady_twist", 0.0))
+	var want := float(puppet.get_meta("faces")) + PI * shares.y + float(puppet.get_meta("steady_twist", 0.0))
 	if not is_equal_approx(model.rotation.y, want):
 		model.rotation.y = want
 
@@ -28813,6 +28938,7 @@ func _lying_down(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 	if work.has("down") and not laid and speed <= WALKING and rig.has(str(work["down"])):
 		puppet.set_meta("laid", true)
 		puppet.set_meta("busy_until", now + int(rig.once(str(work["down"]), tempo) * 1000.0))
+		_lay_ease(puppet, now, int(puppet.get_meta("busy_until")), false, str(work["down"]))  # Laid as it lies down (_lay_shares).
 		return true
 	if laid and not work.has("down"):
 		puppet.set_meta("laid", false)
@@ -28820,6 +28946,12 @@ func _lying_down(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 			var until := now + int(rig.once(CLIP_SLEEP_UP, tempo) * 1000.0)
 			puppet.set_meta("busy_until", until)
 			puppet.set_meta("rising_until", until)
+			_lay_ease(puppet, now, until, true, CLIP_SLEEP_UP)
+			# This frame's _lay ran before the get-up began, as it stands: laid again where it lay. No cell
+			# here (no _stand_at): at the get-up's first moment the lay is all lay_held, which needs none.
+			var body := puppet.get_node_or_null("Body") as Node3D
+			if body != null:
+				_lay(puppet, body, body.rotation.y, Vector2i(-1, -1), now, float(puppet.get_meta("lay_ahead", -1.0)))
 			return true
 	return false
 

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: a townsperson going to bed turns round, sits back onto it and lies down, and on getting up rises and steps off it (751 amended (8)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
 - In a fight your companion stays near you, chasing a foe farther only when you're fighting it too (957).

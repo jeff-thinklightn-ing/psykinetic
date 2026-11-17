@@ -555,6 +555,17 @@ func _test_plate_laid() -> void:
 	_check(body.position.length() > 0.5, "the sleeper's Body is laid off its stand (%s)" % body.position)
 	_check(plate.distance_to(lying) < 0.1, "asleep on a bed, the plate is over the head as drawn (%.3f m off: plate %s, head %s; the Body laid at %s)" % [
 		plate.distance_to(lying), plate.snapped(Vector3.ONE * 0.01), lying.snapped(Vector3.ONE * 0.01), body.position.snapped(Vector3.ONE * 0.01)])
+	# On a drawn plain bed (751 amended (8)): laid SLEEP_BED_BACK farther toward its foot, at the mattress's
+	# height; the plate goes with the moved head.
+	var on_bedroll := body.position
+	puppet.set_meta("bed_back", Client3D.SLEEP_BED_BACK["prop.bed"])
+	puppet.set_meta("bed_height", Client3D.LIE_HEIGHT["prop.bed"])
+	client._lay(puppet, body, 0.0)
+	var on_bed := skeleton.global_transform * skeleton.get_bone_global_pose(head).origin
+	var bed_plate := stand + client._plate_shift(puppet, row)
+	_check(body.position.distance_to(on_bedroll) > 0.1 and bed_plate.distance_to(on_bed) < 0.1,
+		"on a plain bed, laid %.2f m farther along, the plate is over the moved head (%.3f m off: plate %s, head %s)" % [
+		body.position.distance_to(on_bedroll), bed_plate.distance_to(on_bed), bed_plate.snapped(Vector3.ONE * 0.01), on_bed.snapped(Vector3.ONE * 0.01)])
 	puppet.free()
 	client.free()
 

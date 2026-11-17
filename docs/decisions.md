@@ -44987,6 +44987,90 @@ stall or a field not); on a map not out of doors (the tavern's rooms) the rect a
 keep interiors as they are). view_test, on the real wilds: under W1, M2 and M3 out of doors, in the hut
 H2 and the forge H1 indoors. Drawing only, protocol unchanged, no new class_name.
 
+751 amended (8) (a sleeper on a drawn plain bed lies on it, clear of its headboard; pc-character's find while
+measuring the laid body for art-kit's sleeper cover, the coordinator's go; the label from decision_number.sh). Laid
+as Client3D lays a resident on prop.bed's head cell (SLEEP_MIDDLE back from the cell, SLEEP_ASIDE across, Sleep_Side
+on its AnimRig, every drawn mesh skinned with its blend shapes; C:/dev/review/pc-character/cover/cover_bounds.txt),
+every sleeper's head was in the headboard (art-kit's boards at the bed's z -0.98..-0.94 up to 0.55; the mattress's
+top 0.42, its head end -0.90): a tall heavy man at 1.08 reached z -1.09, 11 cm out behind the board, and even a
+middling woman's head and bun -0.985; and LIE_HEIGHT["prop.bed"] 0.37 sank the curled body 3 to 5 cm into the
+mattress. SLEEP_MIDDLE (0.81) was fitted on the bedroll and the strip, where nothing stands at the head end. Now on
+a drawn plain bed (_sync_bedroll's non-solid bed, its prop in SLEEP_BED_BACK) the puppet keeps "bed_back" and _lay
+lays the body SLEEP_BED_BACK["prop.bed"] (0.20) times its scale farther toward the bed's foot, and
+LIE_HEIGHT["prop.bed"] is 0.43, the mattress and a centimetre. 0.15 was the first figure (the coordinator's "about
+0.14"): it cleared a bare head by a centimetre, but a brimmed hat's brim, which a sleeper keeps on, still reached
+-0.974 into the board, so 0.20. The margin: a 1.08 sleeper, the largest (tall 1.06 and the 0.02 spread), in a
+brimmed hat reaches -0.920, 2 cm short of the board's face; the hat's reach grows 0.39 m per unit of scale, so a
+sleeper over about 1.13 would touch the board; bare-headed, cropped, bound (the bun), long-haired or hooded, the same
+man stops by -0.885, and a 1.0 woman by -0.785. The toes stop by 0.708, well inside the foot posts (0.92). A known
+leftover: the brim, stiff on a head lying on its side, dips to 0.391, 3 cm into the mattress at the uncovered head
+end; the body and hair lie on it (lowest 0.411 to 0.422). The bedroll, the strip's lay and a furnished (solid) bed's
+(SLEEP_HEAD_BACK behind its pillow end) are as they were, their rows unchanged. The name plate goes with the moved head
+(865 amended (8) reads lay_at). view_world_test _test_sleeper_on_bed, the same lay through _sync_bedroll and _lay on
+AnimRig at three times: the tall heavy man in a brimmed hat from -0.920 to 0.708 along the bed, lowest 0.422 (the
+brim 0.391, reported); a middling woman -0.785 to 0.613, lowest 0.411 (each nothing nearer the head than the board's
+face -0.94, nothing past the foot posts' 0.92, the body's lowest point within 2 cm of the mattress);
+_test_bedroll_drawn and _test_room_beds read the bed's height and bed_back from the constants; parts_test
+_test_plate_laid's plate over the moved head within 0.1 m. art-kit's cover (961) is fitted to this lay. Drawing
+only, protocol unchanged, no new class_name.
+
+751 amended (8), continued: the lie-down and the get-up eased (the coordinator's, from ui-design's hats-off look,
+where the sleeper jumped as it got up; animation read the diff before it queued, its 869 amended (3) touching the
+get-up's same lines). Measured frame by frame at 1/30 s in Client3D's own order (build/bedease's probe: _sync_bedroll,
+_sync_work, _lay, _lying_down, the rig's advance; the hips' world step against the clip's own, the hips' move in the
+Model's frame), main jumped too, and had since beds went in: Sleep_Down starts standing at the body's root and the
+curl lies well behind it, so at its first frame the standing body was put SLEEP_MIDDLE back, aside and up on the
+bed and turned half round at once (the hips 0.79 m for the tall heavy man in a brimmed hat, 0.76 m for a middling
+woman, 0.67 m on a bedroll); at Sleep_Up's first frame _lay ran before _lying_down had begun the get-up, so the curl
+stood a frame where it stood, unturned (0.46 m), then, _sync_bedroll having let go of the bed's metas, lay on the
+floor at LIE_MIDDLE (0.63 m), its head 0.57 m behind the headboard's face for half a second; and as it stood the
+body jumped again (0.32 m: Sleep_Up ends at its root, LIE_MIDDLE off). This take's bed_back added 0.2 m to the
+first. Now _lying_down records each clip's start and end ("lay_from", "lay_to", "lay_rising"); _lay eases the lay
+(back, aside, bed_back or the furnished bed's pillow end, the bed's height) in from where the body stands over the
+first LAY_IN_BY (0.73) of Sleep_Down and the half turn over its first LAY_TURN_IN_BY (0.3, while it is upright);
+the lay it had is kept ("lay_held", whatever _sync_bedroll lets go of) and eases out after the first LAY_OUT_FROM
+(0.29) of Sleep_Up, the turn after LAY_TURN_OUT_FROM (0.8, standing again), back to where it stands; the get-up's
+_lying_down lays the body again the frame it begins; a sleeper woken as it lies down lies down first, as its clip
+already did. Straight lines, the least speed for the way. The ease reads the clip, not the clock (the coordinator's,
+after the stalls below): _lay_progress takes the rig's own place in the clip ("lay_clip", AnimRig.base_position, where
+its last frame left it) and whatever of the frame's advance is over LAY_LAG (1/30 s), so the lay and the turn follow
+the drawn pose by a frame at 30 a second at the most, as the passed strips drew them, whatever the clock does; never
+back ("lay_u"); the frame once() is called, the slot's last clip's place is read as the start ("lay_unplayed"). The
+clip over, cut short or left with some still to go (busy_until passed), the rest is carried at the clip's own pace
+from there ("lay_carry_at", "lay_carry_u") till "lay_done": at a clip's end under a frame; a get-up cut short a
+third in leaves nearly all its lay, and over the next clip's 0.15 s blend alone that would be some 18 cm a frame, so
+the coordinator's "over the blend" is the clip's pace here, the blend its least only when the rest is that short. What
+a player sees of it (build/bedclip's glide probe, 1/30 s frames): stall-free, Idle starts with the clip at its end and
+nothing left to carry; one 350 ms stall early in Sleep_Up, all of it lost to the rig (the laptop's lost less), leaves
+the clip a fifth short as busy_until passes, and the body, standing in Idle, still 0.28 m from where it stands (the
+man; the woman 0.26, the bedroll 0.21), 0.11 m up, with 2.84 rad of its half turn to go, carried over 10 frames (333
+ms); two such stalls 0.61 m (0.57, 0.46) and the whole half turn over 21 frames (700 ms); the get-up cut a third in
+1.00 m (0.93, 0.75), 0.39 m up, the whole half turn, over 34 frames (1.13 s); never over 3.2 cm a frame. A known look
+of a rare case, said plainly: a standing body turning round and sliding off its bed for up to a second. The pose's
+own clock (AnimRig run on the clock busy_until keeps) is animation's, sent with these figures, not in this take. The fit, on the drawn prop.bed: Sleep_Down falls back toward the head only after its first second, so the lay
+is nearly in by then (any slower and the head went behind the board, any sooner and the feet past the foot posts);
+Sleep_Up's curl leaves the head end in its first half second, so the lay holds that long. Asleep, the lay is as
+before. The most a frame now moves the hips beyond the clip's own: 3.0 cm lying down, 3.5 cm getting up (the man;
+the woman 2.8 and 3.2, the bedroll 2.5 and 2.7); along the bed through both clips the man -0.920 to 0.868, the woman
+-0.785 to 0.748, inside the board's face (-0.94) and the foot posts (0.92). Joined (ui-design's strips at the Mughouse
+keeper's bed, the Atlas at 30 frames a second; the hips' whole step, the clip's own in): main 75.5 and 78.1 cm at
+Sleep_Down's first frame, 42.2 and 45.6 then 64.6 and 71.9 cm at Sleep_Up's first two, 47.8 and 48.3 cm as it stood;
+the take 5.2 to 6.4 cm on a run with no stalls, its two larger frames (19.7 and 29.8 cm) each across a 403 ms stall of
+the laptop's, about 3.6 cm a 33 ms. Lying down, the feet slide under the body for about a second while the clip sits
+(a slide where there was a jump; the clip's to mend, animation told). A leftover: in the middle of each clip
+the body is part way up and the clip low (sitting down, getting up), so for a few frames a knee or hand is a few
+centimetres under the floor's level, inside the bed (main's get-up put it 31 cm under the floor). view_world_test
+_test_sleeper_lies_down: the man and the woman on a drawn bed, the woman on a bedroll out of doors, from standing to
+asleep to standing in that order, the hips' step a frame within the clip's own and LAY_STEP_MOST (0.04 m), and at
+every seventh frame of Sleep_Down and Sleep_Up the body (CPU-skinned) inside the board and the foot posts; each
+again with the clock jumped STALL_MS (350 ms) at each clip's third frame and at its 27th, the rig given only a frame
+of it (the clip behind busy_until, its rest carried) or all of it (that frame's bound its share, LAY_STEP_MOST a
+thirtieth), and once with the get-up cut short 18 frames in (busy_until and rising_until passed, the rig to Idle):
+the most beyond the clip's own a thirtieth 3.9, 3.6 and 3.7 cm for the man, 3.5, 3.3 and 3.4 for the woman, 3.0,
+2.7 and 2.8 on the bedroll, inside the board and posts in each (-0.913 to 0.903 the man's widest). Stall-free the
+hips' path is the clock-timed ease's within 1.3 mm at every frame (build/bedclip's probe on 377372dfb and on this,
+man, woman and bedroll), so the keeper's-bed strips stand. Drawing only, protocol unchanged, no new class_name.
+
 ## 749. Spawn safety: the nearest safe cell first
 
 750, combat's side (2). The heavy axes too. The coordinator: Jeff's
