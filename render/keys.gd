@@ -27,15 +27,15 @@ const DEFAULTS := {
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
-	"forward": "Walk forward (click scheme: the view overhead)", "back": "Walk back (click scheme: the view back to normal)",
-	"left": "Walk left (click scheme: turn)", "right": "Walk right (click scheme: turn)",
-	"open": "Open a chest or a door; talk to someone", "pack": "Your gear and pack", "pick_up": "Pick up",
+	"forward": "Forward (click scheme: overhead)", "back": "Back (click scheme: usual view)",
+	"left": "Left (click scheme: turn)", "right": "Right (click scheme: turn)",
+	"open": "Open a chest or door, or talk", "pack": "Your gear and pack", "pick_up": "Pick up",
 	"drop": "Put down", "throw": "Throw", "talk": "Talk", "talk_log": "Pin the talk box", "map": "Map",
 	"lantern": "Lantern", "reset": "Reset the room", "options": "Options", "hints": "The controls list",
 	"debug": "Debug text", "fullscreen": "Fullscreen", "builder": "Builder mode",
 	"phrase_1": "Quick phrase 1", "phrase_2": "Quick phrase 2", "phrase_3": "Quick phrase 3", "phrase_4": "Quick phrase 4",
-	"stand": "Held with a click: swing where you stand, at whatever is there; with a bow, held: stand firm and draw", "signature": "Held with a click: your weapon's own move (a shield bashes)",
-	"bandage": "A bandage on the cursor: click yourself or an ally", "screenshot": "Screenshot",
+	"stand": "Hold: strike in place or draw a bow", "signature": "Hold, click: your weapon's move",
+	"bandage": "Bandage: click yourself or an ally", "screenshot": "Screenshot",
 	"yes": "Say yes to an offer that stands",
 	"card": "Your companion's card",
 	"town": "The town sheet",

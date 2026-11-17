@@ -40,7 +40,19 @@ const VOLUMES := [["master_volume", "Master"], ["music_volume", "Music"], ["sfx_
 	["voice_volume", "Voices"], ["ambience_volume", "Ambience"], ["ui_volume", "Interface"]]
 
 var _column: VBoxContainer
-var _scroll: ScrollContainer
+## The Controls page's two columns, its key groups (KEY_GROUPS' order) and how many
+## groups the left column holds (_balance_columns).
+var _sides: Array[VBoxContainer] = []
+var _groups: Array[VBoxContainer] = []
+var _split := 2
+var _split_seen := 2
+## The page in front last frame and how tall its content asked to be; whether each page, by name, was
+## seen to need a scroll bar (_process).
+var _front_seen: ScrollContainer
+var _front_tall := 0.0
+var _scrolls: Dictionary[StringName, bool] = {}
+## The gap between the Controls page's two columns (canvas units).
+const COLUMN_GAP := 40
 ## The Character section's rows, beside its preview: [the look's key, its
 ## label, its choices as [value, label]] (PersonLook.PLAYER_CHOICES' values).
 const LOOK_ROWS := [
@@ -96,7 +108,9 @@ var beard_row: Control
 
 
 func _ready() -> void:
-	# Centred at the top whatever its width (a wide section grows it both ways).
+	# Centred at the top whatever its width (a wide section grows it both ways), one
+	# width on every tab (the largest page's: the tabs measure the hidden ones too) and
+	# so one top-left corner; only the height follows the page (_process).
 	custom_minimum_size = Vector2(WIDTH, 0)
 	anchor_left = 0.5
 	anchor_right = 0.5
@@ -104,16 +118,11 @@ func _ready() -> void:
 	offset_right = WIDTH * 0.5
 	offset_top = 180
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
-	# The column in a scroll box capped at the screen's height (the wheel scrolls
-	# it); no inset look inside the panel.
-	_scroll = ScrollContainer.new()
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_scroll.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	add_child(_scroll)
+	# The title and the tab strip stay put; each page scrolls inside its own box
+	# (add_section), capped at the screen's height.
 	_column = VBoxContainer.new()
-	_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_column.add_theme_constant_override("separation", UiTheme.constant("row"))
-	_scroll.add_child(_column)
+	add_child(_column)
 	var title := Label.new()
 	title.text = "Options"
 	title.theme_type_variation = &"Title"
@@ -121,6 +130,8 @@ func _ready() -> void:
 	tabs = TabContainer.new()
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.focus_mode = Control.FOCUS_NONE
+	# All six tabs always shown: the strip never scrolls and has no arrows.
+	tabs.get_tab_bar().clip_tabs = false
 	_column.add_child(tabs)
 	# Who you are first: what a new player sets before anything else.
 	var character := add_section("Character")
@@ -165,6 +176,19 @@ func _ready() -> void:
 	var controls := add_section("Controls")
 	controls.add_child(_choice_row("Move", "controls", [["click", "Click to move"], ["wasd", "WASD and aim"]],
 		func() -> String: return Net.controls, Net.set_controls))
+	# The key groups in two columns, in order; where the split falls is measured by
+	# height (_balance_columns), the first guess being the usual one.
+	var columns := HBoxContainer.new()
+	controls.add_child(columns)
+	for i in 2:
+		if i == 1:
+			var gap := Control.new()
+			gap.custom_minimum_size.x = COLUMN_GAP
+			columns.add_child(gap)
+		var side := VBoxContainer.new()
+		side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		columns.add_child(side)
+		_sides.append(side)
 	for group: Array in KEY_GROUPS:
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", UiTheme.constant("unit"))
@@ -175,9 +199,10 @@ func _ready() -> void:
 		for action: String in group[1]:
 			if Keys.WORDS.has(action):
 				box.add_child(_key_row(action))
-		controls.add_child(box)
+		_groups.append(box)
 		if group[0] == "Testing":
 			dev_rows = box
+	_arrange_columns(2)
 	var reset := Button.new()
 	reset.text = "Reset keys"
 	reset.focus_mode = Control.FOCUS_NONE
@@ -217,21 +242,96 @@ var credits_button: Button
 var _credits: VBoxContainer
 
 
-## The column shown whole where it fits, else as tall as the screen allows.
+## The window as wide as the widest page (one width, so one corner, on every tab) and as tall
+## as the page in front, where that fits under the screen's height less the window's top and
+## the theme's margin, else that tall and the page scrolls inside (the title and the tabs
+## stay). A scroll bar's width is kept in the width once any page has been seen to need one
+## (a page not shown yet is not laid out, so its height says nothing).
 func _process(_delta: float) -> void:
-	if not visible or _scroll == null:
+	if not visible or _column == null:
 		return
-	var room := get_viewport_rect().size.y - offset_top - UiTheme.constant("margin") - 2 * UiTheme.constant("pad")
-	_scroll.custom_minimum_size.y = minf(_column.get_combined_minimum_size().y, maxf(room, 200.0))
+	var front := tabs.get_current_tab_control() as ScrollContainer
+	if front == null:
+		return
+	if front.name == &"Controls":
+		_balance_columns()
+	var room := get_viewport_rect().size.y - offset_top - UiTheme.constant("margin")
+	var chrome := get_combined_minimum_size().y - front.get_combined_minimum_size().y
+	var cap := maxf(room - chrome, 200.0)
+	var tall := (front.get_child(0) as Control).get_combined_minimum_size().y
+	if tall == _front_tall and front == _front_seen:
+		_scrolls[front.name] = tall > cap
+	_front_tall = tall
+	_front_seen = front
+	var widest := 0.0
+	for page: Node in tabs.get_children():
+		widest = maxf(widest, ((page as ScrollContainer).get_child(0) as Control).get_combined_minimum_size().x)
+	if _scrolls.values().has(true):
+		widest += front.get_v_scroll_bar().get_combined_minimum_size().x
+	tabs.custom_minimum_size.x = widest + tabs.get_theme_stylebox("panel").get_minimum_size().x
+	front.custom_minimum_size.y = minf(tall, cap)
 
 
-## A tab titled [param title], its controls to be added to the box returned.
+## A tab titled [param title], its controls to be added to the box returned. The
+## page is a scroll box (named [param title]) round that box, in no inset look.
 func add_section(title: String) -> VBoxContainer:
+	var page := ScrollContainer.new()
+	page.name = title
+	page.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	page.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var box := VBoxContainer.new()
-	box.name = title
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", UiTheme.constant("unit"))
-	tabs.add_child(box)
+	page.add_child(box)
+	tabs.add_child(page)
 	return box
+
+
+## The key groups' boxes put [param first] in the left column and the rest in the right, in order.
+func _arrange_columns(first: int) -> void:
+	for i in _groups.size():
+		var box := _groups[i]
+		var side := _sides[0] if i < first else _sides[1]
+		if box.get_parent() != null and box.get_parent() != side:
+			box.get_parent().remove_child(box)
+		if box.get_parent() == null:
+			side.add_child(box)
+		side.move_child(box, side.get_child_count() - 1)
+	_split = first
+
+
+## The taller column's height when the first [param first] groups are on the left.
+static func _taller(heights: Array[float], first: int) -> float:
+	var left := 0.0
+	var right := 0.0
+	for i in heights.size():
+		if i < first:
+			left += heights[i]
+		else:
+			right += heights[i]
+	return maxf(left, right)
+
+
+## The split of the key groups, in order, that leaves the taller column least tall, measured
+## as laid out (the words wrap to the room the column gives them), a hidden group counting
+## none. Moved only when two frames running measure the same new split (the first frames of
+## a page's layout measure unwrapped words).
+func _balance_columns() -> void:
+	var heights: Array[float] = []
+	for box: VBoxContainer in _groups:
+		heights.append(box.get_combined_minimum_size().y if box.visible else 0.0)
+	var best := _split
+	var least := _taller(heights, _split)
+	for first in range(1, _groups.size()):
+		if _taller(heights, first) < least - 0.5:
+			least = _taller(heights, first)
+			best = first
+	if best == _split:
+		_split_seen = best
+		return
+	if best == _split_seen:
+		_arrange_columns(best)
+	_split_seen = best
 
 
 ## The tab titled [param title] brought forward (none such: unchanged).
@@ -261,6 +361,7 @@ func toggle() -> void:
 			for value: String in choices[key]["buttons"]:
 				(choices[key]["buttons"][value] as Button).set_pressed_no_signal(value == current)
 		_show_resolution()
+		_fit_key_buttons()
 		if dev_rows != null:
 			dev_rows.visible = dev_keys.is_valid() and bool(dev_keys.call())
 	elif _unsaved:
@@ -594,12 +695,15 @@ func _credit_label(text: String, caption: bool) -> Label:
 func _key_row(action: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
+	# The words take the room beside the key and wrap in it.
 	var name := _label(str(Keys.WORDS[action]))
-	name.custom_minimum_size = Vector2(560, 0)
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(name)
 	var button := Button.new()
 	button.text = Keys.name_of(action)
-	button.custom_minimum_size = Vector2(200, 0)
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(func() -> void: begin_rebind(action))
 	key_buttons[action] = button
@@ -619,6 +723,23 @@ func begin_rebind(action: String) -> void:
 func _show_keys() -> void:
 	for action: String in key_buttons:
 		key_buttons[action].text = Keys.name_of(action)
+	_fit_key_buttons()
+
+
+## Every key button as wide as the widest key's name needs (a button reading "press a key"
+## is wider for as long as it does), so the keys line up in a column.
+func _fit_key_buttons() -> void:
+	if key_buttons.is_empty() or not is_inside_tree():
+		return
+	var sample: Button = key_buttons.values()[0]
+	var font := sample.get_theme_font("font")
+	var size := sample.get_theme_font_size("font_size")
+	var widest := 0.0
+	for action: String in key_buttons:
+		widest = maxf(widest, font.get_string_size(Keys.name_of(action), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+	widest += sample.get_theme_stylebox("normal").get_minimum_size().x
+	for action: String in key_buttons:
+		key_buttons[action].custom_minimum_size.x = widest
 
 
 func _input(event: InputEvent) -> void:

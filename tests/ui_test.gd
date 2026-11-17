@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_access()
 	_test_keys()
 	_test_options_tabs()
+	await _test_options_window()
 	_test_inventory_panel()
 	_test_barter()
 	await _test_resident_asks()
@@ -2147,6 +2148,61 @@ func _test_access() -> void:
 	Net.set_ui_scale(kept[3], false)
 	Net.set_text_scale(kept[4], false)
 	Net.set_colours(kept[5], false)
+
+
+## The Options window (ui-design's mock, 2026-11-17): one width and one top-left corner on every
+## tab, the height following the page and capped at the room, all six tabs shown with no arrows,
+## the Controls page in two columns that need no scroll at Normal sizes.
+func _test_options_window() -> void:
+	print("== the Options window: one width, one corner, the height follows the page ==")
+	var panel: OptionsPanel = _main.options_panel
+	var win := get_window()
+	var scale_was := [win.content_scale_mode, win.content_scale_aspect, win.content_scale_size]
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	win.content_scale_size = Vector2i(3840, 2160)
+	var was_shown := panel.visible
+	if not panel.visible:
+		panel.toggle()
+	var rects := {}
+	var arrows := false
+	var scrolled := {}
+	for title: String in ["Character", "Display", "Interface", "Sound", "Controls", "Credits"]:
+		panel.show_tab(title)
+		var last := Rect2()
+		var still := 0
+		var i := 0
+		while i < 120:
+			i += 1
+			await get_tree().process_frame
+			var now := Rect2(panel.global_position, panel.size)
+			still = still + 1 if now == last else 0
+			last = now
+			if still >= 8:
+				break
+		print("   %s: still after %d frames" % [title, i])
+		rects[title] = Rect2(panel.global_position, panel.size)
+		arrows = arrows or panel.tabs.get_tab_bar().get_offset_buttons_visible()
+		var page := panel.tabs.get_node(NodePath(title)) as ScrollContainer
+		scrolled[title] = page.get_v_scroll_bar().visible
+		print("   %s: window %s, page %s, scrollbar %s, content %s min %s, page min %s" % [title, rects[title], page.size, scrolled[title],
+				(page.get_child(0) as Control).size, (page.get_child(0) as Control).get_combined_minimum_size(), page.get_combined_minimum_size()])
+	var same := true
+	for title: String in rects:
+		var r: Rect2 = rects[title]
+		same = same and is_equal_approx(r.size.x, rects["Character"].size.x) and is_equal_approx(r.position.x, rects["Character"].position.x) 				and is_equal_approx(r.position.y, rects["Character"].position.y)
+	_check(same, "the same width and top-left corner on every tab (%s)" % [rects["Character"]])
+	_check(not arrows and not panel.tabs.get_tab_bar().clip_tabs, "the tab strip never shows arrows")
+	_check(rects["Sound"].size.y < rects["Character"].size.y and rects["Character"].size.y < rects["Controls"].size.y,
+		"the height follows the page (Sound %d, Character %d, Controls %d)" % [rects["Sound"].size.y, rects["Character"].size.y, rects["Controls"].size.y])
+	_check(not scrolled["Controls"] and rects["Controls"].end.y <= get_viewport().get_visible_rect().size.y,
+		"Controls needs no scroll at Normal sizes, and the window ends on the screen")
+	win.content_scale_mode = scale_was[0]
+	win.content_scale_aspect = scale_was[1]
+	win.content_scale_size = scale_was[2]
+	panel.show_tab("Character")
+	if panel.visible != was_shown:
+		panel.toggle()
 
 
 ## Jeff (2026-10-28): the Options "better organized and decluttered": a tab
