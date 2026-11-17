@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3071)
+## Lines in the code (3072)
 
 ### companions (Pip, Wren, Nix) (671)
 
