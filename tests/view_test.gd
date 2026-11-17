@@ -4628,6 +4628,7 @@ func _test_kinds() -> void:
 	_test_home_label()
 	_test_inside_is_his()
 	_test_tavern_inside()
+	_test_indoors_round_pieces()
 	_test_room_beds()
 	_test_smithy_inside()
 
@@ -4658,6 +4659,172 @@ func _test_smithy_inside() -> void:
 	var tools := _rig._room.get_node_or_null("Decor_0_1_tool_wall_-1_0") as Node3D
 	_check(tools != null and is_equal_approx(tools.position.x, -0.5) and is_equal_approx(tools.rotation.y, PI * 0.5),
 		"the smith's tool wall hung on the west wall (%s)" % [tools.position if tools != null else null])
+
+
+## 751 amended (10) (maps in buildings' place, the coordinator's ruling; ui-design's bed strips: Aldous
+## the priest asleep on an out-of-doors bedroll inside the temple): out of doors, a cell off the floor in
+## the rect of a building with floor of its own (the temple's altar, the healer's hut's bank and bed)
+## bounds _find_enclosed's flood, so those rooms are walled in; and rain (775 amended (2)) falls unless
+## the cell is walled in under a roof.
+func _test_indoors_round_pieces() -> void:
+	print("\n== the wilds' temple and healer's hut walled in round their solid pieces; the inn's shell, the ruins and pieces in the open as before; rain in through a ruin's open top only (751 amended (10), 775 amended (2)) ==")
+	var WetLook := Client3D.WetLook
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	_rig._find_enclosed()
+	var by_code := {}
+	for building: Dictionary in wilds["buildings"]:
+		if building.get("rect") is Rect2i:
+			by_code[str(building.get("code", ""))] = building["rect"]
+	var floor_of := func(rect: Rect2i) -> Array:
+		return Level.rect_cells(rect).filter(func(cell: Vector2i) -> bool: return _rig._floor_lookup.has(cell))
+	var held := func(rect: Rect2i) -> int:
+		return Level.rect_cells(rect).filter(func(cell: Vector2i) -> bool: return _rig._enclosed.has(cell)).size()
+	var indoors := func(cells: Array) -> bool:
+		return cells.all(func(cell: Vector2i) -> bool: return _rig._indoors(cell))
+	var temple: Rect2i = by_code.get("T1", Rect2i())
+	var altar: Array = Level.rect_cells(by_code.get("T3", Rect2i()))
+	var hut: Rect2i = by_code.get("T2", Rect2i())
+	_check(temple == Rect2i(190, 199, 10, 6) and floor_of.call(temple).size() == 58 and held.call(temple) == 58
+		and indoors.call(floor_of.call(temple)) and _rig._indoors(Vector2i(199, 204))
+		and altar == [Vector2i(199, 201), Vector2i(199, 202)] and not altar.any(func(cell: Vector2i) -> bool: return _rig._enclosed.has(cell) or _rig._indoors(cell)),
+		"the temple: its 58 floor cells walled in and indoors, Aldous's corner (199,204) too; the altar's two cells off the floor close it and are not indoors (%d held)" % held.call(temple))
+	_check(hut.size == Vector2i(7, 5) and floor_of.call(hut).size() == 13 and held.call(hut) == 13 and indoors.call(floor_of.call(hut)),
+		"the healer's hut T2: its 13 floor cells walled in round its bank and bed, indoors (%d held)" % held.call(hut))
+	var inn: Rect2i = by_code.get("I1", Rect2i())
+	_check(floor_of.call(inn).size() == 4 and held.call(inn) == 0 and not floor_of.call(inn).any(func(cell: Vector2i) -> bool: return _rig._indoors(cell)),
+		"the Mughouse's shell: its four doorway cells out of doors, as before (%d held)" % held.call(inn))
+	_check(["C3", "B2"].all(func(code: String) -> bool: return held.call(by_code.get(code, Rect2i())) == 0),
+		"the two laid ruins C3 and B2 out of doors as before: their ways in are open edges, not cells")
+	var open_pieces := ["W1", "M1", "G1", "C1", "W2", "S2", "W3", "W4", "M2", "M3", "C2", "R1"]
+	_check(open_pieces.all(func(code: String) -> bool: return held.call(by_code.get(code, Rect2i())) == 0),
+		"the well, the stalls, the mound, the cairn, the stones and woodpiles: nothing walled in by them")
+	var homes := ["H1", "H4", "H2", "H3", "S1", "T1", "T2"]
+	var in_homes := 0
+	var spaces_of := {}
+	for code: String in homes:
+		in_homes += held.call(by_code.get(code, Rect2i()))
+		var ids := {}
+		for cell: Vector2i in Level.rect_cells(by_code.get(code, Rect2i())):
+			if _rig._enclosed.has(cell):
+				ids[_rig._enclosed[cell]] = true
+		spaces_of[code] = ids.size()
+	# T2's crooked room is four spaces: a one-cell neck between its solid pieces closes as a lone gap between walls
+	# does (ENCLOSED_GAP), its door cell (152,232) and the cells at (150,233) and (150,235) each their own; all indoors.
+	_check(_rig._enclosed.size() == 72 + 58 + 13 and _rig._enclosed_rects.size() == 10 and in_homes == _rig._enclosed.size()
+		and spaces_of.get("T1", 0) == 1 and spaces_of.get("T2", 0) == 4 and ["H1", "H4", "H2", "H3", "S1"].all(func(code: String) -> bool: return spaces_of.get(code, 0) == 1),
+		"the whole wilds: 143 cells walled in in 10 spaces (72 in 5 before), each in a house, hut, shed, the temple (one) or the healer's hut (four) (%d in %d; %d in those; spaces %s)"
+		% [_rig._enclosed.size(), _rig._enclosed_rects.size(), in_homes, spaces_of])
+	# _walled, what anything else reading walls reads, is unchanged: the altar's four edges and the hut's walls beside its bank.
+	var altar_edges: Array[Vector3i] = [Vector3i(198, 201, Terrain.EAST), Vector3i(198, 202, Terrain.EAST), Vector3i(199, 200, Terrain.SOUTH), Vector3i(199, 202, Terrain.SOUTH)]
+	var hut_walls: Array[Vector3i] = [Vector3i(149, 233, Terrain.EAST), Vector3i(150, 232, Terrain.SOUTH), Vector3i(149, 235, Terrain.EAST)]
+	_check(altar_edges.all(func(key: Vector3i) -> bool: return not _rig._walled(key) and _rig._flood_bounds(key))
+		and hut_walls.all(func(key: Vector3i) -> bool: return not _rig._walled(key) and _rig._flood_bounds(key)),
+		"_walled unchanged on the altar's four edges and the hut's walls by its bank (none walled), only the flood's _flood_bounds closes them")
+	# Aldous asleep in his corner: on the level's bedroll (decor), none of the client's own, the bedroll's height.
+	var aldous := Resident.new()
+	aldous.name = "AldousBedrollTest"
+	var puppet := Node3D.new()
+	aldous.tile = Vector2i(199, 204)
+	aldous.facing = Vector2i(1, 0)
+	aldous.activity = "sleep"
+	_rig._sync_bedroll(aldous, puppet)
+	_check(_rig._decor_bedroll(Vector2i(199, 204)) and puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.09),
+		"Aldous asleep at (199,204): on the temple's own bedroll, none laid by the client, 0.09 up (%s)" % [puppet.get_meta("bed_height", 0.0)])
+	puppet.free()
+	aldous.free()
+	# Rain (775 amended (2)): dry walled in and sheltered; walled in under a ruin's open top, wet.
+	var weather = _rig._weather_view
+	if weather != null:
+		var outdoor_was: bool = weather.outdoor
+		var rain_was: float = weather.weather.get("rain", 0.0)
+		weather.outdoor = true
+		weather.weather["rain"] = 1.0
+		var dry: Array[Vector2i] = [Vector2i(195, 201), Vector2i(199, 204), Vector2i(152, 233), Vector2i(211, 205)]
+		var outside := Vector2i(188, 201)
+		_check(dry.all(func(cell: Vector2i) -> bool: return is_zero_approx(WetLook.rain_on(_rig, cell))) and is_equal_approx(WetLook.rain_on(_rig, outside), 1.0),
+			"in rain: dry in the temple, Aldous's corner, the healer's hut and the hut H2; wet outside the temple's doors (%s)"
+			% [dry.map(func(cell: Vector2i) -> float: return WetLook.rain_on(_rig, cell))])
+		# The healer's hut as a ruin, told by the "huts" message's own path (733, Client3D.set_huts by its place
+		# id): its roof gone, so rain falls in it, walled in or not; told standing again, dry.
+		_hut_rain_by_huts("the wilds' healer's hut T2", hut, Vector2i(152, 233), "wilds/healers_hut@152,232")
+		# A level's roof (364, _test_roofs' room: walls by hand, the builder's roof over them): dry under it;
+		# the roofed one in its town's ruin wet; the same walls with no building drawn over them dry, as
+		# 775 read every walled-in space (the castle's hand-walled rooms; the coordinator, 2026-11-17).
+		var map := LevelMap.new(Vector2i(16, 14))
+		for y in 14:
+			for x in 16:
+				map.set_cell(Vector2i(x, y), "grass")
+		var room := Rect2i(3, 3, 5, 3)
+		for key in Level.outline(room):
+			map.set_edge(key, "door" if key == Vector3i(5, 5, Terrain.SOUTH) else "wall")
+		var inside := Vector2i(5, 4)
+		_rig.rebuild(Level.parse(map.to_image(), null, {"outdoor": true, "walls": "wood", "roofs": [{"rect": [3, 3, 5, 3], "use": "", "town": ""}]})["terrain"], Vector2i(7, 7))
+		_rig._find_enclosed()
+		var roofed_dry := _rig._enclosed.has(inside) and _rig.sheltered(inside) and is_zero_approx(WetLook.rain_on(_rig, inside))
+		var roof_entries: Array = _rig._buildings.filter(func(entry: Dictionary) -> bool: return entry.has("roof_index"))
+		var ruin_wet := false
+		if roof_entries.size() == 1:
+			roof_entries[0]["decline"] = Towns.RUIN
+			ruin_wet = not _rig.sheltered(inside) and is_equal_approx(WetLook.rain_on(_rig, inside), 1.0)
+		_rig.rebuild(Level.parse(map.to_image(), null, {"outdoor": true, "walls": "wood"})["terrain"], Vector2i(7, 7))
+		_rig._find_enclosed()
+		var bare_dry := _rig._enclosed.has(inside) and _rig.sheltered(inside) and is_zero_approx(WetLook.rain_on(_rig, inside))
+		_check(roofed_dry and roof_entries.size() == 1 and ruin_wet and bare_dry,
+			"a walled room under a level's roof (364): dry in rain; the roofed one in ruin wet; the same walls with no building over them dry (%s, %s, %s)" % [roofed_dry, ruin_wet, bare_dry])
+		# maps' probe over every outdoor level (2026-11-17): the forest's healer's hut (641, the same turf_house as
+		# T2, faced south) walled in and dry; the castle's two hand-walled rooms, no building over them, dry as before.
+		var forest := Level.load_level("forest")
+		_rig.rebuild(forest["terrain"], forest["centre"])
+		_rig._find_enclosed()
+		var forest_hut := Rect2i()
+		for building: Dictionary in forest["buildings"]:
+			if str(building.get("code", "")) == "H1" and building.get("rect") is Rect2i:
+				forest_hut = building["rect"]
+		var forest_floor: Array = floor_of.call(forest_hut)
+		_check(forest_floor.size() == 13 and held.call(forest_hut) == 13 and indoors.call(forest_floor)
+			and forest_floor.all(func(cell: Vector2i) -> bool: return is_zero_approx(WetLook.rain_on(_rig, cell))),
+			"the forest's healer's hut: its 13 floor cells walled in round its bank, indoors, dry in rain (%d of %d held)" % [held.call(forest_hut), forest_floor.size()])
+		_hut_rain_by_huts("the forest's healer's hut H1", forest_hut, Vector2i(44, 29), "forest/healers_hut@")
+		var castle := Level.load_level("castle")
+		_rig.rebuild(castle["terrain"], castle["centre"])
+		_rig._find_enclosed()
+		var rooms: Array[Rect2i] = [Rect2i(23, 4, 5, 5), Rect2i(11, 17, 3, 3)]
+		var rooms_dry := true
+		var rooms_held := []
+		for room_rect in rooms:
+			rooms_held.append(held.call(room_rect))
+			for cell: Vector2i in Level.rect_cells(room_rect):
+				if not _rig._enclosed.has(cell) or not is_zero_approx(WetLook.rain_on(_rig, cell)):
+					rooms_dry = false
+		_check(rooms_dry, "the castle's keep east chamber and the halls' stair room: walled in by hand, no building over them, dry in rain as before (%s held)" % [rooms_held])
+		weather.outdoor = outdoor_was
+		weather.weather["rain"] = rain_was
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+
+
+## The healer's hut drawn over [param rect], walled in, told by the "huts" message's own path (733,
+## Client3D.set_huts by its place id, which starts with [param id_start]): standing, [param cell] dry
+## in rain; told a ruin, wet (775 amended (2): no roof over it, walled in still); told standing again,
+## dry. The weather's rain is 1 and out of doors for the call (the caller's to put back).
+func _hut_rain_by_huts(what: String, rect: Rect2i, cell: Vector2i, id_start: String) -> void:
+	var WetLook := Client3D.WetLook
+	var entries: Array = _rig._buildings.filter(func(entry: Dictionary) -> bool: return entry.get("rect") == rect and not entry.has("roof_index"))
+	var hut: String = str(entries[0].get("hut", "")) if entries.size() == 1 else ""
+	_check(entries.size() == 1 and not hut.is_empty() and hut.begins_with(id_start),
+		"%s drawn once, its place id %s" % [what, hut])
+	if hut.is_empty():
+		return
+	var dry_standing := _rig._enclosed.has(cell) and _rig.sheltered(cell) and is_zero_approx(WetLook.rain_on(_rig, cell))
+	_rig.set_huts({hut: {"state": Towns.RUIN, "level": 1}})
+	var wet_ruin := str(entries[0].get("decline", "")) == Towns.RUIN and not _rig.sheltered(cell) and is_equal_approx(WetLook.rain_on(_rig, cell), 1.0)
+	var walled_ruin: bool = _rig._indoors(cell)
+	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1}})
+	var dry_again := _rig._enclosed.has(cell) and _rig.sheltered(cell) and is_zero_approx(WetLook.rain_on(_rig, cell))
+	_rig.hut_states.erase(hut)
+	_check(dry_standing and wet_ruin and dry_again,
+		"%s in rain at %s: standing dry; told a ruin by set_huts, no roof over it and rain on its floor (walled in still: %s); told standing again, dry (%s, %s, %s)"
+		% [what, cell, walled_ruin, dry_standing, wet_ruin, dry_again])
 
 
 func _test_tavern_inside() -> void:

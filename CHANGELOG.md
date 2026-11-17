@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The temple and the healers' huts are indoors: step inside one and the camera takes its inside view and the rain stays off you, while a ruin with no roof lets the rain in (751 amended (10), 775 amended (2)).
 - The world map draws only the world's own places, one line between any two that join, and an unclaimed place by its name alone (445 amended (3)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).

@@ -3745,6 +3745,9 @@ var _roofs_clock := 0.0
 ## inside_changed last told (empty, none).
 var _enclosed: Dictionary[Vector2i, int] = {}
 var _enclosed_rects: Array[Rect2i] = []
+## Out of doors, the cells off the floor in a building's rect that bound the
+## flood (_flood_bounds, _find_flood_solid; 751 amended (10)): cell to _buildings' index.
+var _flood_solid: Dictionary[Vector2i, int] = {}
 var _enclosed_dirty := true
 ## The wall edges changed since the spaces were last worked out (a plot
 ## built, a wall felled): only the spaces beside them are worked out again.
@@ -22594,20 +22597,86 @@ func inside_building() -> Rect2i:
 	return _inside_rect
 
 
-## Whether edge [param key] closes a space (_find_enclosed): a wall (_walled)
-## or an opening no wider than ENCLOSED_GAP between walls along one line.
+## Whether edge [param key] closes a space (_find_enclosed): it bounds the
+## flood (_flood_bounds), or is an opening no wider than ENCLOSED_GAP between
+## edges that do, along one line.
 func _closes(key: Vector3i) -> bool:
-	if _walled(key):
+	if _flood_bounds(key):
 		return true
 	var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
 	for before in ENCLOSED_GAP:
-		if not _walled(key - step * (before + 1)):
+		if not _flood_bounds(key - step * (before + 1)):
 			continue
 		for after in ENCLOSED_GAP - before:
-			if _walled(key + step * (after + 1)):
+			if _flood_bounds(key + step * (after + 1)):
 				return true
 		return false
 	return false
+
+
+## Whether edge [param key] bounds _find_enclosed's flood: a wall (_walled),
+## or, out of doors, an edge beside a cell off the floor that a standing
+## building's rect holds, a building with floor of its own (_flood_solid: its
+## solid pieces, the temple's altar, the healer's hut's bank and furnished
+## bed; 751 amended (10)). Such a cell is not itself indoors (no floor). Never
+## the inn's shell (_shell_at: its inside a level of its own, its doorway
+## cells out of doors) nor a gone building's; a solid piece in the open is in
+## no such rect and closes nothing. The flood's own test: _walled, which
+## anything else reading walls would read, is unchanged.
+func _flood_bounds(key: Vector3i) -> bool:
+	if _walled(key):
+		return true
+	if not _outdoor or _flood_solid.is_empty():
+		return false
+	for cell in Terrain.edge_cells(key):
+		var index: int = _flood_solid.get(cell, -1)
+		if index >= 0 and index < _buildings.size() and not _floor_lookup.has(cell) \
+				and str(_buildings[index].get("decline", "")) != DECLINE_GONE:
+			return true
+	return false
+
+
+## _flood_solid afresh (751 amended (10)), on a full work-out of the spaces:
+## out of doors, each cell off the floor in the rect of a drawn building
+## whose rect holds floor, keyed to that building (_buildings' index); never
+## a cell of the inn's shell (_shell_at) nor a roof's own entry.
+func _find_flood_solid() -> void:
+	_flood_solid.clear()
+	if not _outdoor:
+		return
+	for index in _buildings.size():
+		var entry := _buildings[index]
+		if entry.has("roof_index") or not entry.get("rect") is Rect2i:
+			continue
+		var cells: Array = Level.rect_cells(entry["rect"])
+		if not cells.any(func(cell: Vector2i) -> bool: return _floor_lookup.has(cell)):
+			continue
+		for cell: Vector2i in cells:
+			if not _floor_lookup.has(cell) and not _shell_at.has(cell) and not _flood_solid.has(cell):
+				_flood_solid[cell] = index
+
+
+## Whether nothing over [param cell] lets the rain in (775 amended (2)):
+## _building_at's entry for it in ruin or gone decline (_show_decline, a
+## level's roof's too): open; a level's roof (364, _add_roofs: a builder's
+## walled room or shelter, its entry's "roof_index"): sheltered; a drawn
+## building's rect holds it: sheltered unless the building is roofless
+## (Level.roofless: a ruin, a camp). No building drawn over it: sheltered, as
+## 775 read every walled-in space (the castle's hand-walled rooms); a level
+## that wants an open walled yard marks it so, and none does today. Asked
+## only of a walled-in cell (_enclosed; WetLook.rain_on asks that first): a
+## cell out in the open with no building over it reads true here too.
+func sheltered(cell: Vector2i) -> bool:
+	var index: int = _building_at.get(cell, -1)
+	if index >= 0 and index < _buildings.size():
+		if str(_buildings[index].get("decline", "")) in [Towns.RUIN, DECLINE_GONE]:
+			return false
+		if _buildings[index].has("roof_index"):
+			return true
+	for building: Variant in _drawn_buildings():
+		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i and ((building as Dictionary)["rect"] as Rect2i).has_point(cell):
+			return not Level.roofless(building)
+	return true
 
 
 ## Whether edge [param key] is a wall or door that closes a space: one the
@@ -22668,9 +22737,10 @@ func _find_enclosed(changed: Array[Vector3i] = []) -> void:
 	else:
 		_enclosed.clear()
 		_enclosed_rects.clear()
+		_find_flood_solid()
 		if _outdoor:
 			for key: Vector3i in _terrain["edges"]:
-				if _walled(key):
+				if _flood_bounds(key):
 					seeds.append_array(Terrain.edge_cells(key))
 		else:
 			seeds.assign(_floor_lookup.keys())
