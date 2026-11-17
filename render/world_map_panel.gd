@@ -391,6 +391,9 @@ func open() -> void:
 	_panned = false
 	zoom_step = 0
 	_fitted = ""
+	if Net.test_click_log:
+		print("[map] opened: %d areas and %d places known to her way (guide), %d known areas told, %d known places told" % [
+			(guide.get("areas", []) as Array).size(), (guide.get("places", []) as Array).size(), known_areas.size(), known_places.size()])
 	_redraw()
 
 
@@ -820,13 +823,22 @@ func _draw_content(c: Control) -> void:
 		var inner: Rect2 = _inner(rects[area_name], inset)
 		var own := area_name == own_area
 		if own and pictured:
-			_backed_text(c, str(world.areas[area_name].get("display_name", area_name)), inner.position + Vector2(_k(&"name_left"), _k(&"name_top")), serif, heading, UiTheme.color("text"))
+			var shown := inner.intersection(Rect2(Vector2.ZERO, _canvas.size))  # Laid from the part that shows, as a box's name is.
+			_backed_text(c, str(world.areas[area_name].get("display_name", area_name)), shown.position + Vector2(_k(&"name_left"), _k(&"name_top")), serif, heading, UiTheme.color("text"))
 		else:
 			_draw_box_rows(c, area_name, inner, serif, sans, heading, caption, mouth_points)
 		c.draw_rect(inner, UiTheme.color("brass_bright") if own else UiTheme.color("edge"), false, _k(&"own_edge") if own else _k(&"box_edge"))
 	# A chip for each level known below, below its ring, else beside or above it where the "you" mark or
 	# another chip would be covered.
 	var keep_off: Array[Rect2] = []
+	var place_rings: Array[Rect2] = []
+	if pictured:
+		var picture_rect := _inner(rects[own_area], inset)
+		var ring_cell := picture_rect.size / Vector2(picture_cells)
+		for id: String in known_place_ids(own_area):
+			var spot := Vector2((world.areas[own_area]["places"] as Dictionary)[id.get_slice("/", 1)].get("cell", Vector2i(-1000, -1000)))
+			var at_ring := picture_rect.position + (spot + Vector2(0.5, 0.5)) * ring_cell
+			place_rings.append(Rect2(at_ring - Vector2.ONE * _k(&"ring"), Vector2.ONE * _k(&"ring") * 2.0))
 	var chip_pad := Vector2(_k(&"chip_pad_x"), _k(&"chip_pad_y"))
 	for chip: Dictionary in _model["chips"]:
 		var at := _to_screen(chip["at"])
@@ -840,7 +852,8 @@ func _draw_content(c: Control) -> void:
 				Rect2(at + Vector2(-_k(&"mouth") - _k(&"chip_drop") - chip_size.x, -chip_size.y * 0.5 + float(chip["depth"]) * (chip_size.y + 4.0)), chip_size),
 				Rect2(at + Vector2(-chip_size.x * 0.5, -drop - chip_size.y), chip_size)]:
 			if own_box.encloses(candidate) and not (you_rect.size != Vector2.ZERO and you_rect.intersects(candidate)) \
-					and not keep_off.any(func(taken: Rect2) -> bool: return taken.intersects(candidate)):
+					and not keep_off.any(func(taken: Rect2) -> bool: return taken.intersects(candidate)) \
+					and not place_rings.any(func(ring: Rect2) -> bool: return ring.intersects(candidate)):
 				rect = candidate
 				fitted = true
 				break

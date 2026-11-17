@@ -2145,6 +2145,9 @@ func _test_world_map_model() -> void:
 	var too_small := WorldMapModel.fold([labels[0]] as Array[Dictionary], [] as Array[Rect2], 10.0, name_of, measure, Rect2(0, 0, 60, 200))
 	_check(boxed.size() == 1 and boxed[0]["rect"] == Rect2(10, 90, 80, 20) and too_small.is_empty(),
 		"a label stays inside its own box: the side that fits, or none where nothing does (the ring stays)")
+	var none_for_r := WorldMapModel.fold([labels[0], labels[2]] as Array[Dictionary], [Rect2(560, 260, 160, 80)] as Array[Rect2], 10.0, name_of, measure, Rect2(0, 0, 800, 400))
+	_check(none_for_r.size() == 1 and (none_for_r[0]["ids"] as Array).has("r") and (none_for_r[0]["ids"] as Array).has("p") and none_for_r[0]["folded"],
+		"a label with no spot of its own folds into the nearest that has one, so its name is not lost (%s)" % [none_for_r.map(func(g: Dictionary) -> Variant: return g["ids"])])
 	var crowded := WorldMapModel.fold([labels[0]] as Array[Dictionary], [Rect2(85, 85, 30, 30)] as Array[Rect2], 10.0, name_of, measure)
 	_check(crowded.size() == 1 and crowded[0]["rect"] == Rect2(120, 90, 80, 20),
 		"a ring crowded by the you mark keeps its label, stepped out to twice the gap (a newcomer's two places keep their names)")

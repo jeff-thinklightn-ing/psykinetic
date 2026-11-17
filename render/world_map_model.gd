@@ -204,12 +204,26 @@ static func fit_scale(world: Rect2, room: Vector2, margin: float) -> float:
 ## whose rects meet joined until none do.
 static func fold(labels: Array[Dictionary], keep_off: Array[Rect2], gap: float, name_of: Callable, measure: Callable, inside := Rect2()) -> Array[Dictionary]:
 	var groups: Array[Dictionary] = []
+	var unplaced: Array[Dictionary] = []
 	for label: Dictionary in labels:
 		var rect := _placed(label["at"], label["size"], keep_off, gap, inside)
 		if rect.size == Vector2.ZERO:
+			unplaced.append(label)
 			continue
 		groups.append({"ids": [label["id"]], "rect": rect, "at": label["at"], "name": str(label.get("name", "")), "folded": false,
 			"ring_size": label["size"]})
+	# A label with no spot of its own folds into the nearest that has one (a name is not lost while another stands
+	# beside it; it opens out as the wheel zooms); with none standing at all, its ring is all there is.
+	for label: Dictionary in unplaced:
+		var nearest := -1
+		var best := INF
+		for i in groups.size():
+			var away := (groups[i]["at"] as Vector2).distance_to(label["at"])
+			if away < best:
+				best = away
+				nearest = i
+		if nearest >= 0:
+			groups[nearest] = _join(groups[nearest], {"ids": [label["id"]], "at": label["at"]}, keep_off, gap, name_of, measure, inside)
 	var merged := true
 	while merged:
 		merged = false
