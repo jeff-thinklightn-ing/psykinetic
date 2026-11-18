@@ -481,7 +481,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | on its shelf now: %s | `sim/companion.gd` SHELF_ON |
 |  | , and nothing else | `sim/companion.gd` SHELF_CLOSED |
 |  | , and more besides, but no bread | `sim/companion.gd` SHELF_MORE |
-|  | it has no bread | `sim/companion.gd` SHELF_NO_BREAD |
+|  | it has no bread, and you know of nowhere that sells any | `sim/companion.gd` SHELF_NO_BREAD |
 |  | (?i)\\b(bread\|loaf\|loaves\|bun\|buns\|baker\|baker's\|bakery)\\b | `sim/companion.gd` SHELF_BREAD_ASKED |
 |  | ; no food today | `sim/companion.gd` SHELF_NO_FOOD |
 |  | its shelf is bare just now | `sim/companion.gd` SHELF_BARE |

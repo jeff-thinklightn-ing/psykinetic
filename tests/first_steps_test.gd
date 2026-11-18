@@ -52,8 +52,10 @@ func _ready() -> void:
 	_test_guide_lore()
 	_test_here()
 	_test_ways()
+	_test_in_use()
 	_test_off()
 	FirstSteps.forced = -1
+	_test_switch()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -140,10 +142,71 @@ static func _escaped(text: String) -> String:
 	return out
 
 
+## 945 amended (3): the package switched on by its JSON (levels/companion_traits.json "first_steps" "on"),
+## read with nothing forced.
+func _test_switch() -> void:
+	print("
+== the guide switched on: the JSON's switch, nothing forced ==")
+	_check(FirstSteps.forced == -1 and FirstSteps.on() and FirstSteps.table().get("on") == true,
+		"FirstSteps.on() from levels/companion_traits.json's first_steps.on (%s)" % FirstSteps.table().get("on"))
+
+
+## 945 amended (3) (the coordinator's ruling: a pointer names only a place that is in use and someone who
+## is there): the healer's hut only while kept and not in disrepair, the temple only while its town has its
+## priest and it is not in disrepair; asked, unasked (_first_choices) or her hurt offer (_first_dest).
+func _test_in_use() -> void:
+	print("
+== the hut and the temple named only while in use: kept, and not in disrepair ==")
+	var pet := _companion()
+	var player := _player()
+	var record: PlayerRecord = _main._record_of(pet)
+	_lull(pet, player)
+	var kinds := func(unasked: bool) -> Array:
+		return _main._first_choices(pet, player, record, unasked).map(func(to: Dictionary) -> String: return str(to["first"]))
+	var hut: Dictionary = _main._first_dest("healer", pet, player, record)
+	var temple: Dictionary = _main._first_dest("temple", pet, player, record)
+	_check(not hut.is_empty() and not temple.is_empty() and "healer" in kinds.call(false) and "temple" in kinds.call(false),
+		"kept and standing: both named (%s, %s, %s)" % [hut.get("key"), temple.get("key"), kinds.call(false)])
+	if hut.is_empty() or temple.is_empty():
+		return
+	var hut_id := str(hut["key"])
+	var huts: Dictionary = World.towns._huts
+	if not huts.has(hut_id):
+		huts[hut_id] = {"state": Towns.STANDING, "level": 1, "job": 0}
+	var was := str(huts[hut_id]["state"])
+	huts[hut_id]["state"] = Towns.DISREPAIR
+	_check(_main._first_dest("healer", pet, player, record).is_empty() and not "healer" in kinds.call(false) and not "healer" in kinds.call(true),
+		"the hut in disrepair: not named, asked or unasked (%s)" % [kinds.call(false)])
+	huts[hut_id]["state"] = was
+	var keeper := World.towns.hut_keeper
+	World.towns.hut_keeper = func(_id: String) -> String: return ""
+	_check(not World.towns.hut_kept(hut_id) and _main._first_dest("healer", pet, player, record).is_empty() and not "healer" in kinds.call(false),
+		"the hut with no keeper: not named (%s)" % [kinds.call(false)])
+	World.towns.hut_keeper = keeper
+	_check(not _main._first_dest("healer", pet, player, record).is_empty(), "kept and standing again: named again")
+	var town := "wilds/store"  # Umbrage's temple building's town (its place names none).
+	var priest: String = _main._priest_of(town)
+	var buildings: Dictionary = World.towns._towns.get(town, {}).get("buildings", {})
+	_check(not priest.is_empty() and buildings.has("temple"), "the temple's town (%s): its priest (%s) and its temple" % [town, priest])
+	if priest.is_empty() or not buildings.has("temple"):
+		return
+	var trades: Array = World.production._workers[priest]["trades"]
+	World.production._workers[priest]["trades"] = []
+	_check(_main._first_dest("temple", pet, player, record).is_empty() and not "temple" in kinds.call(false) and not "temple" in kinds.call(true),
+		"the town with no priest: the temple not named (%s)" % [kinds.call(false)])
+	World.production._workers[priest]["trades"] = trades
+	var standing := str(buildings["temple"]["state"])
+	buildings["temple"]["state"] = Towns.DISREPAIR
+	_check(_main._first_dest("temple", pet, player, record).is_empty() and not "temple" in kinds.call(false),
+		"the temple in disrepair: not named (%s)" % [kinds.call(false)])
+	buildings["temple"]["state"] = standing
+	_check(not _main._first_dest("temple", pet, player, record).is_empty(), "its priest back, standing again: named again")
+
+
 func _test_tables() -> void:
 	print("\n== her decks and rules are the table's (companion_traits.json first_steps) ==")
 	var table := FirstSteps.table()
-	_check(table.get("on") == false, "the package's switch is off in the JSON (%s)" % [table.get("on")])
+	_check(table.get("on") == true, "the package's switch is on in the JSON (945 amended (3)) (%s)" % [table.get("on")])
 	var keys := ["offer.mughouse", "offer.pond", "offer.catch", "arrive.mughouse", "arrive.pond", "arrive.catch", "go.mughouse",
 		"go.pond", "go.healer", "go.temple", "go.barrow", "sit", "bed", "hurt", "risen.temple_paid", "risen.temple", "risen.healer",
 		"choice.barrow", "choice.healer", "choice.mughouse", "choice.pond", "choice.temple", "asked", "asked_one", "no", "stray", "chain_end"]
@@ -789,9 +852,9 @@ func _test_ways() -> void:
 	var store_line := Companion.store_words("wilds", square)
 	_check(store_line == store_way.trim_suffix(".") + "; on its shelf now: 2 roast perch, some roast meat, 2 bandaging kits and a sword, and nothing else.",
 		"with food: the food first, then the rest, some roast meat, closed (%s)" % store_line)
-	_check(Companion.store_words("wilds", square, "Player: Where can I buy bread?") == store_line.trim_suffix(".") + "; it has no bread."
+	_check(Companion.store_words("wilds", square, "Player: Where can I buy bread?") == store_line.trim_suffix(".") + "; it has no bread, and you know of nowhere that sells any."
 		and Companion.store_words("wilds", square, "Player: Where can I buy a sword?") == store_line,
-		"asked for bread: the shelf ends \"it has no bread\"; asked for a sword, no bread said (%s)" % Companion.store_words("wilds", square, "Where can I buy bread?"))
+		"asked for bread: the shelf ends \"it has no bread, and you know of nowhere that sells any\" (voice); asked for a sword, no bread said (%s)" % Companion.store_words("wilds", square, "Where can I buy bread?"))
 	for id: String in ["dagger", "shield", "ration", "herbs"]:
 		minted.append(stock.book.mint(id, "made", "test"))
 		stock.stock_shop(town, minted.back(), "test", "")
@@ -808,7 +871,7 @@ func _test_ways() -> void:
 	(World.towns._towns[town] as Dictionary).erase("threat")
 	_check(shut == Companion.SHELF_SHUT and Companion.shelf_words(town) == many,
 		"the town threatened: the store shut (economy: no sale then), its shelf again once the threat is gone (%s)" % shut)
-	_check(Companion.shelf_words(town, true).ends_with(", and more besides, but it has no bread"),
+	_check(Companion.shelf_words(town, true).ends_with(", and more besides, but it has no bread, and you know of nowhere that sells any"),
 		"asked for bread, more besides: \"but it has no bread\" (%s)" % Companion.shelf_words(town, true))
 	# The tripwire (the coordinator's ruling, from economy's record: the game has no bread item, recipe
 	# or baker): her Now says "it has no bread" because none exists; the day one lands, this fails.

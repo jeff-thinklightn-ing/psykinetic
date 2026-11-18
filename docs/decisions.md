@@ -61062,6 +61062,26 @@ of the sixteen weight-2 facts fit was not fixed.
   raised her [DO: n] on this ask to 11 of 24 (1 in 24 on base), so this lands on 960 (a [DO: n] taken only when asked).
   Server only,
   protocol unchanged, no new class_name.
+
+945 amended (3): the guide switched on; an offer of the healer's hut or the temple only while it has its
+keeper and is not in disrepair (the script's label; the coordinator's task 6, the companion as a new player's
+guide; package "the guide": this switch and ui's "Where to?" card line, 945 amended (1), landed
+straight after it). levels/companion_traits.json "first_steps" "on" is true, read on both sides
+(FirstSteps.on()). The coordinator's addition: a pointer names only a place that is in use and someone who is
+there. Main._first_dest took the first holdings place of the kind in her player's zone, so a hut in disrepair or
+with nobody keeping it (958's day line) was still offered hurt, chained or in "Where to?". Main._first_in_use
+now guards both: the healer's hut while Towns.hut_kept and its Towns.hut state is not disrepair, a ruin,
+planned or building (untracked reads standing); the temple while its town (its place's, else the one town of its area with a
+temple: Umbrage's temple place names none, its building names "store") has its priest (Main._priest_of) and that town's temple (Towns.building) is not in those states. Where no town's economy runs
+(a bare scene), as before. Every reader of _first_dest goes through it: her hurt offer, _first_choices asked and
+unasked, and the guide's unfound places (_first_unfound). With it, voice's "and you know of nowhere that sells
+any" ends Companion.SHELF_NO_BREAD (945 amended (2)'s note). first_steps_test _test_in_use: the hut in disrepair,
+then with no keeper (Towns.hut_keeper giving ""), the town's priest without his trade, the temple in disrepair:
+each not named by _first_dest or _first_choices, and named again once restored; it fails without the guard.
+_test_switch reads FirstSteps.on() from the JSON with nothing forced. companion_test runs with the guide
+forced off (FirstSteps.forced 0): a new companion's chain holds her quiet talk and 929's wish after her first
+words, as 945 says, and those sections test the path without it (a companion met before 945, card {}). The bullet is voice's. Server and the
+client's switch read, protocol unchanged, no new class_name.
 ## 940. A town's people heard idle: a cleared throat, a sniff, a shifted foot
 
 (sound; the label from tools/decision_number.sh; the coordinator's approval 11-15 after sound's look at

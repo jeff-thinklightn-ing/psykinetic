@@ -22,6 +22,7 @@ func _ready() -> void:
 	Companion.tends_unasked = false  # The older sections hurt bodies she would tend; _test_tends_unasked and _test_drinks_a_remedy have it on (decision 681).
 	Companion.speech_floor = false  # The older sections stage lines ticks apart; _test_speech_floor has it on (decision 917).
 	Companion.greets = false  # Her first words to a new player (929) only in _test_first_words.
+	FirstSteps.forced = 0  # Her guide (945, on since 945 amended (3)) is first_steps_test's: its chain holds her quiet talk and her wish.
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
@@ -193,6 +194,7 @@ func _ready() -> void:
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Companion.hold_tongue = true
 	Companion.tends_unasked = true
+	FirstSteps.forced = -1
 	get_tree().quit(1 if _failures > 0 else 0)
 
 

@@ -11328,6 +11328,7 @@ func _first_choices(pet: Companion, player: Player, record: PlayerRecord, unaske
 ## outside town). The catch: its taker by the store's pointer's rule
 ## (depot_pointer): the stall's keeper "at the stall", else the Mughouse
 ## while the taverner takes it ("taker", the line's words); none else.
+## The hut and the temple only while in use (_first_in_use).
 func _first_dest(kind: String, pet: Companion, player: Player, record: PlayerRecord) -> Dictionary:
 	var to := {}
 	match kind:
@@ -11342,7 +11343,7 @@ func _first_dest(kind: String, pet: Companion, player: Player, record: PlayerRec
 			var want := "healers_hut" if kind == "healer" else "temple"
 			for id: String in World.holdings.places_in(player.zone) if World.holdings != null else []:
 				var place := World.holdings.place(id)
-				if str(place.get("kind", "")) == want:
+				if str(place.get("kind", "")) == want and _first_in_use(id, place):
 					to = {"key": id, "kind": "place", "name": str(place["name"]), "area": str(place["area"]), "cell": place["cell"]}
 					break
 		"barrow":
@@ -11354,6 +11355,28 @@ func _first_dest(kind: String, pet: Companion, player: Player, record: PlayerRec
 	if not to.is_empty():
 		to["first"] = kind
 	return to
+
+
+## Whether her pointer may name healer's hut or temple [param id] (945 amended (3), the
+## coordinator's ruling: a pointer names only a place in use and someone who is there): the hut
+## kept (Towns.hut_kept) and not in disrepair or a ruin (Towns.hut); the temple's town with its
+## priest (_priest_of) and its temple not in disrepair or a ruin (Towns.building). Where no town's
+## economy runs (a bare scene), as before.
+func _first_in_use(id: String, place: Dictionary) -> bool:
+	if World.towns == null or World.production == null:
+		return true
+	var out_of_use := [Towns.DISREPAIR, Towns.RUIN, Towns.PLANNED, Towns.BUILDING]
+	if str(place.get("kind", "")) == "healers_hut":
+		return not str(World.towns.hut(id).get("state", Towns.STANDING)) in out_of_use and World.towns.hut_kept(id)
+	var town := str(place.get("town", ""))
+	if town.is_empty():  # Umbrage's temple place names no town; its building does (the town with a temple in its area).
+		var with_temple := World.towns.ids().filter(func(id_: String) -> bool:
+			return id_.begins_with(str(place.get("area", "")) + "/") and not World.towns.building(id_, "temple").is_empty())
+		town = str(with_temple[0]) if with_temple.size() == 1 else ""
+	if town.is_empty():
+		return false
+	return not str(World.towns.building(town, "temple").get("state", Towns.STANDING)) in out_of_use \
+			and not _priest_of(town).is_empty()
 
 
 ## The Mughouse's door seen from [param zone] (945): its stop cell, the

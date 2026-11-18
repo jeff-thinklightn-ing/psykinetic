@@ -5454,7 +5454,9 @@ const SHELF_MORE := ", and more besides, but no bread"
 ## On a question for bread (SHELF_BREAD_ASKED): said of the shelf, closed or open, bare or with no food (voice;
 ## economy: no bread item, but none ruled out, so "has", not "never sells"). Transcript 7: a closed list still
 ## drew bread from 5 of 24, "no bread today" put it on another day.
-const SHELF_NO_BREAD := "it has no bread"
+## Then "and you know of nowhere that sells any" (voice, 945 amended (2): five of transcript 8's 24 hinted at bread
+## in another town; it went in with the switch-on, 945 amended (3)).
+const SHELF_NO_BREAD := "it has no bread, and you know of nowhere that sells any"
 const SHELF_BREAD_ASKED := "(?i)\\b(bread|loaf|loaves|bun|buns|baker|baker's|bakery)\\b"
 const SHELF_NO_FOOD := "; no food today"
 const SHELF_BARE := "its shelf is bare just now"
