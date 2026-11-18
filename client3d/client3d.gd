@@ -1821,9 +1821,10 @@ const FOOTFALL_MOVING_MS := 1000
 ## (tools/gait_pace.gd; the two bodies' within 0.005): the footstep and worn
 ## armour's clank play on them (676 1b amended), at the body's own steps,
 ## not the cells'.
-## The people's jog (People_Jog_Short, its stance longer: each foot strikes sooner) has its own.
+## The people's jog (People_Jog_Short, its stance longer: each foot strikes sooner) has its own, its feet half a
+## cycle apart (977 amended: its loop closed, the left once struck twice, 0.968 and 1.005).
 const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "Jog_Short": [0.027, 0.532], "Sprint_Short": [0.044, 0.587],
-	"People_Jog_Short": [0.966, 0.450]}
+	"People_Jog_Short": [0.955, 0.455]}
 ## Where a gait starts from standing, a share of its clip as played (the coordinator's ruling on ui-design's hops,
 ## 11-16: a start had begun its gait anywhere along it, at random): the share whose feet stand nearest Idle's, so
 ## the blend from Idle moves them least. Idle stands with the left foot forward: the right foot planted, ending its
@@ -1834,7 +1835,7 @@ const GAIT_STARTS: Dictionary[String, float] = {CLIP_WALK: 0.895, "People_Jog_Sh
 ## Each gait's stances, a share of its clip as played: [[the left foot down from, to], [the right's]] (a span may
 ## wrap past the clip's end), its sole within 2 cm of the ground throughout on both bodies (anim_rig_test
 ## _test_gait_phases). A stop holds with a foot down in one (_hold_gait).
-const GAIT_STANCES: Dictionary[String, Array] = {CLIP_WALK: [[0.96, 0.60], [0.46, 0.10]], "People_Jog_Short": [[0.005, 0.275], [0.55, 0.775]],
+const GAIT_STANCES: Dictionary[String, Array] = {CLIP_WALK: [[0.96, 0.60], [0.46, 0.10]], "People_Jog_Short": [[0.05, 0.275], [0.55, 0.775]],
 	"Jog_Short": [[0.985, 0.22], [0.475, 0.72]], "Sprint_Short": [[0.935, 0.265], [0.475, 0.78]]}
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).

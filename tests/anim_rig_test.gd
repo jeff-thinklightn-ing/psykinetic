@@ -3561,6 +3561,7 @@ func _test_run_body() -> void:
 	var lib := load(CLIPS) as AnimationLibrary
 	var anim := lib.get_animation(Client3D.PEOPLE_PREFIX + JOG)
 	var n := RUN_BODY_SAMPLES
+	var alike: Array[String] = []
 	for build: Array in [SWORD_BUILDS[0], SWORD_BUILDS[4]]:
 		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
 		var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
@@ -3600,6 +3601,7 @@ func _test_run_body() -> void:
 		if trunk < RUN_TRUNK.x or trunk > RUN_TRUNK.y:
 			bad.append("the trunk %.1f" % trunk)
 		var stances: Array[String] = []
+		var feet := {}
 		for side in ["L", "R"]:
 			var soles: Array = s[side + "sole"]
 			var down := []
@@ -3625,6 +3627,23 @@ func _test_run_body() -> void:
 			stances.append("%s down %d of %d: touchdown %+.3f m (%.1f), mid %+.3f m (%.1f deg)" % [side, best[1], n, touch[0], touch[1], mid[0], mid[1]])
 			if float(mid[1]) < RUN_MID_STANCE or float(touch[0]) < -RUN_TOUCHDOWN:
 				bad.append("%s stance: touchdown %+.3f m, mid-stance %.1f deg" % [side, touch[0], mid[1]])
+			feet[side] = {"from": best[0], "touch": touch, "mid": mid,
+				"touch_on": line.call((best[0] + 1) % n), "mid_on": line.call((best[0] + best[1] / 2 + 1) % n)}
+		# The two feet alike (977 amended: the left landed across the clip's seam, 2 cm up for a key, and read a
+		# limp: touchdown 0.09 m nearer, mid-stance 4 degrees more than the right's): the left's landing half a cycle
+		# from the right's within a sample, its touchdown's and mid-stance's place and angle each within what one
+		# sample moves the right's (the measure's own spread).
+		if feet.size() == 2:
+			var apart: int = posmod(int(feet["L"]["from"]) - int(feet["R"]["from"]), n) - n / 2
+			if absi(apart) > 1:
+				alike.append("%s: the left lands %+d samples off half a cycle from the right" % [build[0], apart])
+			for at: String in ["touch", "mid"]:
+				for k in 2:
+					var off: float = absf(float(feet["L"][at][k]) - float(feet["R"][at][k]))
+					var spread: float = absf(float(feet["R"][at + "_on"][k]) - float(feet["R"][at][k]))
+					if off > spread:
+						alike.append("%s %s %s: left %.3f, right %.3f (a sample moves the right's %.3f)" % [
+							build[0], at, ["place", "angle"][k], feet["L"][at][k], feet["R"][at][k], spread])
 		# The settle: the shoulders' rise and fall over the hips', and at each step's landing the trunk still settling
 		# after the hips have bottomed: the shoulders' height over the hips at its lowest after the hips' lowest (within a
 		# quarter cycle of it, each step's; the mean of the two). The shoulders' own lowest can't show it: a centimetre's
@@ -3658,6 +3677,7 @@ func _test_run_body() -> void:
 			build[0], (s["trunk"] as Array).min(), (s["trunk"] as Array).max(), trunk, "; ".join(stances), hips_up, shoulders_up, lags[0] * 1000.0, lags[1] * 1000.0, pitch])
 		_check(bad.is_empty(), "%s: the jog leans from its feet, the body over the planted foot, the shoulders settling after the hips, the gaze steady (%s)" % [build[0], "; ".join(bad)])
 		model.free()
+	_check(alike.is_empty(), "the jog's two feet alike: the left lands half a cycle from the right, its touchdown and mid-stance where the right's are within a sample (%s)" % "; ".join(alike))
 
 
 ## The run varies stride to stride (977; Jeff, 11-17: "throwing in a some slight variation into movement so it's not

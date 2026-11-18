@@ -1954,6 +1954,11 @@ class Rig:
 						frames = [self.basis(m) for m in self.segment_poses(clip, base, times, extra)]
 						if "stride" in clip:
 							frames = narrowed(frames, clip["stride"])
+					# The loop closed on its first frame (977): the last is the base's own end pose with the first's
+					# feet, which the passes never meet (they meet frames 0 to n-1), and the pack's jog does not close
+					# (its left foot 17 mm higher there than at the start). The left lands across the seam: keyed so,
+					# it hovered 2 cm for a key and planted a key late, where the right comes straight down.
+					frames[-1] = frames[0]
 			for f, basis in enumerate(frames):
 				self.basis_cache = basis
 				self.key(action, f, None, last)
