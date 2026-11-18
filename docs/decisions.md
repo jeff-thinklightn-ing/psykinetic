@@ -38894,6 +38894,22 @@ that short (about 4% of it), so what was held back was likely drawn at once, as 
 once drops the lag; that run logged no lag or correction, so the cause is not shown.
 Client only; protocol unchanged; no new class_name.
 
+688 amended (16) (decision_number.sh's label; the coordinator's call, 2026-11-18, the v0.1.233 cut held
+on net_test's crate: "server log shows Player1 pushing Crate1 (got 2, want 1)" in release's full local
+run, pushed at server ticks 9 and 12, Player1 carried (9, 2) -> (8, 2) between, passing alone): (15)'s
+lag is drawing, and (7)'s press read it. Main._free_intent's at is FreeNet.Own.shown, which since (15)
+adds lag, so after a long frame the drawn body stands behind the one that walks; _free_press_waits
+judged the touch on a pushable from there, saw none while the walking body stood against the crate,
+and the route went on sending its way in for as long as the lag took to draw out (0.33 of a cell at a
+0.1 s frame, eased over 0.3 s): the server's body, the push heard, was carried into the freed cell and,
+the step's ticks past, shoved it again, (7)'s case. The press now judges the touch at shown less lag,
+where the body walks; the route's other judgements keep the drawn place. controls_test
+_test_press_after_long_frame: a click onto a crate's cell, its commands taken by the server 0.4 s late
+(a loaded server) and one 0.1 s frame just before the touch: on 97ad14764 the crate went twice ((7, 3)
+then (8, 3), lag 0.333), the same walk at 1/60 s frames once; with this once both ways. It runs last in
+controls_test: its walk steps World 50 ticks, and a later row's respawn falls on a step count. Client
+only; protocol unchanged; no new class_name.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float

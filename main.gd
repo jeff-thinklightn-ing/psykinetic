@@ -3338,7 +3338,8 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 		var near := 0.05 if path.size() == 1 else 0.45
 		if at.distance_to(next) > near:
 			var way := next - at
-			if _free_press_waits(at, path[0], not own.pending.is_empty()):
+			# 688 amended (16): the touch judged where the body walks, not drawn: a hitch's lag (688 amended (15)) is drawing only.
+			if _free_press_waits(at - own.lag, path[0], not own.pending.is_empty()):
 				return Vector2.ZERO
 			if _free_blocked(player, at, way, path):
 				# Ended, or waiting on another (standing, never stepping on the spot), or round him.

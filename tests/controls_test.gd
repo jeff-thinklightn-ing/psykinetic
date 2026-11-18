@@ -67,6 +67,7 @@ func _ready() -> void:
 	_test_free_head_on_pulled()
 	_test_free_no_headway()
 	_test_free_beside_again()
+	_test_press_after_long_frame()  # Last: its walk steps World (a later row's respawn falls on a step count).
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -2538,6 +2539,75 @@ func _test_free_press_once() -> void:
 	World.despawn(crate)
 	crate.queue_free()
 	player.free_view = null
+	Net.controls = saved
+
+
+## net_test's crate (the v0.1.233 cut's full run: pushed at ticks 9 and 12):
+## a click route onto a crate's cell, its commands heard by the server
+## [code]delay[/code] seconds late (a loaded server), and one 0.1 s frame of
+## the client's just before its body touches the crate. The hitch's lag
+## (688 amended (15)) draws the body behind where it walks; the press is
+## judged where it walks, so the route sends no way on past the touch and the
+## server's body is not carried on into the freed cell to shove it twice.
+## The same walk without the long frame is the control.
+func _test_press_after_long_frame() -> void:
+	print("\n== a click route into a crate presses once after a long frame just before the touch ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for long_frame in [false, true]:
+		var player := _place_player(Vector2i(4, 3))
+		_free_start(player)
+		player.free_view = null
+		for cell in [Vector2i(5, 3), Vector2i(6, 3), Vector2i(7, 3), Vector2i(8, 3), Vector2i(9, 3)]:
+			var occupant := World.get_entity_at(cell)
+			if occupant != null:
+				World.despawn(occupant)
+		var crate := EntityFactory.build(Level.CRATE.duplicate(true).merged({"name": "LagCrate"}))
+		add_child(crate)
+		World.spawn(crate, Vector2i(6, 3))
+		var moves: Array[Vector2i] = []
+		var on_moved := func(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
+			if entity == crate:
+				moves.append(to)
+		World.entity_moved.connect(on_moved)
+		_main._free.erase("pressed")
+		_main._move_click(player, Vector2i(6, 3))
+		var own: Variant = _main._free_own(player)  # FreeNet.Own
+		var touch_x := 6.0 - 0.5 - World.FREE_RADIUS
+		var delay := 0.4
+		var queue: Array = []  # [due, commands]
+		var clock := 0.0
+		var next_tick := World.TICK_DT
+		var stalled := false
+		var lag_at_stall := 0.0
+		for i in 150:
+			var delta := 1.0 / 60.0
+			if long_frame and not stalled and own != null and own.shown(player).x >= touch_x - 0.45:
+				delta = 0.1
+				stalled = true
+			clock += delta
+			var intent: Vector2 = _main._free_intent(player, own)
+			var commands: Array[Dictionary] = own.hold(player, intent, delta)
+			if delta > 0.05:
+				lag_at_stall = own.lag.length()
+			if not commands.is_empty():
+				queue.append([clock + delay, commands])
+			while not queue.is_empty() and float(queue[0][0]) <= clock:
+				player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+				var due: Array[Dictionary] = queue.pop_front()[1]
+				World.take_free(player, due)
+			while clock >= next_tick:
+				World.step()
+				next_tick += World.TICK_DT
+		World.entity_moved.disconnect(on_moved)
+		_check(moves == [Vector2i(7, 3)] and crate.tile == Vector2i(7, 3),
+				"%s: the crate shifted once, to (7, 3) (moves %s, crate %s, body %s, lag at the long frame %.3f)" % [
+					"a 0.1 s frame just before the touch" if long_frame else "every frame 1/60 s (the control)",
+					moves, crate.tile, player.free_pos, lag_at_stall])
+		World.despawn(crate)
+		crate.queue_free()
+		_stop_walk()
+		player.free_view = null
 	Net.controls = saved
 
 
