@@ -20457,6 +20457,10 @@ func _test_run_arms_held() -> void:
 	if player == null:
 		_check(false, "a player to run")
 		return
+	# Read with the variation off (--no-vary's flag; its weights ease out in the settle's second): the bands are the
+	# run's, never a random draw's (a run's back reach went 0.060 to 0.086 m with it, 977 amended (1)).
+	var vary_was := AnimRig.vary_on
+	AnimRig.vary_on = false
 	var slots := player.slots
 	while slots.size() < Items.CARRIED:
 		slots.append("")
@@ -20517,6 +20521,7 @@ func _test_run_arms_held() -> void:
 		var r := _run_pearson(s["Lf"], s["Rf"])
 		_check(ok and r <= RUN_HELD_R, "running with %s (%s, %s): each hand fore and aft past the hip, beside the body (%s), the hands opposite (r %+.2f)" % [
 				"the sword" if held != "" else "nothing in hand", clip, rig.as_played(clip), "; ".join(reads), r])
+	AnimRig.vary_on = vary_was
 	AnimRig._clock_movie = -1
 	AnimRig._clock_frame = -1
 	puppet.position = was_at

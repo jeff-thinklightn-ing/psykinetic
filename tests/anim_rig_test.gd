@@ -3170,6 +3170,10 @@ func _test_run_arms() -> void:
 	var lib := load(CLIPS) as AnimationLibrary
 	var bad: Array[String] = []
 	var read: Array[String] = []
+	# Read with the variation off (--no-vary's flag): a band is the clip's, never a random draw's (977 amended (1);
+	# the variation's own row, _test_run_vary, reads the layer by its spread).
+	var vary_was := AnimRig.vary_on
+	AnimRig.vary_on = false
 	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
 		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
 		add_child(model)
@@ -3281,6 +3285,7 @@ func _test_run_arms() -> void:
 		model.queue_free()
 	print("  " + "
   ".join(read))
+	AnimRig.vary_on = vary_was
 	_check(bad.is_empty(), "the people's jog and sprint: the hands pump fore and aft, past the hip, not across; the trunk and head steady (%s)" % ["; ".join(bad.slice(0, 6))])
 
 
