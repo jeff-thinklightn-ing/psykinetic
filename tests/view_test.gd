@@ -20608,7 +20608,9 @@ func _test_gait_holds() -> void:
 	puppet.set_meta("last_ms", AnimRig._clock_msec)
 	puppet.set_meta("last_at", puppet.position)
 	rig.loop(Client3D.CLIP_IDLE, 1.0)
+	player.step_pace = 4.0 * pace  # Its own step at the pace drawn (a burst goes by it, 869 amended (4)).
 	var started: Array = drive.call([[4.0, 0.6]])
+	player.step_pace = 0.0
 	var first: String = started[0]
 	_check(first in gaits and started[30] == gaits[1], "a start from standing goes at once (%s on its first frame) and jogs within 0.5 s (%s)" % [first, started[30]])
 	drive.call([[4.0, 1.0]])
@@ -20673,8 +20675,12 @@ func _test_gait_holds() -> void:
 			"held with a foot down the jog stops where it is, held in the air it plays on to the next (%s: [speed, a foot down, clip, share] %s)" % [jog, held])
 	drive.call([[1.0, 1.5]])
 	var walked := rig.base_clip()
+	player.step_pace = 4.0 * pace  # A real burst: the body's own step goes at it (869 amended (4)).
 	var burst: Array = drive.call([[4.0, 0.1]])
+	player.step_pace = 0.0
 	_check(walked == gaits[0] and burst[-1] == gaits[1], "a burst from a walk (%s) jogs within 0.1 s (%s)" % [walked, burst[-1]])
+	_test_gait_bursts(player, puppet, rig, pace, gaits)
+	_test_stop_settles(player, puppet, rig, pace)
 	AnimRig._clock_movie = -1
 	AnimRig._clock_frame = -1
 	puppet.position = was_at
@@ -20684,6 +20690,191 @@ func _test_gait_holds() -> void:
 		else:
 			puppet.set_meta(key, kept[key])
 	rig.loop(Client3D.CLIP_IDLE, 1.0)
+
+
+## 869 amended (4), the stop (the coordinator on ui-design's look of 977, 11-18: the body stood leaning 19 degrees
+## through STOP_HOLD, then dropped to 8 inside the stand's 0.15 s blend, the trunk's largest 40 ms change 5.3 to 8.1
+## times a mid-stride's): a people's jog stopped, 20 ms frames, the trunk's line (the hips to the neck, skeleton
+## space, its pitch) read each frame; its largest change in 40 ms through the stop no more than 3 times its largest
+## over a stride of the steady jog (that line's stride swings about 2 degrees in 40 ms, a smoother line's less: the
+## laptops' look reads ui-design's); the lean down 2 degrees or more by the hold's last frame, where the layer off
+## holds it (the fault the row is for: the lean held, then dropped in the blend); the feet the held gait's at the
+## hold's last frame (the settle's share put to 0 and read again).
+func _test_stop_settles(player: Player, puppet: Node3D, rig: AnimRig, pace: float) -> void:
+	var found := puppet.find_children("*", "Skeleton3D", true, false)
+	if not rig._vary or found.is_empty():
+		_check(false, "the stop's settle: a people's rig with a skeleton (vary %s, skeletons %d)" % [rig._vary, found.size()])
+		return
+	var sk := found[0] as Skeleton3D
+	var hips := sk.find_bone("Hips")
+	var neck := sk.find_bone("Neck")
+	var lean := func() -> float:
+		var line := sk.get_bone_global_pose(neck).origin - sk.get_bone_global_pose(hips).origin
+		return rad_to_deg(atan2(line.z, line.y))
+	var every := rig.every
+	rig.every = 1
+	# [m/s at pace 1, seconds] in 20 ms frames; each frame's lean.
+	var drive := func(legs: Array) -> Array:
+		var leans := []
+		for leg: Array in legs:
+			for i in int(roundf(float(leg[1]) * 50.0)):
+				AnimRig._clock_frame = Engine.get_process_frames()
+				AnimRig._clock_msec += 20
+				puppet.position += Vector3(float(leg[0]) * pace * 0.02, 0.0, 0.0)
+				_rig._animate(puppet)
+				rig._process(0.02)
+				leans.append(lean.call())
+		return leans
+	var most := func(leans: Array) -> float:
+		var top := 0.0
+		for i in range(2, leans.size()):
+			top = maxf(top, absf(float(leans[i]) - float(leans[i - 2])))
+		return top
+	var hold := int(roundf(Client3D.STOP_HOLD * 50.0))
+	var results := {}
+	for settle_on: bool in [false, true]:
+		rig._vary = settle_on  # The layer's calls go by it (a rig without the settle ignores them).
+		for key: String in ["speed", "gait_speed", "still_since", "gait_want", "burst_since", "burst_gait"]:
+			puppet.remove_meta(key)
+		puppet.set_meta("last_ms", AnimRig._clock_msec)
+		puppet.set_meta("last_at", puppet.position)
+		rig.loop(Client3D.CLIP_IDLE, 1.0)
+		player.step_pace = 4.0 * pace
+		drive.call([[4.0, 1.5]])
+		var stride: Array = drive.call([[4.0, rig.length(rig.base_clip()) / maxf(rig.speed(), 0.01)]])
+		player.step_pace = 0.0
+		var jogged := rig.base_clip()
+		var stop: Array = drive.call([[0.0, float(hold - 1) / 50.0]])
+		var feet := []
+		if settle_on:
+			var held_amount := rig.settled()
+			for amount: float in [held_amount, 0.0]:
+				rig.tree.set("parameters/settle/blend_amount", amount)
+				rig.tree.advance(0.0)
+				feet.append([sk.get_bone_global_pose(sk.find_bone("LeftFoot")).origin, sk.get_bone_global_pose(sk.find_bone("RightFoot")).origin])
+			rig.tree.set("parameters/settle/blend_amount", held_amount)
+			rig.tree.advance(0.0)
+		stop.append_array(drive.call([[0.0, 1.0]]))
+		results[settle_on] = {"jog": jogged, "stride": most.call(stride), "stop": most.call(stop), "first": stop[0], "held": stop[hold - 2],
+				"last": stop[-1], "stood": rig.base_clip(), "feet": feet}
+	rig._vary = true
+	rig.every = every
+	var on: Dictionary = results[true]
+	var off: Dictionary = results[false]
+	var moved := 0.0
+	if (on["feet"] as Array).size() == 2:
+		for k in 2:
+			moved = maxf(moved, ((on["feet"][0][k] as Vector3) - (on["feet"][1][k] as Vector3)).length())
+	_check(on["jog"] == off["jog"] and str(on["jog"]) != Client3D.CLIP_IDLE and on["stood"] == Client3D.CLIP_IDLE
+			and float(on["stop"]) <= 3.0 * float(on["stride"]) and float(on["held"]) <= float(on["first"]) - 2.0
+			and float(off["held"]) > float(off["first"]) - 1.0 and moved < 0.0005,
+			("a people's stop from the jog (%s) comes upright over the hold and the blend: the trunk's largest 40 ms change %.2f degrees, "
+			+ "%.1f times a stride's %.2f (the layer off: %.2f, %.1f times %.2f); its lean %.1f at the stop, %.1f at the hold's end, %.1f stood "
+			+ "(off: %.1f, %.1f, %.1f); the feet at the hold's end %.4f m from the held gait's") % [on["jog"], on["stop"],
+			float(on["stop"]) / maxf(float(on["stride"]), 0.001), on["stride"], off["stop"], float(off["stop"]) / maxf(float(off["stride"]), 0.001),
+			off["stride"], on["first"], on["held"], on["last"], off["first"], off["held"], off["last"], moved])
+
+
+## 869 amended (4): a burst at the body's own pace only; a burst's sprint drops back at its dwell's end. The client's
+## hitch as the laptops drew it (ui-design's run977 lines, the probe C:/dev/review/animation/burst_1118): the body
+## stands through a 500 ms frame (the capped 0.13 m), then makes up the held walk in two frames, the second 50 ms
+## long (FreeNet.Own's glide of the capped tick, or a mirror's display clock): 8 and 10 m/s on the wall.
+func _test_gait_bursts(player: Player, puppet: Node3D, rig: AnimRig, pace: float, gaits: Array) -> void:
+	var kept_gaits: Variant = puppet.get_meta("gaits") if puppet.has_meta("gaits") else null
+	var reset := func() -> void:
+		for key: String in ["speed", "gait_speed", "still_since", "gait_want", "gait_want_at", "burst_since", "burst_gait", "burst_at", "step_speed"]:
+			puppet.remove_meta(key)
+		puppet.set_meta("last_ms", AnimRig._clock_msec)
+		puppet.set_meta("last_at", puppet.position)
+		rig.loop(Client3D.CLIP_IDLE, 1.0)
+	# [ms, metres at pace 1] a frame; each frame's clip and its time from the first.
+	var frames := func(rows: Array) -> Array:
+		var seen := []
+		for row: Array in rows:
+			AnimRig._clock_frame = Engine.get_process_frames()
+			AnimRig._clock_msec += int(row[0])
+			puppet.position += Vector3(float(row[1]) * pace, 0.0, 0.0)
+			_rig._animate(puppet)
+			seen.append(rig.base_clip())
+		return seen
+	var steady := func(speed: float, seconds: float, ms := 16) -> Array:
+		var rows := []
+		for i in int(roundf(seconds * 1000.0 / ms)):
+			rows.append([ms, speed * ms / 1000.0])
+		return rows
+	# The own body's (the laptops' frames), and a mirror's (the probe's companion at 30 fps, before the mend: 0.69 m in
+	# one frame, then 100 ms at 6 to 8 m/s as its display clock caught up; it sprinted 22 times in 119 stalls).
+	var hitches := {"own": [[500, 0.13], [25, 0.2], [50, 0.5]] + steady.call(4.0, 0.6, 40),
+		"mirror": [[515, 0.18], [7, 0.69], [27, 0.07], [31, 0.19], [33, 0.23], [47, 0.20]] + steady.call(4.0, 0.6, 33)}
+	var top: String = gaits[-1]
+	var runs := {}
+	# [the body's own step pace, m/s at pace 1]: a running body's own (a glide's or a slide's), a charge's.
+	for shape: String in hitches:
+		for own: float in [4.0, 12.0]:
+			reset.call()
+			player.step_pace = own * pace
+			frames.call(steady.call(4.0, 1.2))
+			var was := rig.base_clip()
+			runs["%s %d" % [shape, own]] = [was, frames.call(hitches[shape])]
+	player.step_pace = 0.0
+	for shape: String in hitches:
+		var kept: Array = runs["%s 4" % shape]
+		_check(kept[0] == gaits[1] and top not in kept[1] and top in runs["%s 12" % shape][1],
+				"the %s's make-up after a 500 ms stall: at the body's own 4 m/s it keeps the %s (%s), at a charge's 12 m/s the same frames sprint (%s): the frames cross the line, the body's own pace holds it" % [
+				shape, kept[0], "|".join(PackedStringArray(kept[1].slice(0, 5))), top in runs["%s 12" % shape][1]])
+	# A real charge, from a jog: the sprint as fast as before the mend (its own pace over the line from the first frame,
+	# the burst's wait GAIT_BURST_HOLD and no more).
+	reset.call()
+	player.step_pace = 4.0 * pace
+	frames.call(steady.call(4.0, 1.2))
+	player.step_pace = 8.0 * pace
+	var charge: Array = frames.call(steady.call(8.0, 0.2))
+	player.step_pace = 0.0
+	var at := charge.find(top)
+	_check(at >= 0 and at * 16 <= 100, "a charge at 8 m/s from a jog sprints within 0.1 s (frame %d, %d ms)" % [at, at * 16])
+	# (c) The woman at her own run's pace after a real burst: the burst's sprint held its dwell, then the jog again
+	# (the man's run at 4.08 sat in the band, so her sprint was held to the end of a pass, 3d9 Atlas w_behind).
+	puppet.set_meta("gaits", Client3D.HUMAN_F_GAITS)
+	var her := (Client3D.paced(Client3D.HUMAN_F_GAITS) as Array).map(func(gait: Array) -> String: return str(gait[0]))
+	var jog_line := Client3D.gait_change(Client3D.paced(Client3D.HUMAN_F_GAITS), 2)
+	var run := 4.0
+	reset.call()
+	player.step_pace = run * pace
+	frames.call(steady.call(run, 1.5))
+	var her_jog := rig.base_clip()
+	player.step_pace = 8.0 * pace
+	var sprinted: Array = frames.call(steady.call(8.0, 0.1))
+	player.step_pace = run * pace
+	var after: Array = frames.call(steady.call(run, 1.5))
+	var entered := sprinted.find(her[2])
+	var back := after.find(her[1])
+	var dwell_frames := int(Client3D.GAIT_DWELL * 1000.0 / 16.0) + 1
+	_check(her_jog == her[1] and entered >= 0 and back >= 0 and back + (sprinted.size() - entered) <= dwell_frames + int(0.15 * 60.0)
+			and her[2] not in after.slice(back),
+			"the woman running at %.2f m/s (her band %.2f to %.2f): a real burst sprints (frame %d) and is back in the jog %d ms after it began (dwell %d ms), and stays there" % [
+			run, jog_line / Client3D.GAIT_HYSTERESIS, jog_line * Client3D.GAIT_HYSTERESIS, entered, (back + sprinted.size() - entered) * 16, int(Client3D.GAIT_DWELL * 1000.0)])
+	# No flapping on either edge of her band, 10 s a side, the read jittering 3% a frame (her own step's pace with it).
+	var edges := {}
+	for edge: float in [jog_line / Client3D.GAIT_HYSTERESIS * 1.02, jog_line * Client3D.GAIT_HYSTERESIS * 0.98]:
+		var rows := []
+		for i in 625:
+			var speed := edge * (1.03 if i % 2 == 0 else 0.97)
+			rows.append([16, speed * 0.016])
+		reset.call()
+		player.step_pace = edge * pace
+		frames.call(steady.call(edge, 1.0))
+		var seen: Array = frames.call(rows)
+		var n := 0
+		for i in range(1, seen.size()):
+			n += 1 if seen[i] != seen[i - 1] else 0
+		edges[snappedf(edge, 0.01)] = n
+	player.step_pace = 0.0
+	_check(edges.values().all(func(n: int) -> bool: return n <= 1), "held 10 s on each edge of her band, jittering: at most one change each (%s)" % [edges])
+	if kept_gaits == null:
+		puppet.remove_meta("gaits")
+	else:
+		puppet.set_meta("gaits", kept_gaits)
+	reset.call()
 
 
 func _test_blows_seen() -> void:

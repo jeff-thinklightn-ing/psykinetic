@@ -421,6 +421,12 @@ var _move_duration := 0.0
 ## Mirrors only: the display clock as of the last frame drawn, where a
 ## slide hurried by the next cell's arrival goes on from (_mirror_tile_changed).
 var _drawn_shown := -INF
+## The slide _catch_up last hurried, as it left it (_move_tick, _move_duration; floats, not a Vector3's 32 bits), and
+## its own pace as sent, cells a second: step_pace reads that pace while it is the slide shown (869 amended (4): a view's gait goes by the body's
+## own pace, never the display's catch-up after a hitch).
+var _hurried_tick := -INF
+var _hurried_duration := -1.0
+var _hurried_pace := 0.0
 ## The facing as shown, an angle in grid space, turning toward the wanted
 ## one at TURN_RATE.
 var _shown_angle := NAN
@@ -506,7 +512,7 @@ var push_direction := Vector2i.ZERO
 ## not its push's).
 var stepping := false
 ## The pace it is drawn at along that step, cells a second (0 when not stepping): a slide's own (its length
-## over its time, constant along it) or a free body's. A view's start takes its gait by it from its first
+## over its time, constant along it; a late slide's as sent, not _catch_up's hurry, 869 amended (4)) or a free body's. A view's start takes its gait by it from its first
 ## frame (Client3D._gait), where a speed read from its frames is still catching up. Display only.
 var step_pace := 0.0
 var _push_from := Vector2i.ZERO
@@ -835,7 +841,11 @@ func _process(delta: float) -> void:
 			var sliding := t < 1.0 and to != _from_tile
 			var knocked := sliding and _on_push_line(_from_tile, to)
 			stepping = sliding and not knocked
-			step_pace = _from_pos.distance_to(Vector2(to)) / (_move_duration * World.TICK_DT) if stepping and _move_duration > 0.0 else 0.0
+			step_pace = 0.0
+			if stepping and _move_duration > 0.0:
+				# 869 amended (4): a slide _catch_up hurried goes at its own pace as sent, not the hurry's.
+				var hurried := _hurried_tick == _move_tick and _hurried_duration == _move_duration
+				step_pace = _hurried_pace if hurried else _from_pos.distance_to(Vector2(to)) / (_move_duration * World.TICK_DT)
 			_note_push_shown(knocked, to, t)
 			if stepping:
 				wanted = bent[1] if not bent.is_empty() else Vector2(to - _from_tile)
@@ -1379,9 +1389,13 @@ func _catch_up(shown: float, here: Vector2) -> void:
 	var late := shown - _move_tick
 	if late <= 0.0:
 		return
+	var own := _from_pos.distance_to(Vector2(_to_tile)) / (_move_duration * World.TICK_DT) if _move_duration > 0.0 else 0.0
 	_from_pos = here
 	_move_duration = maxf(_move_duration - late, _move_duration / CATCH_UP_SPEED)
 	_move_tick = shown
+	_hurried_tick = _move_tick
+	_hurried_duration = _move_duration
+	_hurried_pace = own
 
 
 ## A replicated tile arrived.

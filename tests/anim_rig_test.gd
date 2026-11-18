@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_run_body()
 	_test_run_vary()
 	await _test_gait_phases()
+	await _test_gait_switch_feet()
 	await _test_run_arms()
 	await _test_posture_arms()
 	_test_work_clips_loop()
@@ -3124,6 +3125,119 @@ func _test_gait_phases() -> void:
 	print("  starts, both feet from Idle's: %s" % ", ".join(starts))
 	_check(bad.is_empty(), "every stance span's foot down within %.2f m on both bodies, every start the right foot down and the left leading, its feet within %.2f m of Idle's (%s)" % [
 		STANCE_SOLE, START_NEAR, "; ".join(bad.slice(0, 6))])
+
+
+## 869 amended (4): a change of gait keeps the foot (ui-design's run977, L R L R R L after a burst: the new clip began
+## at a random point of its cycle). Each body's gaits as it plays them, every foot's touchdowns read from its sole
+## (SWITCH_SAMPLES a cycle; down when the sole falls under a quarter of its range): each foot lands once a cycle (the
+## read's own check). From SWITCH_SHARES points of each gait, switched up and down to its neighbour (Client3D.switch_at),
+## the foot that lands next is the one that would have: L R L R across the switch. A point within SWITCH_NEAR of a
+## landing is left out (there the foot is landing, either clip's next is a matter of a sample). A crowd's spread phases
+## stay spread (no two of SWITCH_CROWD within SWITCH_CROWD_GAP of a cycle). A random seek's share of wrong feet printed.
+const SWITCH_SAMPLES := 48
+const SWITCH_SHARES := 32
+const SWITCH_NEAR := 0.07
+const SWITCH_CROWD := 8
+const SWITCH_CROWD_GAP := 0.04
+func _test_gait_switch_feet() -> void:
+	print("== a change of gait keeps the foot ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var bad: Array[String] = []
+	var read: Array[String] = []
+	var crowd_gap := 1.0
+	for build: Array in [["man", "res://art/models/characters/human_m.glb", Client3D.HUMAN_GAITS, true],
+			["woman", "res://art/models/characters/human_f.glb", Client3D.HUMAN_F_GAITS, true],
+			["goblin", SCENE, Client3D.GAITS, false],
+			["skeleton", "res://art/kit/creatures/creature.skeleton/creature.skeleton.glb", Client3D.DEAD_GAITS, false]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		if build[3]:
+			rig.stood_as = Client3D.PEOPLE_PREFIX
+		var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var toes := [sk.find_bone("LeftToes"), sk.find_bone("RightToes")]
+		var feet := [sk.find_bone("LeftFoot"), sk.find_bone("RightFoot")]
+		var gaits: Array = (Client3D.paced(build[2]) as Array).map(func(gait: Array) -> String: return str(gait[0]))
+		# Each gait's touchdowns, [left shares, right shares].
+		var lands := {}
+		for clip: String in gaits:
+			var length := rig.length(clip)
+			if length <= 0.0:
+				bad.append("%s: no %s" % [build[0], clip])
+				continue
+			var soles := [[], []]
+			for k in SWITCH_SAMPLES:
+				rig.base_at(clip, float(k) / SWITCH_SAMPLES * length)
+				await _frames(2)
+				for s in 2:
+					var toe := sk.get_bone_global_pose(toes[s]).origin.y - sk.get_bone_global_rest(toes[s]).origin.y
+					var foot := sk.get_bone_global_pose(feet[s]).origin.y - sk.get_bone_global_rest(feet[s]).origin.y
+					soles[s].append(minf(toe, foot))
+			var both := [[], []]
+			for s in 2:
+				var low: float = soles[s].min()
+				var line: float = low + (float(soles[s].max()) - low) * 0.25
+				for k in SWITCH_SAMPLES:
+					if float(soles[s][k]) <= line and float(soles[s][k - 1]) > line:
+						both[s].append(float(k) / SWITCH_SAMPLES)
+				if both[s].size() != 1:
+					bad.append("%s %s: the %s foot lands %d times a cycle %s" % [build[0], clip, ["left", "right"][s], both[s].size(), both[s]])
+			lands[clip] = both
+			read.append("%s %s %s" % [build[0], rig.as_played(clip), both])
+		# The foot landing next after [param share] of [param clip] (0 left, 1 right), and how near a landing it is.
+		var next_foot := func(clip: String, share: float) -> Array:
+			var best := [-1, 2.0, 2.0]
+			for s in 2:
+				for at: float in lands[clip][s]:
+					var ahead := fposmod(at - share, 1.0)
+					var near := minf(ahead, 1.0 - ahead)
+					if ahead < best[1]:
+						best = [s, ahead, best[2]]
+					best[2] = minf(best[2], near)
+			return best
+		var kept := 0
+		var tried := 0
+		var random_wrong := 0.0
+		for i in range(gaits.size() - 1):
+			for pair: Array in [[gaits[i], gaits[i + 1]], [gaits[i + 1], gaits[i]]]:
+				if not lands.has(pair[0]) or not lands.has(pair[1]):
+					continue
+				var to_length := rig.length(pair[1])
+				var wrong: Array[String] = []
+				for k in SWITCH_SHARES:
+					var share := (k + 0.5) / SWITCH_SHARES
+					var was: Array = next_foot.call(pair[0], share)
+					if float(was[2]) < SWITCH_NEAR:
+						continue
+					rig.base_at(pair[0], share * rig.length(pair[0]))
+					var t := Client3D.switch_at(rig, pair[0], pair[1])
+					var now: Array = next_foot.call(pair[1], fposmod(t / to_length, 1.0))
+					tried += 1
+					if t >= 0.0 and int(now[0]) == int(was[0]):
+						kept += 1
+					else:
+						wrong.append("%.2f->%.2f" % [share, t / to_length])
+					var other := 0
+					for r in SWITCH_SHARES:
+						other += 1 if int(next_foot.call(pair[1], (r + 0.5) / SWITCH_SHARES)[0]) != int(was[0]) else 0
+					random_wrong += float(other) / SWITCH_SHARES
+				if not wrong.is_empty():
+					bad.append("%s %s to %s: the other foot next at %s" % [build[0], pair[0], pair[1], ", ".join(wrong.slice(0, 4))])
+		read.append("%s: %d of %d switches keep the foot (a random seek: %.0f%% the wrong foot)" % [build[0], kept, tried, 100.0 * random_wrong / maxf(tried, 1)])
+		# A crowd jogging out of step, all switched up together: still out of step.
+		if gaits.size() >= 3:
+			var shares: Array[float] = []
+			for k in SWITCH_CROWD:
+				rig.base_at(gaits[1], float(k) / SWITCH_CROWD * rig.length(gaits[1]))
+				shares.append(fposmod(Client3D.switch_at(rig, gaits[1], gaits[2]) / rig.length(gaits[2]), 1.0))
+			shares.sort()
+			for k in SWITCH_CROWD:
+				crowd_gap = minf(crowd_gap, fposmod(shares[(k + 1) % SWITCH_CROWD] - shares[k], 1.0))
+		model.queue_free()
+	print("  %s" % "\n  ".join(read))
+	_check(bad.is_empty() and crowd_gap >= SWITCH_CROWD_GAP,
+			"walk to jog, jog to sprint and back keep L R L R on the man, the woman, the goblin and the skeleton; a crowd's spread phases stay %.3f apart at least (%s)" % [
+			crowd_gap, "; ".join(bad.slice(0, 6))])
 
 
 ## The people's run arms (Jeff on v0.1.226: "the running animation, the arms swinging left to right together is

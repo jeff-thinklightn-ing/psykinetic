@@ -1825,6 +1825,14 @@ const FOOTFALL_MOVING_MS := 1000
 ## cycle apart (977 amended: its loop closed, the left once struck twice, 0.968 and 1.005).
 const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "Jog_Short": [0.027, 0.532], "Sprint_Short": [0.044, 0.587],
 	"People_Jog_Short": [0.955, 0.455]}
+## Where each gait's feet come down (left, right), a share of the clip as played, for a change of gait only
+## (switch_at, 869 amended (4)): the sole's first touch (anim_rig_test's switch row reads it, the lower of toe and
+## foot crossing a quarter of its rise), not GAIT_FOOTFALLS' toe strikes, which are the sounds': the walk's heel is
+## down 0.12 of a cycle before its toe, so a switch read by the toe put a walk's left foot, just down, before the
+## jog's landing of it and it came down twice. The goblin's own (its walk not the people's) as "Goblin_Walk".
+const SWITCH_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.958, 0.458], "Jog_Short": [0.0, 0.5],
+	"Sprint_Short": [0.979, 0.542], "People_Jog_Short": [0.958, 0.438], "People_Sprint_Short": [0.979, 0.542],
+	"Goblin_Walk": [0.188, 0.667], CLIP_JOG: [0.083, 0.583], CLIP_SPRINT: [0.104, 0.625]}
 ## Where a gait starts from standing, a share of its clip as played (the coordinator's ruling on ui-design's hops,
 ## 11-16: a start had begun its gait anywhere along it, at random): the share whose feet stand nearest Idle's, so
 ## the blend from Idle moves them least. Idle stands with the left foot forward: the right foot planted, ending its
@@ -28844,6 +28852,7 @@ func _animate(puppet: Node3D) -> void:
 				* ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
 	if speed > WALKING and not puppet.has_meta("still_since"):
+		rig.unsettle()  # Moving again: a stop's settle given back (869 amended (4)).
 		_gait(puppet, rig, speed, smooth)
 		return
 	if speed > WALKING and _gait_held(puppet, rig):
@@ -28922,47 +28931,112 @@ func _gait(puppet: Node3D, rig: AnimRig, speed: float, smooth := -1.0) -> void:
 		if gaits[i][0] == rig.base_clip():
 			at = i
 	var by := speed if smooth < 0.0 else smooth
+	var stepper := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
 	if at < 0:
 		# A start from standing (or from another clip): its gait at once, by the quickest of the two reads and its
 		# step's own pace (GridEntity.step_pace: the reads ease in over the first frames, and a player's start at
 		# 4 m/s read as a walk and walked half a second, gliding; ui-design's hops2).
 		by = maxf(speed, by)
-		var stepper := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
 		if stepper != null:
 			by = maxf(by, stepper.step_pace)
 		puppet.set_meta("gait_speed", by)
 	var index := gait_for(rig.base_clip(), by / pace, gaits)
+	var clock := AnimRig.now_msec()
+	var dwell := int(ArtKit.feel("client3d.gait_dwell", GAIT_DWELL) * 1000.0)
+	# The body's own pace (GridEntity.step_pace: its slide's as sent or its glide's, which no frame's drawing moves,
+	# 869 amended (4)); -1 for a view without its body.
+	var own := stepper.step_pace / pace if stepper != null else -1.0
+	# A gait a burst brought it into (869 amended (4)) is held by the band only if the smoothed read or the body's
+	# own pace is over its own change up at the end of its dwell; else it goes back down then (the woman's run,
+	# 3.97 m/s against her sprint's 3.70 down, had sprinted to the end of a 3 s pass after one hitch). The own pace
+	# keeps a burst that was real through a stall that ate its dwell (the probe's: a start's jog, 4.7 m/s, dropped to
+	# the walk on the frame after a 410 ms stall, the smoothed read reset by it).
+	var drop := false
+	if int(puppet.get_meta("burst_gait", -1)) != at:
+		puppet.remove_meta("burst_gait")
+	elif at > 0 and clock - int(puppet.get_meta("burst_at", clock)) >= dwell:
+		# Judged at the dwell's end, not on any frame before it: the burst's own frames lift the smoothed read
+		# over the line a moment (the woman's 0.1 s at 8 m/s, at her 4.0 m/s run).
+		puppet.remove_meta("burst_gait")
+		if maxf(by / pace, own) <= gait_change(gaits, at) * GAIT_HYSTERESIS:
+			index = mini(index, gait_for(gaits[at - 1][0], by / pace, gaits))
+			drop = index < at
 	# A burst goes by the quick read: past the next change up by GAIT_BURST, its gait at once, before the
-	# smoothed read has crossed the change (a walk broken into a run jogs in a tenth of a second).
+	# smoothed read has crossed the change (a walk broken into a run jogs in a tenth of a second). The body's own
+	# pace must be past it too (869 amended (4), GridEntity.step_pace: its slide's or its glide's, which no frame's
+	# drawing moves): a client's hitch drew a player's own body standing through the long frame, then its 0.1 s
+	# of walking in one 0.4 m frame, and the reads off the wall clock went to 44 to 200 m/s. Its gait is the one its
+	# own pace reaches, not the quick read's (a mirror's catch-up after a stall, a 0.7 m frame, read 7.7 m/s on a
+	# jogger and sprinted her).
 	var burst := false
 	if at >= 0 and at + 1 < gaits.size():
 		var up := gait_change(gaits, at + 1) * ArtKit.feel("client3d.gait_burst", GAIT_BURST)
-		var clock := AnimRig.now_msec()
 		if float(puppet.get_meta("step_speed", speed)) / pace <= up:
 			puppet.remove_meta("burst_since")
 		elif not puppet.has_meta("burst_since"):
 			puppet.set_meta("burst_since", clock)
-		if speed / pace > up and clock - int(puppet.get_meta("burst_since", clock)) >= int(GAIT_BURST_HOLD * 1000.0):
+		var reach := minf(speed / pace, own) if stepper != null else speed / pace
+		if reach > up and clock - int(puppet.get_meta("burst_since", clock)) >= int(GAIT_BURST_HOLD * 1000.0):
 			burst = true
-			index = maxi(index, gait_for(rig.base_clip(), speed / pace, gaits))
+			index = maxi(index, gait_for(rig.base_clip(), reach, gaits))
 	if at >= 0 and index != at:
-		var clock := AnimRig.now_msec()
 		burst = burst and index > at
 		if int(puppet.get_meta("gait_want", -1)) != index:
 			puppet.set_meta("gait_want", index)
 			puppet.set_meta("gait_want_at", clock)
-		if not burst and clock - int(puppet.get_meta("gait_want_at", clock)) < int(ArtKit.feel("client3d.gait_dwell", GAIT_DWELL) * 1000.0):
+		if not burst and not drop and clock - int(puppet.get_meta("gait_want_at", clock)) < dwell:
 			index = at  # Not wanted long enough yet.
 		else:
 			puppet.remove_meta("gait_want")
+			if burst:
+				puppet.set_meta("burst_gait", index)
+				puppet.set_meta("burst_at", clock)
 	else:
 		puppet.remove_meta("gait_want")
 	var gait: Array = gaits[index]
 	var rate := clampf(by / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0)
 	if at < 0:
 		rig.loop(gait[0], rate, -1.0, false, start_at(rig, gait[0]))  # From standing: GAIT_STARTS, never at random.
+	elif index != at:
+		rig.loop(gait[0], rate, -1.0, false, switch_at(rig, gaits[at][0], gait[0]))  # The same foot next (869 amended (4)).
 	else:
 		rig.loop(gait[0], rate)
+
+
+## Seconds into [param to] as [param rig] plays it where a change from the gait it plays, [param from], takes the
+## step up where it was (869 amended (4)): the same share of the way from one footfall to the next (SWITCH_FOOTFALLS),
+## so the foot that came down next in the one comes down next in the other. A change had begun the new gait at
+## random, and two in a hitch's burst stepped L R L R R L (ui-design's run977, 11-18). Each body's own phase is
+## kept, so a crowd out of step stays so. A clip without its footfalls on either side keeps its share.
+static func switch_at(rig: AnimRig, from: String, to: String) -> float:
+	var was := rig.length(from)
+	var length := rig.length(to)
+	if was <= 0.0 or length <= 0.0:
+		return -1.0
+	var share := fposmod(rig.base_position(), was) / was
+	# The goblin's body (its gaits GAITS: Jog_Fwd, Sprint) lands the one Walk clip at another share than a person's.
+	var goblin := CLIP_JOG in [from, to] or CLIP_SPRINT in [from, to]
+	return gait_phase(share, _switch_falls(rig, from, goblin), _switch_falls(rig, to, goblin)) * length
+
+
+static func _switch_falls(rig: AnimRig, clip: String, goblin: bool) -> Array:
+	var played := "Goblin_Walk" if goblin and clip == CLIP_WALK else rig.as_played(clip)
+	return SWITCH_FOOTFALLS.get(played, SWITCH_FOOTFALLS.get(clip, []))
+
+
+## [param share] of a gait whose footfalls (left, right) are [param was] as the same place in one whose are
+## [param falls]: as far from the left's footfall to the right's (or the right's to the left's) in the one as in
+## the other; [param share] itself where either has not two.
+static func gait_phase(share: float, was: Array, falls: Array) -> float:
+	if was.size() != 2 or falls.size() != 2:
+		return fposmod(share, 1.0)
+	var into := fposmod(share - float(was[0]), 1.0)
+	var half := fposmod(float(was[1]) - float(was[0]), 1.0)
+	var left := float(falls[0])
+	var other := fposmod(float(falls[1]) - left, 1.0)
+	if into < half:
+		return fposmod(left + into / half * other, 1.0)
+	return fposmod(left + other + (into - half) / (1.0 - half) * (1.0 - other), 1.0)
 
 
 ## Seconds into [param clip] as [param rig] plays it where a start from standing begins it (GAIT_STARTS), -1
@@ -29000,6 +29074,8 @@ func _hold_gait(puppet: Node3D, rig: AnimRig) -> void:
 		return
 	if foot_down(rig, clip, fposmod(rig.base_position(), length) / length):
 		rig.set_speed(0.0)
+	# The trunk comes upright from the hold's first frame, over the hold and the stand's blend (869 amended (4)).
+	rig.settle(_idle_clip(puppet), ArtKit.feel("client3d.stop_hold", STOP_HOLD) + rig.blend)
 
 
 ## Whether [param puppet], in a gait and reading standing, holds it yet (869: still under STOP_HOLD,

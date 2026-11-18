@@ -18,6 +18,7 @@ func _ready() -> void:
 	_test_a_walk_is_drawn_without_jumps_or_pauses()
 	_test_a_fast_walker_slides_too()
 	_test_a_rush_is_drawn_as_a_slide()
+	_test_a_hurried_slide_keeps_its_own_pace()
 	_test_turning_a_corner()
 	_test_a_step_starts_after_the_display_delay()
 	_test_the_display_clock_rides_out_late_ticks()
@@ -111,6 +112,43 @@ func _test_a_rush_is_drawn_as_a_slide() -> void:
 	# The step on screen has the display delay's share of its cell still to draw by the next's tick: at most twice the pace, as _catch_up allows.
 	_check(hurried.max() <= three * 2.0 * 1.05, "a step hurried by the next, a cell in three ticks: never a jump, at most twice that pace (largest %.2f px a sample, want <= %.2f)" % [hurried.max(), three * 2.0])
 	_check(walker.position.is_equal_approx(Iso.tile_to_local(Vector2i(5, 11))), "and it ends on its tile (%s)" % Iso.local_to_grid(walker.position))
+
+
+## 869 amended (4): after a client's hitch, a walker's late slides are drawn faster to catch up (_catch_up, up to
+## CATCH_UP_SPEED), but its step_pace (a view's gait goes by it) stays its own step's, as sent: a hurry is not a sprint.
+func _test_a_hurried_slide_keeps_its_own_pace() -> void:
+	print("\n== a slide hurried after a hitch keeps its own pace for the gait ==")
+	var walker := _mirror("Stalled", Vector2i(2, 13), 4)
+	var own := 1.0 / (4.0 * World.TICK_DT)
+	var moves: Array[float] = []
+	for s in 3:
+		_run_tick(walker, moves, Vector2i(1, 0))
+		for i in 3:
+			_run_tick(walker, moves)
+	for k in 8:  # The hitch: eight ticks and two steps arrive, no frame drawn.
+		_tick += 1
+		World._net_tick(_tick)
+		if k % 4 == 0:
+			walker.tile += Vector2i(1, 0)
+	var paces: Array[float] = []
+	var moved: Array[float] = []
+	for k in 16:
+		_tick += 1
+		World._net_tick(_tick)
+		if k % 4 == 0 and k < 12:
+			walker.tile += Vector2i(1, 0)
+		for sample in SAMPLES_PER_TICK:
+			World.tick_alpha = (float(sample) + 0.37) / SAMPLES_PER_TICK  # Off the tenths: a frame's time as a game's, no float32 has it.
+			var before := walker.position
+			walker._process(0.0)
+			moved.append(before.distance_to(walker.position))
+			if walker.stepping:
+				paces.append(walker.step_pace)
+	var per_sample := _tile_pixels(Vector2i(1, 0)) / (4.0 * SAMPLES_PER_TICK)
+	var hurried := moved.filter(func(m: float) -> bool: return m > per_sample * 1.3 and m <= per_sample * GridEntity.CATCH_UP_SPEED * 1.05).size()
+	_check(hurried >= SAMPLES_PER_TICK, "the late slides are drawn hurried, up to twice its pace (%d samples over 1.3 times its %.2f px a sample)" % [hurried, per_sample])
+	_check(not paces.is_empty() and paces.max() <= own * 1.01 and paces.min() >= own * 0.99,
+			"and step_pace stays its own step's throughout (%.2f to %.2f cells a second, own %.2f)" % [paces.min() if not paces.is_empty() else -1.0, paces.max() if not paces.is_empty() else -1.0, own])
 
 
 func _test_turning_a_corner() -> void:

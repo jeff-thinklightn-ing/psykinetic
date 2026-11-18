@@ -56,6 +56,8 @@ const POSTURE_GAIT_BODY := 0.65
 ## at every footfall, "look" every VARY_LOOK_STEPS footfalls; in a gait only (gaits), eased to 0 over the blend
 ## otherwise; "look" scaled by 1 - look_held (a head turned on purpose, Client3D's addressing look, has the head). The
 ## legs, the timing and the pace never touched. vary_on false (the command line's --no-vary) turns the layer off.
+## The trunk's bones a stop settles (settle; 869 amended (4)): above the hips, so the feet are the held gait's.
+const SETTLE_BONES: Array[String] = ["Spine", "Chest", "UpperChest", "Neck", "Head"]
 const VARY_CARRY: Array[String] = ["Vary_Carry_Minus", "Vary_Carry_Plus"]
 const VARY_LOOK: Array[String] = ["Vary_Look_Minus", "Vary_Look_Plus"]
 const VARY_EASE := 0.5
@@ -132,6 +134,15 @@ var _vary_rng := RandomNumberGenerator.new()
 var _vary_w := {"carry": {"now": 0.0, "from": 0.0, "to": 0.0, "eased": 1.0}, "look": {"now": 0.0, "from": 0.0, "to": 0.0, "eased": 1.0}}
 var _vary_step: Array = ["", -1]
 var _vary_look_in := 0
+## A stop's settle (settle): the stand clip the trunk eases to, its share now (0 to 1), the seconds it rises over, the
+## gait it rises from, whether it rises, and the seconds the base has played the stand clip.
+var _settle_clip := ""
+var _settle := 0.0
+var _settle_seconds := 0.45
+var _settle_from := ""
+var _settle_rising := false
+var _settle_stood := 0.0
+var _settle_skeleton: Skeleton3D
 ## How much of the head a purposeful turn holds (0 to 1; Client3D's addressing look): "look" yields so much.
 var look_held := 0.0
 
@@ -174,6 +185,17 @@ func _build(upper: bool) -> void:
 	_root.connect_node("base", 0, "a_speed")
 	_root.connect_node("base", 1, "b_speed")
 	var under := "base"
+	if _vary:
+		# A people's stop (settle): the trunk (SETTLE_BONES) eased to the stand's over the held gait.
+		var settle := AnimationNodeBlend2.new()
+		settle.filter_enabled = true
+		for bone in SETTLE_BONES:
+			settle.set_filter_path(NodePath("%GeneralSkeleton:" + bone), true)
+		_root.add_node("settle_clip", AnimationNodeAnimation.new())
+		_root.add_node("settle", settle)
+		_root.connect_node("settle", 0, under)
+		_root.connect_node("settle", 1, "settle_clip")
+		under = "settle"
 	if upper:
 		var layer := AnimationNodeBlend2.new()
 		layer.filter_enabled = true
@@ -273,6 +295,7 @@ func _build(upper: bool) -> void:
 	if _vary:
 		tree.set("parameters/vary_carry/add_amount", 0.0)
 		tree.set("parameters/vary_look/add_amount", 0.0)
+		tree.set("parameters/settle/blend_amount", 0.0)
 	if upper:
 		tree.set("parameters/legs/blend_amount", 0.0)
 	tree.active = true
@@ -607,6 +630,83 @@ func vary_weight(layer: String) -> float:
 
 
 ## Steps the variation by [param delta] seconds (_process; a test steps it): a footfall of a gait draws, else it eases.
+## A people's stop (869 amended (4); the coordinator on ui-design's look of 977, 11-18: the body stood leaning 19
+## degrees through STOP_HOLD, held with the gait, then dropped to 8 inside the stand's 0.15 s blend, the trunk's
+## largest 40 ms change 5.3 to 8.1 times a mid-stride's): from the hold's first frame the trunk (SETTLE_BONES, above
+## the hips: the feet stay the held gait's) eases to [param clip]'s, evenly over [param seconds] (the hold and the
+## blend), so the runner comes upright. Called each held frame; the rest is the rig's own: rising while the base
+## plays the gait it began over or the stand, then, the stand's blend done, given back to the stand over the blend
+## (the stand under it by then); moving again (unsettle) or anything else on the base, given back over the blend. A
+## rig without the layer (not a people's) ignores it.
+func settle(clip: String, seconds: float) -> void:
+	if not _vary:
+		return
+	clip = _name(clip)
+	if not player.has_animation(clip):
+		return
+	if _settle_rising and clip == _settle_clip:
+		return
+	if clip != _settle_clip:
+		_settle_clip = clip
+		(_root.get_node("settle_clip") as AnimationNodeAnimation).animation = clip
+	_settle_seconds = maxf(seconds, 0.01)
+	_settle_from = str(_base_clip[_slot])
+	_settle_rising = true
+	_settle_stood = 0.0
+
+
+## Moving again: the settle given back over the blend.
+func unsettle() -> void:
+	_settle_rising = false
+
+
+## The stop's settle share now (settle).
+func settled() -> float:
+	return _settle
+
+
+func _settle_ease(delta: float) -> void:
+	if not _vary or (_settle <= 0.0 and not _settle_rising):
+		return
+	var base := str(_base_clip[_slot])
+	if base == _settle_clip:
+		_settle_stood += delta
+	if _settle_rising and (base == _settle_from or base == _settle_clip):
+		_settle = minf(1.0, _settle + delta / _settle_seconds)
+		if base == _settle_clip and _settle >= 1.0 and _settle_stood >= blend:
+			_settle_rising = false
+	else:
+		_settle_rising = false
+		_settle = maxf(0.0, _settle - delta / maxf(blend, 0.01))
+	tree.set("parameters/settle/blend_amount", _settle)
+
+
+## The settle's trunk as the stand's from the hips up, the feet the held gait's: the people's jog leans most at the
+## pelvis (pitched forward and the spine bent back over it), so the stand's spine on the held pelvis leaned further
+## (19.4 degrees to 23.0 in view_world_test). After each pose the Spine is turned by the held hips' turn back to the
+## stand's (its clip's hips where it plays), at the settle's share: so much of the trunk faces as the stand's does,
+## on hips and legs untouched. Through the stand's blend the hips come round themselves and the turn goes to none.
+func _settle_trunk() -> void:
+	if _settle <= 0.0 or _settle_clip == "" or not player.has_animation(_settle_clip):
+		return
+	if _settle_skeleton == null:
+		var root := player.get_node_or_null(player.root_node)
+		_settle_skeleton = root.find_child("GeneralSkeleton", true, false) as Skeleton3D if root != null else null
+		if _settle_skeleton == null:
+			return
+	var sk := _settle_skeleton
+	var hips := sk.find_bone("Hips")
+	var spine := sk.find_bone("Spine")
+	var stand := player.get_animation(_settle_clip)
+	var track := stand.find_track(NodePath("%GeneralSkeleton:Hips"), Animation.TYPE_ROTATION_3D)
+	if hips < 0 or spine < 0 or track < 0:
+		return
+	var at: Variant = tree.get("parameters/settle_clip/current_position")
+	var stood := stand.rotation_track_interpolate(track, float(at) if at != null else 0.0)
+	var turn := (sk.get_bone_pose_rotation(hips).inverse() * stood).normalized()
+	sk.set_bone_pose_rotation(spine, (Quaternion.IDENTITY.slerp(turn, _settle) * sk.get_bone_pose_rotation(spine)).normalized())
+
+
 func _vary_ease(delta: float) -> void:
 	if not _vary:
 		return
@@ -765,15 +865,18 @@ func _process(delta: float) -> void:
 	_frames += 1
 	_ease_posture_arms(delta)
 	_vary_ease(delta)
+	_settle_ease(delta)
 	if every <= 1 or _frames % every == 0:
 		tree.advance(_since)
 		_since = 0.0
+		_settle_trunk()
 
 
 ## A change takes now, not at the tree's next frame: what plays (and where)
 ## is what was asked for straight away.
 func _apply() -> void:
 	tree.advance(0.0)
+	_settle_trunk()
 
 
 static func _slot_name(slot: int) -> String:
