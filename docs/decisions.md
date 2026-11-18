@@ -61982,3 +61982,44 @@ spacing rule and laid 11 panes and their patches in its walls, unmeasured by per
 "windows" whenever its spec has the key, an empty list too, and the attic's spec says "windows": []: marked, none.
 Its dark (ambient 0.05 against upstairs' 0.15, 811's numbers for a loft under the thatch; 946 lifts each floor's by
 the same INSIDE_DAY_LIFT) stays: lit by the player's lantern alone, by day and night. view_test: panes 4, 4 and 0.
+
+## 977. The people's run as a body: the lean from the feet, the arms in, the pelvis and the chest (animation; the coordinator's approval, 2026-11-17)
+
+Jeff on v0.1.230, 11-17: "running animation is better but not done yet, the alternating arms is good, but body the arms
+swing backwards too far, the body sits starkly spine straight upright, running adjust the center of gravity forward a
+little bit, its not just arms and legs moving. we have to nail this animation." The design and its reads:
+C:/dev/review/animation/run3/design.md (the probe C:/dev/psykinetic-trees/animation/build/runprobe/probe.gd). The
+pack's People_Jog_Short held its trunk 7.7 degrees forward, its hips 0.27 m behind the landing foot, the pelvis turning
+1 degree, hips, chest and head rising and falling as one, each hand 0.25 m behind the hips on an arm near straight.
+
+tools/humanoid_clips.py's run_body, for People_Jog_Short: the pelvis pitched PEOPLE_JOG_LEAN (5) degrees forward,
+PEOPLE_JOG_AHEAD (0.02) m ahead over the feet and PEOPLE_JOG_HIPS_DOWN (0.02) m lower (0.08 m ahead left the planted
+leg short of its ball at toe-off), the neck back PEOPLE_JOG_LEAN_NECK (4); the pelvis turned PEOPLE_JOG_PELVIS (5)
+each way with its thigh; the shoulders' roll cut by PEOPLE_JOG_UNROLL (0.4; the sprint's see-saw by 0.6); the upper
+back settling PEOPLE_RUN_SETTLE (3) degrees and the shoulders PEOPLE_RUN_SHOULDERS (4) a key after the hips sink. The
+arms closed in: the elbow bent 90 +- 15 (jog) and 90 +- 35 (sprint), never near straight; the hand at the back just
+behind the top of the hip. The sprint keeps Sprint_Short's legs (the foes'), its pelvis with them. One lean constant:
+if it reads as a stoop at the look, it comes down.
+
+A posture's body share in a gait (AnimRig.POSTURE_GAIT_BODY, 0.65): the stooped jog read 22.7 degrees with the
+posture whole and would have read 27.7 under the new lean; in a gait the rest of the posture now plays at that share,
+eased with its arms (posture_arms 1 at rest gives the whole, 0 in a gait this), so the lean is part of the bend. The
+man's stooped jog reads 20.8 (Slouch 14.8; v0.1.231 22.7 and 16.2).
+
+The tests: anim_rig_test _test_run_body (man and woman, 96 samples a cycle): the trunk's mean 11 to 14 degrees (Teng
+and Powers at 3.4 m/s: 7.3 chosen, 14.1 asked to lean); the centre of mass (Winter's shares) at mid-stance 9 degrees or
+more ahead of the ankle, at touchdown no more than 0.27 m behind it (v0.1.231's); the shoulders' up travel 5 mm over
+the hips', and their lowest on the hips at least half a key (21 ms) after the hips' (read on the shoulders' height over
+the hips: a 1 cm settle on the hips' 8.5 cm cannot move the sum's lowest); the head's pitch within 3 degrees.
+_test_run_arms: the back of the path a band, the jog's 0.06 to 0.14 m in its heading frame and the sprint's 0.10 to
+0.18 in its trunk's; the elbow bent 70 (jog) or 50 (sprint) at least; the jog's pelvis yaw 5 to 16 degrees (a floor
+and a cap, no band round a guess); the shoulders' roll 12 (jog) and 20 (sprint) at most, on the heading 18 at most.
+_test_posture_arms: the body share at the gait and whole again at rest; the man's jog's trunk within 2 degrees of
+v0.1.231's. view_test _test_run_arms_held: travel 0.32, the back in the jog's band. Read: the trunk 12.3 on the mean
+(10.7 to 15.4); mid-stance 13.6 and 9.3 degrees; touchdown -0.15 and -0.24 m (the design's 0.22 missed by the right
+foot); hips 0.085, shoulders 0.094 m up, 38 ms after; head pitch 1.1; the jog's hands 0.08 behind, elbows 74 to 112,
+pelvis 11.6, roll 11.6; the sprint's 0.11 behind its trunk, elbows 56 at least, pelvis 4.1, roll 19.0.
+
+A stop: the jog held STOP_HOLD (0.3 s) with a foot down, then crossed to Idle over CLIP_BLEND (0.15 s); the lean is
+in the clip's pelvis and leaves across that crossfade, no pop. The start/stop rows (7f78c899d) pass unchanged.
+Client only; protocol unchanged; no new class_name; no levels/ file.

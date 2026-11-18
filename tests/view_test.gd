@@ -20441,12 +20441,13 @@ func _toes_ahead(puppet: Node3D) -> Vector2:
 ## with the starting sword in hand and with nothing, run straight at 4 m/s through Client3D's own _animate (its gait,
 ## its rate, its carry), its rig stepped at 1/60 s, RUN_HELD_FRAMES read after RUN_HELD_SETTLE: each hand from the
 ## Hips in the root's own heading frame (forward from its rest's toes) travels RUN_HELD_TRAVEL fore and aft or more,
-## passes RUN_HELD_BEHIND behind the hips and moves RUN_HELD_SIDE across at most; the two hands opposite (r at most
-## RUN_HELD_R). anim_rig_test _test_run_arms holds the clips' own paths; this, what the view adds to them.
+## its back RUN_HELD_BEHIND behind the hips (977: the jog's band, the arm no longer flung back) and moves RUN_HELD_SIDE
+## across at most; the two hands opposite (r at most RUN_HELD_R). anim_rig_test _test_run_arms holds the clips' own
+## paths; this, what the view adds to them.
 const RUN_HELD_SETTLE := 60
 const RUN_HELD_FRAMES := 66
-const RUN_HELD_TRAVEL := 0.40
-const RUN_HELD_BEHIND := 0.15
+const RUN_HELD_TRAVEL := 0.32
+const RUN_HELD_BEHIND := Vector2(0.06, 0.14)
 const RUN_HELD_SIDE := 0.10
 const RUN_HELD_R := -0.85
 func _test_run_arms_held() -> void:
@@ -20512,7 +20513,7 @@ func _test_run_arms_held() -> void:
 			var fore: Array = s[side + "f"]
 			var across: Array = s[side + "s"]
 			reads.append("%s fore-aft %+.3f to %+.3f, across %.3f" % [side, fore.min(), fore.max(), across.max() - across.min()])
-			ok = ok and fore.max() - fore.min() >= RUN_HELD_TRAVEL and fore.min() <= -RUN_HELD_BEHIND and across.max() - across.min() <= RUN_HELD_SIDE
+			ok = ok and fore.max() - fore.min() >= RUN_HELD_TRAVEL and -fore.min() >= RUN_HELD_BEHIND.x and -fore.min() <= RUN_HELD_BEHIND.y and across.max() - across.min() <= RUN_HELD_SIDE
 		var r := _run_pearson(s["Lf"], s["Rf"])
 		_check(ok and r <= RUN_HELD_R, "running with %s (%s, %s): each hand fore and aft past the hip, beside the body (%s), the hands opposite (r %+.2f)" % [
 				"the sword" if held != "" else "nothing in hand", clip, rig.as_played(clip), "; ".join(reads), r])

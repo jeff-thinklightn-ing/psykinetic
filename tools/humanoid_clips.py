@@ -230,6 +230,40 @@ CLIPS["People_Jog_Short_Loop"] = dict(CLIPS["People_Jog_Short_Loop"], kept_hands
 	stride=dict(CLIPS["People_Jog_Short_Loop"]["stride"], arms=1.0))
 CLIPS["People_Sprint_Short_Loop"] = dict(CLIPS["Sprint_Short_Loop"], untwist=PEOPLE_SPRINT_UNTWIST, arms=PEOPLE_SPRINT_ARMS,
 	stride=dict(CLIPS["Sprint_Short_Loop"]["stride"], arms=1.0))
+# The run as a body (977; Jeff on v0.1.230: "the arms swing backwards too far, the body sits starkly spine straight
+# upright, running adjust the center of gravity forward a little bit, its not just arms and legs moving"; the
+# coordinator's terms, 11-17). Measured on both bodies (C:/dev/psykinetic-trees/animation/build/runprobe/probe.gd): the
+# jog's trunk 7.7 degrees forward on the cycle's mean (a runner at 3.4 m/s holds 7.3 +- 3.6 by choice, 14.1 asked to
+# lean: Teng and Powers), its hips 0.27 m behind the landing foot, the pelvis turning 1 degree, the hips, chest and
+# head rising and falling as one; each hand 0.25 m behind the hips' head at the back on an arm near straight (38
+# degrees at the elbow). "body" (run_body): the jog's pelvis pitched PEOPLE_JOG_LEAN degrees forward and moved
+# PEOPLE_JOG_AHEAD m ahead over the feet, PEOPLE_JOG_HIPS_DOWN m lower (the stance plan's feet are where they were:
+# 0.08 m ahead, the lean's own share about the ankle, left the planted leg 9 cm short of its ball at toe-off, and the
+# hips 2 cm down give the reach back; the balls on their marks within 1.6 cm, as close as before), the neck back
+# PEOPLE_JOG_LEAN_NECK; the pelvis turned PEOPLE_JOG_PELVIS each way with its thigh (a start the look sets,
+# not a measure); the shoulders' roll cut by PEOPLE_JOG_UNROLL of it (the sprint's see-saw, 47 degrees, by
+# PEOPLE_SPRINT_UNROLL); the upper back settling PEOPLE_RUN_SETTLE degrees and the shoulders PEOPLE_RUN_SHOULDERS as
+# the hips sink, a frame behind them. The arms closed in (these ARMS take the place of 953 amended (2)'s above): the
+# elbow bent BEND +- BEND_SWING (never near straight), the hand at the back just behind the top of the hip. The sprint keeps its lean and its legs (Sprint_Short's, the foes'),
+# so its pelvis too.
+PEOPLE_JOG_LEAN = 5.0
+PEOPLE_JOG_LEAN_NECK = 4.0
+PEOPLE_JOG_PELVIS = 5.0
+PEOPLE_JOG_UNROLL = 0.4
+PEOPLE_SPRINT_UNROLL = 0.6
+PEOPLE_RUN_SETTLE = 3.0
+PEOPLE_RUN_SHOULDERS = 4.0
+PEOPLE_RUN_SETTLE_LAG = 1
+PEOPLE_JOG_AHEAD = 0.02
+PEOPLE_JOG_HIPS_DOWN = 0.02
+PEOPLE_JOG_ARMS = {"center": -42.5, "swing": 22.5, "bend": 90.0, "bend_swing": 15.0, "out": 12.0, "inward": 4.0}
+PEOPLE_SPRINT_ARMS = {"center": -53.0, "swing": 19.8, "bend": 90.0, "bend_swing": 35.0, "out": 13.0, "inward": 4.0}
+CLIPS["People_Jog_Short_Loop"] = dict(CLIPS["People_Jog_Short_Loop"], arms=PEOPLE_JOG_ARMS, hips_up=-PEOPLE_JOG_HIPS_DOWN, body={
+	"lean": PEOPLE_JOG_LEAN, "ahead": PEOPLE_JOG_AHEAD, "neck": PEOPLE_JOG_LEAN_NECK,
+	"yaw": PEOPLE_JOG_PELVIS, "unroll": PEOPLE_JOG_UNROLL, "settle": PEOPLE_RUN_SETTLE, "shoulders": PEOPLE_RUN_SHOULDERS,
+	"settle_lag": PEOPLE_RUN_SETTLE_LAG})
+CLIPS["People_Sprint_Short_Loop"] = dict(CLIPS["People_Sprint_Short_Loop"], arms=PEOPLE_SPRINT_ARMS, body={
+	"unroll": PEOPLE_SPRINT_UNROLL, "settle": PEOPLE_RUN_SETTLE, "shoulders": PEOPLE_RUN_SHOULDERS, "settle_lag": PEOPLE_RUN_SETTLE_LAG})
 # The wade (775; Jeff: wading the hills' streams): the pack's walk with each knee lifted high out
 # of the water over its swing (the walk's swing windows, measured on its feet: the right foot off
 # the ground from 0.11 s to 0.67 s of its 1.33 s, the left half a cycle on), the arms held a little
@@ -1736,22 +1770,34 @@ class Rig:
 		the base puts it, carried with the hips' rise (so a trunk turned up leaves the arms as they swung)."""
 		rise = clip.get("rise", 1.0)
 		turns = list(clip.get("turns", ()))
-		if not turns and rise == 1.0 and "floor" not in clip and not clip.get("untwist") and not clip.get("arms"):
+		if not turns and rise == 1.0 and "floor" not in clip and not clip.get("untwist") and not clip.get("arms") and not clip.get("body"):
 			return [self.posed(base, t) for t in times]
 		arms = run_arms(self, clip, base, times) if clip.get("arms") else None
 		heights = [self.posed(base, t)["pelvis"].translation.z for t in times]
 		mean = sum(heights) / len(heights)
+		body = run_body(self, clip, base, times, heights) if clip.get("body") else None
+		ahead = clip["body"].get("ahead", 0.0) if body else 0.0
 		floor = self.floor_of(clip["floor"]) if "floor" in clip else None
 		out = []
 		specs = []
 		for i, (t, z) in enumerate(zip(times, heights)):
 			# "hips_up" (m): the pelvis raised by that much on every frame, the feet held where they were (the
 			# knees opened: less fold at the passing pose).
-			move = (0.0, 0.0, (mean - z) * (1.0 - rise) + clip.get("hips_up", 0.0))
+			move = (0.0, -ahead, (mean - z) * (1.0 - rise) + clip.get("hips_up", 0.0))
 			frame_turns = list(turns)
 			stock = self.posed(base, t)
 			if clip.get("untwist"):
 				frame_turns += untwisted(stock, clip["untwist"])
+			if body:
+				frame_turns += body[i][0]
+				if body[i][1]:
+					# The roll taken back on a spine the untwist and the pelvis have yawed: the neck turned by
+					# exactly what the spine's tilts gave it, so the head keeps the bearing and pitch it had.
+					plain = self.pose(P(base, t, frame_turns, move=move))["neck_01"].to_3x3().normalized().to_quaternion()
+					frame_turns += body[i][1]
+					rolled = self.pose(P(base, t, frame_turns, move=move))["neck_01"].to_3x3().normalized().to_quaternion()
+					axis, angle = (plain @ rolled.inverted()).to_axis_angle()
+					frame_turns.append(("neck_01", Vector(axis), math.degrees(angle)))
 			if rise != 1.0 or floor is not None:
 				for side, sign in (("l", 1.0), ("r", -1.0)):
 					lift = max(0.0, floor - stock["ball_" + side].translation.z) if floor is not None else 0.0
@@ -2048,15 +2094,9 @@ def untwisted(stock: dict, share: float) -> list:
 	return [("spine_01", TURN, back / 3.0), ("spine_02", TURN, back / 3.0), ("spine_03", TURN, back / 3.0), ("neck_01", TURN, -back)]
 
 
-def run_arms(rig, clip: dict, base: str, times: list) -> list:
-	"""Each frame's arm for "arms" (People_Jog_Short's, People_Sprint_Short's), {side: the wrist from its shoulder}: the
-	upper arm's swing fore and aft, opposite its own side's thigh (the thigh's fore-aft angle over the base's frames,
-	scaled to -1..1), out from the body, the elbow bent; segment_poses reaches each wrist there from the hips."""
-	spec = clip["arms"]
-	length = {b.name: b.length for b in rig.bones}
-	# The right thigh's swing as a sine at its own phase (its cycle's fundamental), the left's its opposite: the pack's
-	# two thighs are not half a cycle apart and the swing is not symmetric (arms taken from each thigh read -0.81
-	# against each other, from the right one half a cycle on -0.89).
+def thigh_phase(rig, base: str, times: list) -> list:
+	"""The right thigh's fore-aft swing over [base]'s frames as a sine at its own phase (its cycle's fundamental), 1
+	where it is most forward, -1 most back; the left thigh's is its opposite."""
 	cycle = len(times) - 1  # The last frame is the first again.
 	angles = []
 	for t in times[:cycle]:
@@ -2066,7 +2106,57 @@ def run_arms(rig, clip: dict, base: str, times: list) -> list:
 	c = sum(a * math.cos(2.0 * math.pi * i / cycle) for i, a in enumerate(angles))
 	s = sum(a * math.sin(2.0 * math.pi * i / cycle) for i, a in enumerate(angles))
 	at = math.atan2(s, c)  # The thigh most forward at this share of the cycle.
-	right = [math.cos(2.0 * math.pi * i / cycle - at) for i in range(len(times))]
+	return [math.cos(2.0 * math.pi * i / cycle - at) for i in range(len(times))]
+
+
+def run_body(rig, clip: dict, base: str, times: list, heights: list) -> list:
+	"""Each frame's turns and the hips' move forward for "body" (977; People_Jog_Short's, People_Sprint_Short's), the
+	run as a body rather than legs and arms on a post: "lean" degrees of the pelvis pitched forward with the hips moved
+	"ahead" m over the feet (the line from the planted ankle through the hips to the shoulders tipped as one, the
+	feet kept where the base and the stance plan put them), the neck back by "neck"; the pelvis turned "yaw" degrees
+	each way about the vertical with its own thigh (the right hip forward as the right thigh is), the spine taking it
+	back so the shoulders keep their line; "unroll" that share of the shoulders' side-to-side roll (the stock's, about
+	its mean) taken back over spine_01 to spine_03, the neck turning by exactly what that gave it so the head keeps
+	its bearing and pitch (segment_poses); and the settle: the
+	upper back pitched "settle" degrees further forward and the clavicles let down "shoulders" degrees as the hips
+	sink to their lowest (mid-stance), "settle_lag" frames behind them, the neck taking the pitch back."""
+	body = clip["body"]
+	cycle = len(times) - 1
+	right = thigh_phase(rig, base, times)
+	low, high = min(heights), max(heights)
+	middle = (low + high) * 0.5
+	lag = body.get("settle_lag", 0)
+	sink = [(middle - heights[(i - lag) % cycle]) / (high - low) * 2.0 if high > low else 0.0 for i in range(len(times))]
+	rolls = []
+	for t in times:
+		stock = rig.posed(base, t)
+		sh = stock["upperarm_l"].translation - stock["upperarm_r"].translation
+		rolls.append(math.degrees(math.atan2(sh.z, math.hypot(sh.x, sh.y))))
+	roll_mean = sum(rolls[:cycle]) / cycle
+	out = []
+	for i in range(len(times)):
+		yaw = body.get("yaw", 0.0) * right[i]
+		roll = body.get("unroll", 0.0) * (rolls[i] - roll_mean)
+		pitch = body.get("settle", 0.0) * 0.5 * sink[i]
+		drop = body.get("shoulders", 0.0) * 0.5 * sink[i]
+		turns = [("pelvis", LIFT, -body.get("lean", 0.0)), ("pelvis", TURN, yaw)]
+		for k in (1, 2, 3):
+			turns.append(("spine_0%d" % k, TURN, -yaw / 3.0))
+		turns += [("spine_02", LIFT, -pitch), ("neck_01", LIFT, body.get("neck", 0.0) + pitch), ("clavicle_l", TILT, drop), ("clavicle_r", TILT, -drop)]
+		out.append((turns, [("spine_0%d" % k, TILT, roll / 3.0) for k in (1, 2, 3)] if roll else []))
+	return out
+
+
+def run_arms(rig, clip: dict, base: str, times: list) -> list:
+	"""Each frame's arm for "arms" (People_Jog_Short's, People_Sprint_Short's), {side: the wrist from its shoulder}: the
+	upper arm's swing fore and aft, opposite its own side's thigh (the thigh's fore-aft angle over the base's frames,
+	scaled to -1..1), out from the body, the elbow bent; segment_poses reaches each wrist there from the hips."""
+	spec = clip["arms"]
+	length = {b.name: b.length for b in rig.bones}
+	# The right thigh's swing as a sine at its own phase (its cycle's fundamental), the left's its opposite: the pack's
+	# two thighs are not half a cycle apart and the swing is not symmetric (arms taken from each thigh read -0.81
+	# against each other, from the right one half a cycle on -0.89).
+	right = thigh_phase(rig, base, times)
 	phase = {"r": right, "l": [-x for x in right]}
 	ahead, up = Vector((0.0, -1.0, 0.0)), Vector((0.0, 0.0, 1.0))
 	out = []

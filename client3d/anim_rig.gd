@@ -42,6 +42,11 @@ const LEG_BONES: Array[String] = ["LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "L
 ## the spine 0.015, the neck and head, hips, legs none). The arm below them is here too, for a posture that turns it.
 const POSTURE_ARM_BONES: Array[String] = ["LeftShoulder", "LeftUpperArm", "LeftLowerArm", "LeftHand",
 	"RightShoulder", "RightUpperArm", "RightLowerArm", "RightHand"]
+## A posture's body share through a gait (977): the people's run leans from the feet (5 degrees on the pelvis), and
+## a stooped or slouched body added whole on top of it would run bent further than it stands (stooped 22.7 to 27.7
+## degrees, hips to shoulders). In a gait the rest of the posture plays at this share, eased with its arms
+## (posture_arms: 1 at rest gives the whole posture, 0 in a gait gives this), so the lean is part of the bend.
+const POSTURE_GAIT_BODY := 0.65
 ## A strike's speed is kept within these (a blow can be hurried or held back
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
@@ -525,13 +530,18 @@ func posture(pose: Animation, weight: float) -> void:
 			body_add.set_filter_path(NodePath(str(path.get_concatenated_names()) + ":" + bone), not bone in POSTURE_ARM_BONES)
 		_posture = pose
 	_posture_weight = weight
-	tree.set("parameters/posture/add_amount", weight)
+	tree.set("parameters/posture/add_amount", weight * posture_body())
 	tree.set("parameters/posture_arms/add_amount", weight * _posture_arms)
 
 
 ## The posture's arm share now: 1 at rest, 0 through a gait (gaits), eased between over the base's crossfade.
 func posture_arms() -> float:
 	return _posture_arms
+
+
+## The posture's body share now (POSTURE_GAIT_BODY): 1 at rest, POSTURE_GAIT_BODY through a gait, eased with the arms.
+func posture_body() -> float:
+	return lerpf(POSTURE_GAIT_BODY, 1.0, _posture_arms)
 
 
 ## Eases the posture's arm share toward its mark by [param delta] seconds (_process; a test steps it).
@@ -542,6 +552,7 @@ func _ease_posture_arms(delta: float) -> void:
 	_posture_arms = move_toward(_posture_arms, mark, delta / maxf(blend, 0.01))
 	if _posture != null:
 		tree.set("parameters/posture_arms/add_amount", _posture_weight * _posture_arms)
+		tree.set("parameters/posture/add_amount", _posture_weight * posture_body())
 
 
 ## How much of a strike's legs give way to the base's (0 its own footwork,
