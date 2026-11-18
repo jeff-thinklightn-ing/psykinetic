@@ -57,15 +57,29 @@ place, and a text and loot don't go in before a quest is in."
   complete; the coordinator rules on each (switch it off, or hold the cut) before the
   build goes out. Cut checklists list only complete packages.
 
-## No tree is idle (Jeff, 2026-11-11)
+## One task at a time (Jeff, 2026-11-17)
+
+"relax the no tree is idle rule, lets do this, coordinator chooses 1 task at a time, and selects
+which trees are active for that task, the rest can sit idle until that task is done." (His usage
+had run out for nine hours that day; this replaces 2026-11-11's "no tree is idle".)
+
+- The coordinator names one task and the trees active for it. A tree not named is idle: it
+  starts nothing (no gated job, laptop run, look, audit or three-worst list), sends nothing, and
+  answers no tree but the coordinator. Its work stays owed and waits for its call; it commits
+  what it has on its local branch and keeps one line of state in its tree's memory file.
+- An idle tree still reports one thing unasked, in one line to the coordinator: a fault that
+  loses a player's goods on the box, or puts a player's id or a name in a server log line.
+- An active tree sends the coordinator one message per decision, asks for and sends no
+  acknowledgement, and messages no idle tree. Every tool round re-reads the session's whole
+  context (three quarters of all usage on 11-17): put commands that don't depend on each other
+  in one call, read a part of a file rather than the whole, and never poll; a wait is one
+  background waiter that returns once.
+
+## Looks (Jeff, 2026-11-11)
 
 "what made me call this out is animation reporting nothing to do", on the morning he reported
 that the walk looks like skipping and the people look like "bad claymation place holders".
 
-- A tree with nothing queued, or waiting on the gate or a freeze, doesn't ask "what next". It
-  looks at its own area in the game as a player meets it (Umbrage first, ordinary play, the
-  nearest zoom) and brings the coordinator its three worst things: one line each, with a still
-  or a number, and what it would do. A report of Jeff's goes first, then queued work, then this.
 - Passing tests and a far-camera still are not "it looks right". Art and animation are shown at
   the nearest zoom beside Jeff's goblin before they land. A look names its camera (out of doors
   the low camera, a new player's own, or the high one, with its zoom: the playing zoom is low at
@@ -82,10 +96,10 @@ that the walk looks like skipping and the people look like "bad claymation place
   still's time comes from the run's log (11-14: an axe's edge direction passed for the ready
   and the rest alike). A still that needs the town's people settles on the town's step
   (`World.steps >= 310`: the settled are found at the first turn, step 300), not a frame count.
-- Playtest runs a look pass on every released build: close stills of each kind of person and
-  creature, the player walking and a companion following, kept in
-  `C:/dev/review/look/<version>/` and laid beside the last build's. A difference nobody intended
-  is reported the day it appears.
+- A released build's look pass is playtest's, run when the coordinator calls it for that build:
+  close stills of each kind of person and creature, the player walking and a companion
+  following, kept in `C:/dev/review/look/<version>/` and laid beside the last build's. A
+  difference nobody intended is reported the day it appears.
 
 ## Landing work
 
