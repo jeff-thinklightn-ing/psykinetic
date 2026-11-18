@@ -18,6 +18,8 @@ notes (decision 324).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
 
+## v0.1.231
+
 ## v0.1.230
 
 - Towns: by day the Mughouse's rooms are lit by the day outside and the lanterns, yours and your companion's, burn low; at night they burn full (451 amended (9)).
