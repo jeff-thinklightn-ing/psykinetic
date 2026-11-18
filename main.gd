@@ -20427,8 +20427,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var speaker := str(data.get("speaker", entity.name if entity != null else "?"))
 		print("[speech] %s: %s" % [speaker, data.get("text", "")])
 		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
-		if entity != null and _is_own_companion(entity) and RegEx.create_from_string(Companion.LEAD_OFFER).search(str(data.get("text", ""))) != null:
-			_lead_offer_msec = Time.get_ticks_msec()  # Her offer to lead (929): Y answers it for Guide.OFFER_S.
+		if entity != null and _is_own_companion(entity) and (RegEx.create_from_string(Companion.LEAD_OFFER).search(str(data.get("text", ""))) != null
+				or FirstSteps.offer_said(str(data.get("text", "")))):
+			_lead_offer_msec = Time.get_ticks_msec()  # Her offer to lead (929), or a first-steps offer of her deck's (945): Y answers it for Guide.OFFER_S.
 		if entity != null and barter_panel != null and barter_panel.is_open() and barter_panel.person == entity:
 			barter_panel.add_said(speaker, str(data.get("text", "")), str(data.get("aside", "")))  # 802: in their window too.
 		if entity != null and barter_panel != null:

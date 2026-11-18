@@ -41,6 +41,7 @@ func _ready() -> void:
 		pet.said.connect(func(line: String) -> void: _said.append(line))
 	_test_tables()
 	_test_card()
+	_test_y_arms()
 	_test_chain()
 	_test_asked()
 	_test_unasked()
@@ -99,6 +100,7 @@ func _lull(pet: Companion, player: Player, at := Vector2i(196, 214)) -> void:
 	pet.first_steps.fought = -100000
 	pet.guide = null
 	_main._guides.erase(pet.keeper_id)
+	player.led_by = ""  # As Main._guide_done leaves it (a walk dropped here, not ended).
 	_main._chat_tick.clear()
 	_main._first_steps_at = -100000
 	player.hp = player.max_hp
@@ -120,6 +122,88 @@ func _why(pet: Companion, player: Player) -> String:
 		now - pet._keeper_spoke_tick, now - fs.fought, pet.zone == player.zone, World.distance(pet.tile, player.tile),
 		pet._hostile_within(Companion.SIGHT_RANGE), _main._keeper_busy(pet), pet.heard_by_anyone(), pet.guide != null and pet.guide.going(),
 		_main._first_door(player.zone), fs.next_step(), fs.offer, pet.first_words, fs.first_words_tick, _main._first_lull(pet, player)]
+
+
+## Her line reaches her player's client as a speech message, and the player presses Y (the key's own path,
+## Main._unhandled_input): what a first-steps offer heard and taken by the key does (945 amended (3)).
+func _press_y(pet: Companion, line: String) -> void:
+	_main._chat_sent_at = -100000
+	_main._chat_tick.clear()
+	_main.standing_title = ""
+	_main._lead_offer_msec = -1
+	_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": line})
+	var me: Player = _main._local_player()
+	_check(_main.lead_offer_stands(), "her offer heard: Y armed for it (%s; offer_said %s, msec %d, me %s, led_by %s, dist %s)" % [line,
+		FirstSteps.offer_said(line), _main._lead_offer_msec, me != null, me.led_by if me != null else "", World.distance(pet.tile, me.tile) if me != null else -1])
+	var ev := InputEventKey.new()
+	ev.keycode = int(Keys.bound.get("yes", Keys.DEFAULTS.get("yes", KEY_Y)))
+	ev.pressed = true
+	_main._unhandled_input(ev)
+
+
+## 945 amended (3), the coordinator's row: every offer of the deck (offer.*, the unasked go.*, hurt, bed
+## and sit, and an asked or asked_one line joined from every choice.* clause), as her player's client hears
+## it, arms Y; an arrive, no, stray, chain_end or risen line does not. On dd11ad637 none armed it.
+func _test_y_arms() -> void:
+	print("
+== Y: every offer of her deck arms it, as her client hears it; no other line of the deck does ==")
+	var decks: Dictionary = FirstSteps.table().get("decks", {})
+	var choices: Array[String] = []
+	for key: String in decks:
+		if key.begins_with("choice."):
+			choices.append(str(FirstSteps.lines(key, "")[0]))
+	var arms_not: Array[String] = []
+	var arms_wrong: Array[String] = []
+	var heard := 0
+	for key: String in decks:
+		if key.begins_with("choice."):
+			continue
+		var offer := key.begins_with("offer.") or key.begins_with("go.") or key in ["hurt", "bed", "sit", "asked", "asked_one"]
+		var deck: Variant = decks[key]
+		var all: Array = []
+		if deck is Dictionary:
+			for t: String in deck:
+				all.append_array(deck[t] if deck[t] is Array else [deck[t]])
+		else:
+			all = FirstSteps.lines(key, "")
+		for each: Variant in all:
+			var said: Array[String] = []
+			if key == "asked":
+				for i in choices.size():
+					said.append(FirstSteps.joined(str(each), [choices[i], choices[(i + 1) % choices.size()]]))
+			elif key == "asked_one":
+				for c: String in choices:
+					said.append(FirstSteps.joined(str(each), [c]))
+			elif "%s" in str(each):
+				said.append(str(each) % ("Rolf at the stall" if key.begins_with("offer.catch") else "Umbrage"))
+			else:
+				said.append(str(each))
+			for line: String in said:
+				heard += 1
+				if offer and not FirstSteps.offer_said(line):
+					arms_not.append(key + ": " + line)
+				elif not offer and FirstSteps.offer_said(line):
+					arms_wrong.append(key + ": " + line)
+	_check(heard > 60 and arms_not.is_empty(), "every offer line arms Y (%d heard; not armed: %s)" % [heard, arms_not])
+	_check(arms_wrong.is_empty(), "no arrive, no, stray, chain_end or risen line arms it (%s)" % [arms_wrong])
+	_check(not FirstSteps.offer_said("Shall we rest a while?") and not FirstSteps.offer_said("I'd try the stew, I'd say."),
+		"a line of her own voice that no deck holds arms nothing")
+	# Through the client's own handler: her offer heard arms Y and the HUD's line; another of hers does not.
+	var pet := _companion()
+	if pet == null:
+		_check(false, "(her companion)")
+		return
+	var offer_line := str(FirstSteps.lines("offer.mughouse", "")[0])
+	_main._lead_offer_msec = -1
+	_main.standing_title = ""
+	_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": offer_line})
+	var armed: bool = _main.lead_offer_stands()
+	var hud: String = _main.offer_words()
+	_main._lead_offer_msec = -1
+	_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": str(FirstSteps.lines("arrive.mughouse", "")[0])})
+	_check(armed and hud == 'say "yes" to follow %s' % Companion._name_of(pet) and not _main.lead_offer_stands(),
+		"her Mughouse offer heard by her client: Y armed and the HUD's line up; her arrive line: not (%s; %s)" % [armed, hud])
+	_main._lead_offer_msec = -1
 
 
 func _says(line: String) -> void:
@@ -263,13 +347,15 @@ func _test_chain() -> void:
 			break
 	_check(str(fs.offer.get("kind", "")) == "mughouse" and not _said.is_empty() and _in_deck(_said[-1], "offer.mughouse", pet),
 		"in a lull after her first words she offers the Mughouse in her deck's words (%s%s)" % [_said, "" if not _said.is_empty() else "; " + _why(pet, player)])
+	var offer_heard := str(_said[-1]) if not _said.is_empty() else ""
 	_check(to.get("first") == "mughouse" and to.get("cell") == door and int(to.get("arrive", 0)) == 1,
 		"its walk ends on the door's stop cell, %s (%s)" % [door, to.get("cell")])
 	_said.clear()
 	_tick()
 	_check(_said.is_empty(), "one offer stands at a time: nothing more the next second")
-	_says("Yes.")
-	_check(pet.guide != null and pet.guide.going() and pet.guide.goal.get("first") == "mughouse", "a yes sets her off to the door")
+	_press_y(pet, offer_heard)
+	_check(pet.guide != null and pet.guide.going() and pet.guide.goal.get("first") == "mughouse",
+		"Y on her Mughouse offer, as her player's client hears it: the server's yes, and she sets off to the door (%s)" % [_said])
 	_said.clear()
 	pet._last_unasked_tick = -100000  # Her offer this tick holds a NEEDED line under the floor; in play the walk takes longer.
 	_main._guide_done(pet, "arrived")
@@ -429,6 +515,28 @@ func _test_unasked() -> void:
 	_put(player, _main._nearest_free(player.tile + Vector2i(0, 6)))
 	_tick()
 	_check(fs.lapses == 0, "moving off clears them")
+	fs.offer = {}
+	_main._guide_offers.erase(pet.keeper_id)
+	# Y on an unasked offer (the coordinator's row): the server's yes, she sets off for the place offered.
+	_lull(pet, player)
+	fs.last_unasked_tick = -100000
+	fs.quiet_until = -100000
+	fs.unasked_ticks.clear()
+	fs.lapses = 0
+	fs.clear_noes()
+	fs.no_where.clear()
+	fs.last_new_tick = World.tick - FirstSteps.ticks("nothing_new_s", 240) - 10
+	fs.cells_since_new = 100
+	fs.known = _known(player)
+	_said.clear()
+	_tick()
+	var y_kind := str(fs.offer.get("kind", ""))
+	_press_y(pet, _said[-1] if not _said.is_empty() else "")
+	_check(not y_kind.is_empty() and fs.offer.get("unasked", true) != false and pet.guide != null and pet.guide.going()
+			and pet.guide.goal.get("first") == y_kind,
+		"Y on an unasked offer: the server's yes, and she sets off for it (%s: %s)" % [y_kind, _said])
+	pet.guide = null
+	_main._guides.erase(pet.keeper_id)
 	fs.offer = {}
 	_main._guide_offers.erase(pet.keeper_id)
 

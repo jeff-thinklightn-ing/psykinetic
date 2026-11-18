@@ -113,6 +113,56 @@ static func ticks(key: String, otherwise: float) -> int:
 	return roundi(rule(key, otherwise) * World.TICK_RATE)
 
 
+## The decks a yes answers (945 amended (3), the coordinator's terms): her chain's offers, her unasked
+## ones, and her answer to "where to?" (joined from the choice.* clauses). Arrive, no, stray, chain_end
+## and risen lines offer nothing.
+const OFFER_DECKS: Array[String] = ["hurt", "bed", "sit"]
+const OFFER_PREFIXES: Array[String] = ["offer.", "go."]
+const ASKED_DECKS: Array[String] = ["asked", "asked_one"]
+## The compiled pattern of offer_said, built once from the decks.
+static var _offer_pattern: RegEx = null
+
+
+## Whether [param text] is one of her first-steps offers as her player's client hears it (945 amended
+## (3)): a line of an offer deck, any temperament's, its %s filled as the server fills it (the catch's
+## taker, any words; an asked line's, one of the choice.* clauses, its first letter raised by joined, so
+## the case is not read). The client arms Y by it beside
+## Companion.LEAD_OFFER, so the deck's "Shall we ...?" offers take Y with no new field on her line.
+static func offer_said(text: String) -> bool:
+	if _offer_pattern == null:
+		var decks: Variant = table().get("decks", {})
+		var choices: Array[String] = []
+		var shapes: Array[String] = []
+		if decks is Dictionary:
+			for key: String in decks:
+				if key.begins_with("choice."):
+					for each: Variant in lines(key, ""):
+						choices.append(_escaped(str(each)))
+			var choice := "(" + "|".join(choices) + ")" if not choices.is_empty() else ".+"
+			for key: String in decks:
+				var asked := key in ASKED_DECKS
+				if not (asked or key in OFFER_DECKS or OFFER_PREFIXES.any(func(p: String) -> bool: return key.begins_with(p))):
+					continue
+				var deck: Variant = decks[key]
+				var all: Array = []
+				if deck is Dictionary:
+					for t: String in deck:
+						all.append_array(deck[t] if deck[t] is Array else [deck[t]])
+				else:
+					all = lines(key, "")
+				for each: Variant in all:
+					shapes.append(_escaped(str(each)).replace("%s", choice if asked else ".+"))
+		_offer_pattern = RegEx.create_from_string("(?i)^(" + "|".join(shapes) + ")$" if not shapes.is_empty() else "(?!)")
+	return _offer_pattern.search(text.strip_edges()) != null
+
+
+static func _escaped(text: String) -> String:
+	var out := ""
+	for c in text:
+		out += "\\" + c if c in ".?*+()[]{}|^$\\" else c
+	return out
+
+
 ## Deck [param key]'s lines for [param temperament]: its own list joined
 ## to the default's, or the default's alone.
 static func lines(key: String, temperament: String) -> Array:

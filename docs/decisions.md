@@ -61084,8 +61084,18 @@ then with no keeper (Towns.hut_keeper giving ""), the town's priest without his 
 each not named by _first_dest or _first_choices, and named again once restored; it fails without the guard.
 _test_switch reads FirstSteps.on() from the JSON with nothing forced. companion_test runs with the guide
 forced off (FirstSteps.forced 0): a new companion's chain holds her quiet talk and 929's wish after her first
-words, as 945 says, and those sections test the path without it (a companion met before 945, card {}). The bullet is voice's. Server and the
-client's switch read, protocol unchanged, no new class_name.
+words, as 945 says, and those sections test the path without it (a companion met before 945, card {}). Y answers
+her first-steps offers (ui-design's look on guide-look-3: the client armed Y only on Companion.LEAD_OFFER, "shall I
+... lead you", and the deck's offers are "Shall we ...?"; the coordinator's terms, no new field on her line): the
+client's speech handler also arms it on FirstSteps.offer_said, one pattern built once from the decks a yes
+answers (offer.*, the unasked go.*, hurt, bed, sit; asked and asked_one with each %s one of the choice.* clauses;
+a catch offer's taker any words; case not read, as joined raises the first letter), so a later edit of a deck
+cannot unhook the key. The HUD's 'say "yes" to follow <her name>' (551 amended (5)) stands while it does.
+first_steps_test _test_y_arms: every line of those decks, filled as the server fills it, arms Y, and no arrive,
+no, stray, chain_end or risen line does, nor a line no deck holds; through Main._on_message, her Mughouse offer
+arms Y and the HUD's line, her arrive line not. _test_chain and _test_unasked take her Mughouse offer and an
+unasked one by the Y key (Main._unhandled_input, "yes, <her name>"), and she sets off; all fail without the
+handler's call. The bullet is voice's. Server and client, protocol unchanged, no new class_name.
 ## 940. A town's people heard idle: a cleared throat, a sniff, a shifted foot
 
 (sound; the label from tools/decision_number.sh; the coordinator's approval 11-15 after sound's look at
