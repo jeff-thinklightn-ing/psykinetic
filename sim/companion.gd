@@ -5608,7 +5608,9 @@ static func shelf_words(town: String, bread := false) -> String:
 			words.append(("an " if word.left(1) in "aeiou" else "a ") + word)
 	var listed := words[0] if words.size() == 1 else ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1]
 	if rows.size() > SHELF_MOST:
-		return SHELF_ON % listed + (", and more besides, but " + SHELF_NO_BREAD if bread else SHELF_MORE) + ("" if fed else SHELF_NO_FOOD)
+		if bread:  # every join ends on SHELF_NO_BREAD after a semicolon, the wider "no food today" first (voice)
+			return SHELF_ON % listed + ", and more besides, but " + ("no food today; " if not fed else "") + SHELF_NO_BREAD
+		return SHELF_ON % listed + SHELF_MORE + ("" if fed else SHELF_NO_FOOD)
 	var said := SHELF_ON % listed + SHELF_CLOSED
 	if not fed:
 		return said + ("; " + SHELF_NO_BREAD if bread else SHELF_NO_FOOD)  # asked for bread: the closed shelf's form (voice)

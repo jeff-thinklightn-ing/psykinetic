@@ -879,6 +879,23 @@ func _test_ways() -> void:
 		"the town threatened: the store shut (economy: no sale then), its shelf again once the threat is gone (%s)" % shut)
 	_check(Companion.shelf_words(town, true).ends_with(", and more besides, but it has no bread, and you know of nowhere that sells any"),
 		"asked for bread, more besides: \"but it has no bread\" (%s)" % Companion.shelf_words(town, true))
+	var food_off: Array[int] = []
+	for uid: int in minted:
+		if Items.has_tag(stock.book.id_of(uid), "food"):
+			food_off.append(uid)
+			stock.take_from_shop(town, uid, "test")
+	var extra: Array[int] = []
+	for id: String in ["flint", "feathers", "reeds"]:
+		extra.append(stock.book.mint(id, "made", "test"))
+		stock.stock_shop(town, extra.back(), "test", "")
+	var long_bare := Companion.shelf_words(town, true)
+	_check(long_bare.ends_with(", and more besides, but no food today; it has no bread, and you know of nowhere that sells any"),
+		"asked for bread, more besides and no food: no food today, then the bread after a semicolon (voice) (%s)" % long_bare)
+	for uid: int in extra:
+		stock.take_from_shop(town, uid, "test")
+	for uid: int in food_off:
+		stock.stock_shop(town, uid, "test", "")
+	_check(Companion.shelf_words(town) == many, "the shelf as it was after the no-food row (%s)" % Companion.shelf_words(town))
 	# The tripwire (the coordinator's ruling, from economy's record: the game has no bread item, recipe
 	# or baker): her Now says "it has no bread" because none exists; the day one lands, this fails.
 	var catalog: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/items.json"))

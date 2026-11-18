@@ -47,9 +47,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3152)
+## Lines in the code (3153)
 
-### companions (Pip, Wren, Nix) (720)
+### companions (Pip, Wren, Nix) (721)
 
 | | Line | Where |
 |---|---|---|
@@ -494,6 +494,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s lies close by; %s. | `sim/companion.gd` store_words() |
 |  | %s lies %s to the %s; %s. | `sim/companion.gd` store_words() |
 |  | , and more besides, but | `sim/companion.gd` shelf_words() |
+|  | no food today; | `sim/companion.gd` shelf_words() |
 |  | \\b(%s)\\b | `sim/companion.gd` _way_asked() |
 |  | %s %s %s%s | `sim/companion.gd` stance_prompt() |
 |  | While %s is away you stay in this town and work as its %s. | `sim/companion.gd` voice_messages() |

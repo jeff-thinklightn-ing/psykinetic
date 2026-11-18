@@ -61076,7 +61076,8 @@ temple: Umbrage's temple place names none, its building names "store") has its p
 (a bare scene), as before. Every reader of _first_dest goes through it: her hurt offer, _first_choices asked and
 unasked, and the guide's unfound places (_first_unfound). With it, voice's "and you know of nowhere that sells
 any" ends Companion.SHELF_NO_BREAD (945 amended (2)'s note), after a semicolon on a bare shelf, and on a shelf
-with goods but no food in place of "no food today", as on a closed shelf with food (voice: no two "and"s); voice's read of the decks after 929 amended (2)'s greeting changed one
+with goods but no food in place of "no food today", as on a closed shelf with food, and on a long shelf with no food after "but no
+food today;" (voice: no two "and"s, the wider fact first, every join ending on the bread after a semicolon); voice's read of the decks after 929 amended (2)'s greeting changed one
 offer.mughouse line (restless and curious: "this town's like inside" leaned on the greeting, and the Mughouse
 is not the town's inside; now "I want to see what folk here are like."). first_steps_test _test_in_use: the hut in disrepair,
 then with no keeper (Towns.hut_keeper giving ""), the town's priest without his trade, the temple in disrepair:
