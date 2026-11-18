@@ -839,6 +839,9 @@ func _test_ways() -> void:
 	var bare := Companion.store_words("wilds", square)
 	_check(not town.is_empty() and bare == store_way.trim_suffix(".") + "; its shelf is bare just now.",
 		"to buy, the shelf bare: the town's store, its way, and its shelf bare (%s; %s)" % [town, bare])
+	var bare_bread := Companion.shelf_words(town, true)
+	_check(bare_bread == "its shelf is bare just now; it has no bread, and you know of nowhere that sells any",
+		"asked for bread, the shelf bare: after a semicolon, no two \"and\"s (voice) (%s)" % bare_bread)
 	var minted: Array[int] = []
 	for id: String in ["sword", "bandaging_kit", "bandaging_kit"]:
 		minted.append(stock.book.mint(id, "made", "test"))
@@ -846,6 +849,9 @@ func _test_ways() -> void:
 	var gear := Companion.store_words("wilds", square)
 	_check(gear == store_way.trim_suffix(".") + "; on its shelf now: 2 bandaging kits and a sword, and nothing else; no food today.",
 		"gear and no food: what is on it, the most first, closed, and no food today (%s)" % gear)
+	var gear_bread := Companion.shelf_words(town, true)
+	_check(gear_bread == "on its shelf now: 2 bandaging kits and a sword, and nothing else; it has no bread, and you know of nowhere that sells any",
+		"asked for bread, gear and no food: after a semicolon, as the closed shelf's (voice) (%s)" % gear_bread)
 	for id: String in ["roast", "cooked_fish", "cooked_fish"]:
 		minted.append(stock.book.mint(id, "made", "test"))
 		stock.stock_shop(town, minted.back(), "test", "")

@@ -3362,7 +3362,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Shall we try the Mughouse? I'd sooner have walls round us while we get our bearings. | `first_steps.decks.offer.mughouse.quick and wary[0]` |
 |  | Oh, shall we try the Mughouse? There's a hearth, and ale, and folk to talk to. | `first_steps.decks.offer.mughouse.warm and talkative[0]` |
 |  | Shall we see the Mughouse first? A fire and a room to hire are worth knowing about. | `first_steps.decks.offer.mughouse.careful and thoughtful[0]` |
-|  | Shall we look in at the Mughouse? I want to see what this town's like inside. | `first_steps.decks.offer.mughouse.restless and curious[0]` |
+|  | Shall we look in at the Mughouse? I want to see what folk here are like. | `first_steps.decks.offer.mughouse.restless and curious[0]` |
 |  | Shall we try the Mughouse? A fire, and somewhere to sit. | `first_steps.decks.offer.mughouse.quiet and patient[0]` |
 |  | The Mughouse first, I'd say. Fire, ale, a bed if we want one. Shall we? | `first_steps.decks.offer.mughouse.blunt and fearless[0]` |
 |  | Right, shall we try the Mughouse? A hearth and an ale fix most things. | `first_steps.decks.offer.mughouse.cheerful under pressure[0]` |

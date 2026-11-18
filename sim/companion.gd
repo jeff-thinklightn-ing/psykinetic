@@ -5451,7 +5451,8 @@ const STORE_STOCK := ("it sells what the town's makers make and what caravans br
 const SHELF_ON := "on its shelf now: %s"
 const SHELF_CLOSED := ", and nothing else"
 const SHELF_MORE := ", and more besides, but no bread"
-## On a question for bread (SHELF_BREAD_ASKED): said of the shelf, closed or open, bare or with no food (voice;
+## On a question for bread (SHELF_BREAD_ASKED): said of the shelf, closed or open, bare or with no food, after a
+## semicolon but on "more besides" (voice;
 ## economy: no bread item, but none ruled out, so "has", not "never sells"). Transcript 7: a closed list still
 ## drew bread from 5 of 24, "no bread today" put it on another day.
 ## Then "and you know of nowhere that sells any" (voice, 945 amended (2): five of transcript 8's 24 hinted at bread
@@ -5585,7 +5586,7 @@ static func shelf_words(town: String, bread := false) -> String:
 		if not id.is_empty():
 			counts[id] = int(counts.get(id, 0)) + 1
 	if counts.is_empty():
-		return SHELF_BARE + (", and " + SHELF_NO_BREAD if bread else "")
+		return SHELF_BARE + ("; " + SHELF_NO_BREAD if bread else "")
 	var rows: Array = []
 	for id: String in counts:
 		rows.append({"id": id, "count": counts[id], "food": Items.has_tag(id, "food")})
@@ -5610,7 +5611,7 @@ static func shelf_words(town: String, bread := false) -> String:
 		return SHELF_ON % listed + (", and more besides, but " + SHELF_NO_BREAD if bread else SHELF_MORE) + ("" if fed else SHELF_NO_FOOD)
 	var said := SHELF_ON % listed + SHELF_CLOSED
 	if not fed:
-		return said + SHELF_NO_FOOD + (", and " + SHELF_NO_BREAD if bread else "")
+		return said + ("; " + SHELF_NO_BREAD if bread else SHELF_NO_FOOD)  # asked for bread: the closed shelf's form (voice)
 	return said + ("; " + SHELF_NO_BREAD if bread else "")
 
 
