@@ -147,7 +147,12 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		# side, amended; ui's bench: his straight line fell to a route round her).
 		var clear := keep_clear(leader)
 		if clear.has(body.tile):
-			var aside := _aside(body, leader, clear)
+			# Setting off through her, a cell within 90 degrees of his way (678
+			# amended (3)): stepped aside behind him she walked back to the cell he
+			# set off from to rejoin; walled round, any cell out of his way.
+			var aside := _aside(body, leader, clear, walking_on(leader))
+			if aside == NONE:
+				aside = _aside(body, leader, clear)
 			if aside != NONE:
 				_pace(body, leader, NONE)
 				step(body, aside, false, leader)
@@ -192,7 +197,9 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		_goal = footstep
 		_on_trail = true
 	elif clear.has(body.tile):
-		_goal = _aside(body, leader, clear)  # In their way: a step aside, not round them.
+		_goal = _aside(body, leader, clear, _rejoin)  # In their way: a step aside, not round them.
+		if _goal == NONE and _rejoin:
+			_goal = _aside(body, leader, clear)
 		_on_trail = false
 	elif _on_trail and World.tick <= leader.step_until + SETTLE_TICKS and _serves(_goal, body, leader, way, avoid):
 		pass  # Stopped a moment ago: a turn straight back may come; she waits a cell back.
@@ -204,7 +211,14 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		# They stopped (or a footstep went): their heel, a cell nearer.
 		_goal = cell(body, leader, avoid, way)
 		_on_trail = false
+		# Rejoining, no heel cell back toward where he set off from (678 amended
+		# (3)): she waits for a footstep of his ahead of her. Nor a cell he has
+		# yet to cross: aside, she stays clear till he is past.
+		if _rejoin and _goal != NONE and (not _with(body, leader, _goal) or _yet_to_cross(leader, _goal)):
+			_goal = NONE
 	var heel := _goal
+	if _rejoin and heel == NONE and not astray:
+		return
 	var ahead := ahead_of(body.tile - leader.tile, way) > 0
 	if body.tile == heel:
 		if not walking:
@@ -301,6 +315,11 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 			continue
 		if at == body.tile:
 			return at
+		# Rejoining, only a footstep ahead of her (678 amended (3)): not the cell
+		# he set off from, behind her once she stepped aside; nor one he has yet
+		# to cross, an old footstep he walks back over (a tap back past her).
+		if _rejoin and (not _with(body, leader, at) or _yet_to_cross(leader, at)):
+			continue
 		# Only one that brings her nearer them: none back onto their line
 		# after a step aside, a cell no nearer.
 		if World.is_walkable(at) and World.is_free(at) and (World.distance(at, lead) < World.distance(body.tile, lead)
@@ -312,17 +331,49 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 ## A step out of [param leader]'s way for [param body] standing in it: the
 ## free walkable cell next to her, within STOP of them and out of their way
 ## ([param clear]), never a door's nor a gap's (shut_cell), nearest them; NONE if none.
-static func _aside(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vector2i:
+## [param forward] (678 amended (3), a leader setting off through her): only a step
+## within 90 degrees of his way (_with), and of two as near him the one more along it.
+static func _aside(body: GridEntity, leader: GridEntity, clear: Dictionary, forward := false) -> Vector2i:
 	var best := NONE
+	var heading := _heading(leader)
 	for way: Vector2i in World.DIRECTIONS:
 		var at := body.tile + way
 		if clear.has(at) or World.distance(at, leader.tile) > STOP or shut_cell(at):
 			continue
+		if forward and not _with(body, leader, at):
+			continue
 		if not (World.is_walkable(at) and World.is_free(at)) or World.find_path(body.tile, at, false, null, ASIDE_SEARCH_TILES).size() != 1:
 			continue
-		if best == NONE or World.distance(at, leader.tile) < World.distance(best, leader.tile):
+		var near := World.distance(at, leader.tile)
+		if best == NONE or near < World.distance(best, leader.tile) \
+				or forward and near == World.distance(best, leader.tile) and Vector2(way).dot(heading) > Vector2(best - body.tile).dot(heading) + 0.001:
 			best = at
 	return best
+
+
+## Where [param leader] is heading (678 amended (3)): his step's own way while he
+## walks on (a free body's slant as it is, not travel's rounding to a grid way),
+## else the way he is pressed, else his facing.
+static func _heading(leader: GridEntity) -> Vector2:
+	if walking_on(leader):
+		return leader.step_velocity
+	if leader.free_way.length() > 0.001:
+		return leader.free_way
+	return Vector2(leader.facing)
+
+
+## Whether [param body]'s step from her cell to [param at] heads within 90 degrees
+## of where [param leader] is heading (678 amended (3); task 4: set off through, she
+## stepped aside behind him and back onto the cell he set off from).
+static func _with(body: GridEntity, leader: GridEntity, at: Vector2i) -> bool:
+	return Vector2(at - body.tile).dot(_heading(leader).normalized()) >= -0.001
+
+
+## Whether [param at] lies ahead of [param leader]'s centre along where he is
+## heading while he walks on (678 amended (3); the second look: tapped back past
+## her, she stepped aside and back onto an old footstep of his, his way ahead).
+static func _yet_to_cross(leader: GridEntity, at: Vector2i) -> bool:
+	return walking_on(leader) and (Vector2(at) - World.body_centre(leader)).dot(_heading(leader).normalized()) > 0.001
 
 
 ## Whether [param at] is a cell she never stops on of her own accord: a

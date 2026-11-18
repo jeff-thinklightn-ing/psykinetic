@@ -181,6 +181,8 @@ func _ready() -> void:
 	_test_return_cell_his_side()  # Loads the wilds and back.
 	_test_fight_leash()  # Loads the wilds and back.
 	_test_paced_past_game()  # Loads the wilds and back.
+	_test_set_off_through_her()  # Loads the wilds and back.
+	_test_tap_back_past_her()  # Loads the wilds and back.
 	_test_greets_once_across_zones()  # Moves by the console to sample and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_speech_floor()  # Late: its five calm quarter hours move the clock on (917).
@@ -4944,6 +4946,151 @@ func _test_paced_past_game() -> void:
 	_put(owner, owner_was)
 	_put(pet, _main._nearest_free(owner_was + Vector2i(1, 0)))
 	_main.load_map(was)
+
+
+func _test_set_off_through_her() -> void:
+	print("\n== he sets off through her on the road and on a slant: a step aside within 90 degrees of his way, no step back, no stand by him over 2 ticks (678 amended (3); task 4's look) ==")
+	var was := String(World.zone.name)
+	if not _main.load_map("wilds"):
+		_check(false, "the wilds load")
+		return
+	var owner := _player()
+	var pet := _companion()
+	if owner == null or pet == null or not pet.spawned or pet.zone != "wilds":
+		_check(false, "a player and her companion in the wilds (%s, %s)" % [owner, pet])
+		_main.load_map(was)
+		return
+	_kill_monsters()
+	var owner_was := owner.tile
+	# The look's two starts: settled a cell ahead of him on his line, on the
+	# road east and on his slant to (202, 192).
+	for run: Array in [["road", Vector2i(207, 201), Vector2i(208, 201), Vector2i(217, 201)],
+			["slant", Vector2i(186, 200), Vector2i(187, 200), Vector2i(202, 192)]]:
+		var from: Vector2i = run[1]
+		var to: Vector2i = run[3]
+		var line := Vector2(to - from).normalized()
+		_put(owner, from)
+		owner.free_pos = Vector2(from)
+		_put(pet, run[2])
+		pet.heel.catching_up = false
+		for i in 20:
+			World.free_input(owner, Vector2.ZERO, World.TICK_DT)
+			World.step()
+		_check(pet.tile == run[2] and not pet.heel.catching_up, "(%s: settled at %s, him at %s)" % [run[0], pet.tile, owner.tile])
+		var her_was := pet.tile
+		var cells: Array[Vector2i] = [pet.tile]
+		var back: Array[String] = []
+		var by := 0  # Stood beside or ahead of him while he walks.
+		var by_longest := 0
+		var behind := 0  # Stood behind him (the start wait, he getting ahead).
+		var behind_longest := 0
+		for i in 120:
+			var left := Vector2(to) - owner.free_pos
+			var go := Vector2.ZERO
+			if left.length() > 0.01:
+				go = left.normalized() * minf(1.0, left.length() * World.step_ticks(owner, Vector2i(1, 0)))
+			World.free_input(owner, go, World.TICK_DT)
+			World.step()
+			var stepped := pet.tile != her_was
+			if stepped:
+				var off := absf(rad_to_deg(Vector2(pet.tile - her_was).angle_to(line)))
+				if off > 90.01:
+					back.append("%s->%s %d deg" % [her_was, pet.tile, roundi(off)])
+				cells.append(pet.tile)
+			her_was = pet.tile
+			var moving := stepped or World.tick < pet.step_until
+			var level := Vector2(pet.tile - owner.tile).dot(line) >= -0.001
+			by = by + 1 if go != Vector2.ZERO and not moving and level else 0
+			behind = behind + 1 if go != Vector2.ZERO and not moving and not level else 0
+			by_longest = maxi(by_longest, by)
+			behind_longest = maxi(behind_longest, behind)
+			if go == Vector2.ZERO and not moving and World.tick > pet.step_until + 10:
+				break
+		_check(cells.size() > 2 and back.is_empty(),
+			"%s: every step of hers within 90 degrees of his way, none back toward where he set off (%s; she %s)" % [run[0], back, cells.slice(0, 5)])
+		_check(by_longest <= 2,
+			"%s: she stands beside or ahead of him at most 2 ticks as he goes by (longest %d; behind him, he getting ahead, %d)" % [run[0], by_longest, behind_longest])
+		_check(World.distance(pet.tile, owner.tile) <= Heel.STOP + 1 and pet.tile != owner.tile,
+			"%s: and she is at his heel when he stops (%s, him %s)" % [run[0], pet.tile, owner.tile])
+	_put(owner, owner_was)
+	_put(pet, _main._nearest_free(owner_was + Vector2i(1, 0)))
+	_main.load_map(was)
+
+
+func _test_tap_back_past_her() -> void:
+	print("\n== he taps back past her from the slant's end: aside, she stays clear till he is past, no step onto his way ahead of him, never within 0.5 (678 amended (3); task 4's second look) ==")
+	var was := String(World.zone.name)
+	if not _main.load_map("wilds"):
+		_check(false, "the wilds load")
+		return
+	var owner := _player()
+	var pet := _companion()
+	if owner == null or pet == null or not pet.spawned or pet.zone != "wilds":
+		_check(false, "a player and her companion in the wilds (%s, %s)" % [owner, pet])
+		_main.load_map(was)
+		return
+	_kill_monsters()
+	var owner_was := owner.tile
+	var from := Vector2i(202, 192)
+	var to := Vector2i(198, 194)
+	# The look's two stands (Atlas, Lenovo), him at the slant's end with its last
+	# footsteps behind him, as the walk from (186, 200) left them.
+	for her: Vector2i in [Vector2i(200, 194), Vector2i(200, 193)]:
+		_put(owner, from)
+		owner.free_pos = Vector2(from)
+		_put(pet, her)
+		pet.heel.catching_up = false
+		for i in 30:
+			World.free_input(owner, Vector2.ZERO, World.TICK_DT)
+			World.step()
+		pet.heel._trail.assign([Vector2i(201, 193), Vector2i(200, 193), Vector2i(200, 194), Vector2i(199, 194)])
+		pet.heel._leader_at = owner.tile
+		owner.free_pos = Vector2(202.0185, 191.9824)
+		_check(pet.tile == her and not pet.heel.catching_up, "(her on %s: settled at %s, him at %s)" % [her, pet.tile, owner.tile])
+		var her_was := pet.tile
+		var cells: Array[Vector2i] = [pet.tile]
+		var onto: Array[String] = []
+		var nearest := 99.0
+		for i in 120:
+			var left := Vector2(to) - owner.free_pos
+			var go := Vector2.ZERO
+			if left.length() > 0.01:
+				go = left.normalized() * minf(1.0, left.length() * World.step_ticks(owner, Vector2i(1, 0)))
+			World.free_input(owner, go, World.TICK_DT)
+			World.step()
+			var drawn := Vector2(pet.tile)
+			if World.tick < pet.step_until:
+				drawn -= pet.step_velocity * (pet.step_until - World.tick)
+			nearest = minf(nearest, drawn.distance_to(owner.free_pos))
+			if pet.tile != her_was:
+				# Onto his way ahead of him: a cell within one of his line on to the
+				# goal (side by side as he passes), from one outside it (a step off his
+				# line, aside, is hers to take).
+				if _lane_ahead(pet.tile, owner.free_pos, Vector2(to)) and not _lane_ahead(her_was, owner.free_pos, Vector2(to)):
+					onto.append("%s->%s, him (%.2f, %.2f)" % [her_was, pet.tile, owner.free_pos.x, owner.free_pos.y])
+				cells.append(pet.tile)
+			her_was = pet.tile
+			if go == Vector2.ZERO and World.tick > pet.step_until + 10:
+				break
+		_check(cells.size() > 1 and onto.is_empty(), "her on %s: no step onto a cell on his way ahead of him (%s; she %s)" % [her, onto, cells])
+		_check(nearest >= 0.5, "her on %s: never within 0.5 of him (nearest %.2f)" % [her, nearest])
+		_check(World.distance(pet.tile, owner.tile) <= Heel.STOP + 1 and pet.tile != owner.tile,
+			"her on %s: and she is at his heel when he stops (%s, him %s)" % [her, pet.tile, owner.tile])
+	_put(owner, owner_was)
+	_put(pet, _main._nearest_free(owner_was + Vector2i(1, 0)))
+	_main.load_map(was)
+
+
+## Whether cell [param at] lies ahead of [param from] on the way to [param to] and
+## within a cell of that line.
+func _lane_ahead(at: Vector2i, from: Vector2, to: Vector2) -> bool:
+	var line := to - from
+	if line.length() < 0.01:
+		return false
+	var along := (Vector2(at) - from).dot(line.normalized())
+	if along <= 0.001:
+		return false
+	return Vector2(at).distance_to(from + line.normalized() * minf(along, line.length())) < 1.0
 
 
 func _test_greets_once_across_zones() -> void:

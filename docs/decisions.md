@@ -38138,6 +38138,53 @@ off at the start band with no step before it, as designed (unchanged).
   stands in his way no longer than a step aside takes (3 ticks at most) and steps on and off his
   line at most once.
 Server only, protocol unchanged, no new class_name.
+678 amended (3): set off through her, she steps aside within 90 degrees of his way and rejoins
+ahead of her (the coordinator's terms, 2026-11-18, task 4: Jeff 11-17, "companion trails you still
+in a zig zag"; ui-design's laptop look C:/dev/review/ui-design/looks/trail4_report, its stops read
+by kind on the server, C:/dev/review/companions/trail4/server_probe_504b437e8.txt). Settled a cell
+ahead of him on his line, a player setting off on a slant (the look's (186, 200) to (202, 192), she
+at (187, 200)) had her step aside to the cell nearest him, behind his way ((187, 201)), then rejoin
+onto the cell he set off from ((186, 200), a step back toward where he came from, 108 degrees off
+his way), then forward over her own first cell again: the look's "turned back on herself" at the
+set-off. On the road ((207, 201) east, she at (208, 201)) her aside was already square to his way.
+- Heel._with: a step of hers heads within 90 degrees of where he is heading (Heel._heading: his
+  step's own velocity while he walks on, a free body's slant as it is, not travel's grid way; else
+  the way he is pressed; else his facing).
+- Heel._aside, forward (a leader walking on, set off through her): only a cell _with allows, and of
+  two as near him the one more along his way. Walled in with none, any cell out of his way, as
+  before. His start cell is his own and in keep_clear, never an aside.
+- The rejoin (678 amended (2)): _footstep passes over a footstep _with refuses (the cell he set off
+  from, behind her once she stepped aside), a heel cell behind her is dropped, and with no goal she
+  stands (not a step toward him) until a footstep of his ahead of her is in reach.
+- Kept: 555's start band and the start wait behind him; 678's stay-put while he goes by; 485
+  amended (2)'s footsteps and pace; a step aside for a standing player.
+- Measured, server side, on the wilds (a probe driving him by free input, as a click's path does,
+  two runs each): road, unchanged: aside (0, 1) square to him, stood 2 ticks as he went by, onto his
+  line behind him, the start wait 2 ticks at d2, then no stand. Slant: before, aside (0, 1) then
+  back to (186, 200) and forward (2 steps over 90 degrees off his way, no stand); after, aside to
+  (188, 200) (27 degrees), stood 2 ticks as he went by and 3 behind him at d1 while he crossed the
+  cell ahead of her, then onto his footstep (188, 199) and along his line, no step over 90 degrees.
+- companion_test _test_set_off_through_her: the look's two starts on the wilds (the road to
+  (217, 201), the slant to (202, 192)): every step of hers within 90 degrees of his way, she stands
+  beside or ahead of him at most 2 ticks as he goes by (stands behind him, he getting ahead, are
+  the start wait and not counted), at his heel and off his cell when he stops. It fails on the pace
+  take (ce056599d) for the slant's back steps.
+- Tapped back past her (the second look, C:/dev/review/ui-design/looks/trail4b_report: at the
+  slant's end (202, 192) he taps (198, 194), she on (200, 194)): her rejoin's footsteps are his old
+  slant cells, and _with passed (200, 194), west, his way back, though he had yet to walk past it.
+  She stepped aside to (201, 194) and back onto (200, 194) two ticks later, drawn through him.
+  Heel._yet_to_cross: a cell ahead of his centre along his heading while he walks on. Rejoining,
+  _footstep passes over one and the heel cell is dropped, so she holds aside until he is past.
+  Measured (the probe with the walk's last footsteps behind him): before, (200, 194) to (201, 194),
+  back to (200, 194) at t3 (him at (200.95, 192.52)), nearest 0.90; after, as main: (201, 194),
+  stood 5 ticks, (200, 193) at t8 once he was past (him at (199.16, 193.42)), nearest 1.36. From
+  (200, 193): (200, 192), stood 5, (200, 193) behind him at t8, nearest 0.91.
+- companion_test _test_tap_back_past_her: both stands, his slant's last footsteps behind him: no
+  step of hers onto his way ahead of him (a cell ahead of him within one of his line on to the
+  goal, from one outside it; a step off his line is her aside), never within 0.5 of him, at his
+  heel and off his cell when he stops. It fails on this take before the mend, (201, 194) to
+  (200, 194) with him at (200.95, 192.52); main's heel passes it.
+Server only, protocol unchanged, no new class_name.
 ## 660 amended (2): the scatter meshes warmed behind the card
 
 The coordinator's request: the 249 ms Client3D._grow_scatter frame a moment
