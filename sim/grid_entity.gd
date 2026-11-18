@@ -128,6 +128,34 @@ const UNKNOWN_TILE := Vector2i(-99999, -99999)
 const PUSH_SHOWN_TICKS := 14.0
 ## A refused or corrected step eases to a stop over this many ticks.
 const STOP_EASE_TICKS := 2.0
+## 655 amended (3) (the coordinator's task 4, from Jeff's 11-17 "companion trails you still in a zig
+## zag"): a body with a keeper (a companion) walking by its cells behind him is drawn on the path he was
+## drawn along, not on its own cell steps: under a slant of his, her steps (a staircase of straight and
+## diagonal ones) are drawn on his line, and she faces along it. The last RIDE_KEPT cells of his drawn
+## path are kept, a point each RIDE_SAMPLE of a cell. She rides while she steps, her slide does not ease
+## to a stop, and that path's nearest point is within RIDE_NEAR of where her own slides put her and at
+## least RIDE_BEHIND behind his newest point; once riding she keeps it while that point is within
+## RIDE_KEEP (her own cells can lie a cell's diagonal off his: he stepped (192,197), she (192,198) and
+## (193,198)) and across a gap between her slides of up to RIDE_GAP_SECONDS (joined, 0.22 s on the slant); riding, her place along his
+## path only goes on, by no more a frame than twice her own slides' move and RIDE_ON_SLACK (the nearest
+## point otherwise leapt back to an earlier stretch of his, 0.7 of a cell in a frame). She is never
+## drawn more than RIDE_MOST from where her own slides put her, and blends on and off over RIDE_BLEND_SECONDS. Her gait still reads her slide's pace
+## (step_pace). Drawing only, on any view that draws her (her keeper's, another player's, a host's):
+## never a server's.
+const RIDE_KEPT := 6.0
+const RIDE_SAMPLE := 0.1
+const RIDE_NEAR := 0.6
+const RIDE_KEEP := 1.0
+const RIDE_GAP_SECONDS := 0.3
+## How much farther than twice her own slides' move a frame her place along his path may go on.
+const RIDE_ON_SLACK := 0.02
+const RIDE_MOST := 0.75
+const RIDE_BEHIND := 0.5
+const RIDE_BLEND_SECONDS := 0.3
+## A keeper not found is looked for again after this long (the roster is read once).
+const RIDE_FIND_MSEC := 500
+## His path takes this much of a jump as a new path (a link, a respawn): RIDE_KEPT's points are dropped.
+const RIDE_JUMP := 2.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)
 const HURT_TINT := Color(1.0, 0.3, 0.3)
 
@@ -412,6 +440,19 @@ var action_direction := Vector2i.ZERO
 var action_tick := 0
 
 # Render interpolation: slide from _from_tile to tile over _move_duration ticks.
+## 655 amended (3): her keeper's drawn path (grid units, oldest first), how far she is drawn on it
+## (0 her own slides, 1 his path), the body found as her keeper and when it was looked for, and the
+## way along his path she faces this frame (ZERO when not riding).
+var _ride_path: Array[Vector2] = []
+var _ride := 0.0
+var _ride_keeper: GridEntity = null
+var _ride_found_msec := -RIDE_FIND_MSEC
+var _ride_way := Vector2.ZERO
+var _ride_gap := 0.0
+## His path's whole length noted (_ride_note), and her place along it from its start (-INF: not riding).
+var _ride_total := 0.0
+var _ride_arc := -INF
+var _ride_last_drawn := Vector2.ZERO
 var _from_tile := Vector2i.ZERO
 ## Where the slide being shown starts, in grid space: _from_tile's cell, or
 ## wherever the body was drawn when a present push took it (see _present).
@@ -837,9 +878,12 @@ func _process(delta: float) -> void:
 				t = _settling(to, t)
 			var bent := _bent_step(to, t)  # 655: the corners rounded; [] for a slide drawn straight.
 			var drawn: Vector2 = bent[0] if not bent.is_empty() else _from_pos.lerp(Vector2(to), t)
-			position = Iso.grid_to_local(drawn)
 			var sliding := t < 1.0 and to != _from_tile
 			var knocked := sliding and _on_push_line(_from_tile, to)
+			# 655 amended (3): a companion behind her keeper drawn on his path.
+			var rides := sliding and not knocked and not _present and not _settle and _told.is_empty()
+			var between := not sliding and not _present and not _settle and _told.is_empty()
+			position = Iso.grid_to_local(_ride_drawn(drawn, delta, rides, between) if keeper_peer != 0 else drawn)
 			stepping = sliding and not knocked
 			step_pace = 0.0
 			if stepping and _move_duration > 0.0:
@@ -855,7 +899,8 @@ func _process(delta: float) -> void:
 				else:
 					# 655 amended (2): the way over the next LOOK_AHEAD cells, so a
 					# path of straight and diagonal steps faces its mean heading.
-					var ahead := _look_ahead(drawn, to)
+					# 655 amended (3): along her keeper's path while she is drawn on it.
+					var ahead := _ride_way if _ride_way != Vector2.ZERO else _look_ahead(drawn, to)
 					if ahead != Vector2.ZERO:
 						wanted = ahead
 					rate = WALK_TURN_RATE
@@ -982,6 +1027,135 @@ func _look_ahead(drawn: Vector2, to: Vector2i) -> Vector2:
 		left -= length
 		point = next
 	return point - drawn if point.distance_to(drawn) > 0.05 else Vector2.ZERO
+
+
+## 655 amended (3): where a body with a keeper is drawn this frame: [param drawn] (where its own slides
+## put it), or toward the nearest point of its keeper's drawn path, by _ride; [param rides] whether this
+## frame's slide may ride (stepping, not knocked, pushed, settling or told); [param between] whether it
+## stands between slides, none of those (a gap a ride keeps for RIDE_GAP_SECONDS). Keeps the path, eases
+## _ride, and sets _ride_way.
+func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false) -> Vector2:
+	_ride_way = Vector2.ZERO
+	var him := _ride_keeper_body()
+	if him == null:
+		_ride_path.clear()
+		_ride = 0.0
+		_ride_arc = -INF
+		return drawn
+	_ride_note(Iso.local_to_grid(him.position))
+	var near := []
+	if _ride > 0.0 and _ride_arc != -INF:
+		# Riding: her place along his path goes on from the last frame's, never back, and by no more than
+		# twice what her own slides moved (RIDE_ON_SLACK besides).
+		var on := 2.0 * _ride_last_drawn.distance_to(drawn) + RIDE_ON_SLACK
+		near = ride_nearest(_ride_path, drawn, _ride_total - _ride_arc - on, _ride_total - _ride_arc)
+	else:
+		near = ride_nearest(_ride_path, drawn)
+	_ride_last_drawn = drawn
+	_ride_arc = _ride_total - float(near[1]) if not near.is_empty() else -INF
+	var want := 0.0
+	_ride_gap = 0.0 if rides else _ride_gap + delta
+	var going := rides or between and _ride > 0.0 and _ride_gap <= RIDE_GAP_SECONDS
+	var reach := RIDE_KEEP if _ride > 0.0 else RIDE_NEAR
+	if going and not near.is_empty() and float(near[1]) >= RIDE_BEHIND and (near[0] as Vector2).distance_to(drawn) <= reach:
+		want = 1.0
+	_ride = move_toward(_ride, want, delta / RIDE_BLEND_SECONDS)
+	if _ride <= 0.0:
+		_ride_arc = -INF
+	if _ride <= 0.0 or near.is_empty():
+		return drawn
+	var shown := drawn.lerp(near[0] as Vector2, _ride)
+	if shown.distance_to(drawn) > RIDE_MOST:
+		shown = drawn + (shown - drawn).limit_length(RIDE_MOST)
+	if _ride >= 0.5:
+		_ride_way = ride_ahead(_ride_path, near, LOOK_AHEAD)
+	return shown
+
+
+## 655 amended (3): adds [param his] (his drawn place) to the kept path, a point each RIDE_SAMPLE, the
+## path cut to its last RIDE_KEPT cells; a jump over RIDE_JUMP starts a new one.
+func _ride_note(his: Vector2) -> void:
+	if not _ride_path.is_empty():
+		var gap: float = (_ride_path.back() as Vector2).distance_to(his)
+		if gap < RIDE_SAMPLE:
+			return
+		if gap > RIDE_JUMP:
+			_ride_path.clear()
+			_ride_arc = -INF
+		else:
+			_ride_total += gap
+	_ride_path.append(his)
+	var length := 0.0
+	for i in range(_ride_path.size() - 1, 0, -1):
+		length += _ride_path[i].distance_to(_ride_path[i - 1])
+		if length > RIDE_KEPT:
+			_ride_path = _ride_path.slice(i - 1)
+			return
+
+
+## 655 amended (3): the body this one keeps to (the player whose peer is its keeper_peer), on a view
+## that draws; null on a server, or while none is found (looked for again each RIDE_FIND_MSEC).
+func _ride_keeper_body() -> GridEntity:
+	if keeper_peer == 0 or Net.mode == Net.Mode.SERVER:
+		return null
+	if is_instance_valid(_ride_keeper) and _ride_keeper.spawned and _ride_keeper.owner_peer == keeper_peer:
+		return _ride_keeper
+	_ride_keeper = null
+	var now := Time.get_ticks_msec()
+	if now - _ride_found_msec < RIDE_FIND_MSEC:
+		return null
+	_ride_found_msec = now
+	for entity: GridEntity in World.sought():
+		if is_instance_valid(entity) and entity != self and entity.spawned and entity.owner_peer == keeper_peer:
+			_ride_keeper = entity
+			break
+	return _ride_keeper
+
+
+## 655 amended (3): the nearest point of [param path] (oldest first) to [param at], and how far along
+## the path it is from the path's newest point, and the index of the path's next point after it
+## ([point, along, next]); [] for a path of under two points. Only points from [param least] to
+## [param most] along from the newest are taken (a ride's window: never back along his path, never a
+## leap on to a later stretch of it); a stretch's nearest point outside it is taken at its edge.
+static func ride_nearest(path: Array[Vector2], at: Vector2, least := -INF, most := INF) -> Array:
+	if path.size() < 2:
+		return []
+	var newer_along := 0.0  # Along from the newest point to path[i + 1].
+	var best := []
+	var best_d := INF
+	for i in range(path.size() - 2, -1, -1):
+		var leg := path[i + 1].distance_to(path[i])
+		var older_along := newer_along + leg
+		if older_along >= least and newer_along <= most:
+			var q := Geometry2D.get_closest_point_to_segment(at, path[i], path[i + 1])
+			var along := newer_along + q.distance_to(path[i + 1])
+			var kept := clampf(along, maxf(least, newer_along), minf(most, older_along))
+			if kept != along:
+				along = kept
+				q = path[i + 1].lerp(path[i], (along - newer_along) / leg) if leg > 0.0 else path[i + 1]
+			var d := q.distance_squared_to(at)
+			if d < best_d:
+				best_d = d
+				best = [q, along, i + 1]
+		newer_along = older_along
+	return best
+
+
+## 655 amended (3): the way from [param near] (ride_nearest's) to the point [param reach] on along
+## [param path] toward its newest point, or as far as it goes; ZERO with nowhere ahead.
+static func ride_ahead(path: Array[Vector2], near: Array, reach: float) -> Vector2:
+	var from: Vector2 = near[0]
+	var left := reach
+	var point := from
+	for i in range(int(near[2]), path.size()):
+		var leg := path[i] - point
+		var length := leg.length()
+		if length >= left:
+			point += leg * (left / length)
+			break
+		left -= length
+		point = path[i]
+	return point - from if point.distance_to(from) > 0.05 else Vector2.ZERO
 
 
 ## 655 amended (2) (the coordinator's guard: combat reads facing): the

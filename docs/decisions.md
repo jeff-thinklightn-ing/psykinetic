@@ -34128,6 +34128,44 @@ slide ended, as before). A gate on the first slide's start alone hid the swing (
 start on the same mid-turn), so the test reads the whole steady walk. Client only; protocol unchanged;
 no new class_name.
 
+655 amended (3) (decision_number.sh's label; the coordinator's task 4, take 1, on physics' and
+companions' design; from Jeff's 11-17 "companion trails you still in a zig zag which is quite obvious
+to me visually"): a companion behind her keeper is drawn on the path he was drawn along, not on her
+cell steps. The count (physics' trail probe, a headless client joined to a local server, every
+frame's drawn places): on a straight road, a diagonal and across the square her drawn path turned on
+0 to 9% of her steps and never swung; on a 2:1 slant of his her cells were a staircase, (1, -1) and
+(1, 0) by turns, drawn 0.32 to 0.35 of a cell either side of his line: 10 sideways swings in 19 cells
+against his 4, and 71% of her steps a turn. 655's bends round each corner and (2)'s look-ahead faces
+the mean, so a staircase is still a staircase drawn. Now a body with a keeper_peer (on any view that
+draws: her keeper's, another player's, a host's, never a server) keeps the last RIDE_KEPT (6) cells
+of his drawn place, a point each RIDE_SAMPLE (0.1); while it steps (not knocked, pushed, told, or its
+slide easing to a stop) and that path's nearest point is within RIDE_NEAR (0.6) of where its own
+slides put it and RIDE_BEHIND (0.5) or more behind his newest, it is drawn there, facing LOOK_AHEAD
+along his path. Joined, her cells lay farther off his than the row's staircase (he stepped (192,197),
+she (192,198) and (193,198): 0.89 off his line) and her slides had gaps of a frame to 0.22 s between
+them, so the first build rode a few frames at a time: once riding, it keeps riding while that point
+is within RIDE_KEEP (1.0) and across a gap of up to RIDE_GAP_SECONDS (0.3), and its place along his
+path only goes on, by no more a frame than twice its own slides' move plus RIDE_ON_SLACK (0.02) (the
+nearest point otherwise leapt back to an earlier stretch of his, 0.7 of a cell in one frame). It is
+never drawn more than RIDE_MOST (0.75) from where its own slides put it, and goes on and off over
+RIDE_BLEND_SECONDS (0.3): a step aside, his stop, a fight or an errand takes it off his path as its
+steps leave it. The server's cells, her follow (companions' Heel) and her gait are
+as they were: step_pace is still her slide's own, so on his 2:1 line she is drawn about 7% slower
+than her gait over the staircase (11% on a straight step, 5% on a diagonal one: his line is shorter
+than the staircase). Joined (the probe on the look branch, the same walks): on the 2:1 slant she
+swings 6 times against his 4, and the 4 she makes riding are his 4, about 1.2 s behind him; the other
+two are before she rides (her server's first step, from in front of him to his side) and her stop
+(drawn from his path onto her own cell); her drawn speed over her gait's pace, by tenths of a second,
+has a median of 0.91 there and 0.99 to 1.05 on the road, the diagonal and the square. His own clicked
+route on a slant (a few legs with a half-cell kink, 4 swings in 18 cells) is left as it is: she copies
+it. view_test _test_ride_path: her staircase under his 2:1 slant is drawn with 0 swings (14 for her
+cell steps alone), within 0.02 of his line, facing within 2 degrees of it, never over 0.75 from her own
+slides, her place along his path never going back; a staircase whose corners lie 0.89 off his line is
+ridden all the way; a 0.25 s stand between her slides keeps her riding; 1.2 cells off his path she is
+held within 0.75 and back on her slides in 0.3 s; her keeper is found
+by keeper_peer, the row's keeper another player's (peer 9, the view's own 1); a server finds none.
+Client only; protocol unchanged; no new class_name.
+
 ### The war hammer swings one-handed
 
 The coordinator, on the hand pass's cut: the war hammer (hands 1) shared Axe_Overhead, now

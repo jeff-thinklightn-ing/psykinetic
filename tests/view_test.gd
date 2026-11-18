@@ -149,6 +149,7 @@ func _ready() -> void:
 		await _test_stone_names()
 		_test_cone_lift()
 		_test_bent_walk()
+		_test_ride_path()
 		_test_pine_stands()
 		_test_ground_textures()
 		_test_canopy_mask()
@@ -22107,6 +22108,163 @@ func _test_cone_lift() -> void:
 	_check(same_ground, "lifted, the cone's sides stand over the same ground (%d vertices): its spread is the sim's at either pitch" % flat_faces.size())
 	_check(is_equal_approx(_rig._aim_arc.position.y, flat_y), "and back at the ortho pitch, on the ground again")
 	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, false)
+
+
+## 655 amended (3) (task 4, Jeff 11-17: "companion trails you still in a zig zag"): a companion
+## stepping a staircase behind her keeper's slant is drawn on his drawn path, faces along it, is never
+## drawn more than RIDE_MOST from where her own slides put her, blends back off it, and is drawn so for
+## any keeper (her own player's, another's), never on a server.
+func _test_ride_path() -> void:
+	print("\n== a companion behind her keeper is drawn on his path, not her cell steps (655 amended (3)) ==")
+	var him := GridEntity.new()
+	him.owner_peer = 9  # Not this view's own peer: another player's companion is drawn the same.
+	him.spawned = true
+	var her := GridEntity.new()
+	her.keeper_peer = 9
+	her._ride_keeper = him
+	var way := Vector2(2, -1).normalized()  # His 2:1 slant, as on the wilds' square (trail2's slant2).
+	var pace := 3.9
+	# Her cells: the staircase the server steps under his slant, (1, -1) and (1, 0) by turns.
+	var cells: Array[Vector2] = [Vector2.ZERO]
+	for k in 16:
+		cells.append(cells.back() + (Vector2(1, -1) if k % 2 == 0 else Vector2(1, 0)))
+	var dt := 1.0 / 60.0
+	var walk := _ride_walk(her, him, cells, way, pace)
+	var shown_side: Array[float] = walk["shown_side"]
+	var drawn_side: Array[float] = walk["drawn_side"]
+	var most_off: float = walk["most_off"]
+	var most_from_slides: float = walk["most_from_slides"]
+	var worst_way: float = walk["worst_way"]
+	var nearest_him: float = walk["nearest_him"]
+	var swings := func(side: Array[float]) -> int:
+		var count := 0
+		var direction := 0
+		var anchor := side[0]
+		for p in side:
+			var d := p - anchor
+			if direction == 0 and absf(d) >= 0.05:
+				direction = int(signf(d))
+				anchor = p
+			elif direction != 0 and signf(d) == direction:
+				anchor = p
+			elif direction != 0 and absf(d) >= 0.05:
+				count += 1
+				direction = -direction
+				anchor = p
+		return count
+	var her_swings: int = swings.call(shown_side)
+	var steps_swings: int = swings.call(drawn_side)
+	_check(her_swings == 0 and steps_swings >= 6 and most_off < 0.02 and nearest_him >= 0.7,
+			"on his slant her staircase of steps is drawn on his line: %d sideways swings drawn (her cell steps alone: %d), at most %.3f of a cell off it, never nearer him than %.2f" % [her_swings, steps_swings, most_off, nearest_him])
+	_check(worst_way < deg_to_rad(2.0), "and she faces along his path, not her steps: at most %.1f degrees off it" % rad_to_deg(worst_way))
+	_check(most_from_slides <= GridEntity.RIDE_MOST + 0.0001 and most_from_slides > 0.3,
+			"never drawn more than %.2f of a cell from where her own slides put her (at most %.3f)" % [GridEntity.RIDE_MOST, most_from_slides])
+	_check(float(walk["most_back"]) < 0.0001 and float(walk["least_ride"]) == 1.0,
+			"her place along his path only goes on (back by at most %.4f a frame), riding all the way" % float(walk["most_back"]))
+	# The staircase the joined probe met (two straight steps, then two diagonals): its corner cells lie 0.89
+	# off his line, past RIDE_NEAR; once riding she keeps it (RIDE_KEEP), drawn RIDE_MOST toward his line.
+	var wide: Array[Vector2] = [Vector2.ZERO]
+	for k in 16:
+		wide.append(wide.back() + (Vector2(1, 0) if k % 4 < 2 else Vector2(1, -1)))
+	walk = _ride_walk(her, him, wide, way, pace)
+	var wide_steps: float = 0.0
+	for p: float in walk["drawn_side"]:
+		wide_steps = maxf(wide_steps, absf(p))
+	_check(float(walk["least_ride"]) == 1.0 and float(walk["most_off"]) <= wide_steps - GridEntity.RIDE_MOST + 0.01 and wide_steps > 0.85,
+			"a staircase whose corners lie %.2f off his line: ridden all the way, drawn at most %.3f off it" % [wide_steps, float(walk["most_off"])])
+	# Joined on the slant she stood 0.22 s between two slides while he walked on: she keeps riding.
+	walk = _ride_walk(her, him, cells, way, pace, 6, 0.25)
+	_check(float(walk["least_ride"]) == 1.0 and float(walk["most_back"]) < 0.0001,
+			"a 0.25 s stand between her slides while he walks on: still riding (least %.2f), her place never going back" % float(walk["least_ride"]))
+	# Off his path (a step aside, his stop): back to her own slides, and held within RIDE_MOST on the way.
+	var here := Vector2(cells.back())
+	var off := here + Vector2(1, 2).normalized() * 1.2
+	var held := true
+	for i in int(GridEntity.RIDE_BLEND_SECONDS / dt) + 2:
+		held = held and her._ride_drawn(off, dt, true).distance_to(off) <= GridEntity.RIDE_MOST + 0.0001
+	_check(held and her._ride == 0.0 and her._ride_drawn(off, dt, true) == off,
+			"a step 1.2 cells off his path: held within %.2f of her own slides, back on them in %.1f s" % [GridEntity.RIDE_MOST, GridEntity.RIDE_BLEND_SECONDS])
+	her._ride = 1.0
+	for i in int(GridEntity.RIDE_BLEND_SECONDS / dt) + 2:
+		her._ride_drawn(here, dt, false)
+	_check(her._ride == 0.0 and her._ride_drawn(here, dt, false) == here, "her slide easing to a stop: back on her own cells as it ends")
+	# Whose companion: found by her keeper_peer among the sought, this view's own player or not.
+	var mine: GridEntity = null
+	for entity: GridEntity in World.sought():
+		if is_instance_valid(entity) and entity.owner_peer != 0 and entity.spawned:
+			mine = entity
+			break
+	var found := GridEntity.new()
+	found.keeper_peer = mine.owner_peer if mine != null else -1
+	_check(mine != null and found._ride_keeper_body() == mine and her.keeper_peer != Net.local_id,
+			"her keeper found by her keeper_peer (%s); the drawing above was another player's companion's (peer %d, this view %d)" % [mine, her.keeper_peer, Net.local_id])
+	var was := Net.mode
+	Net.mode = Net.Mode.SERVER
+	found._ride_keeper = null
+	found._ride_found_msec = -GridEntity.RIDE_FIND_MSEC
+	var on_server := found._ride_keeper_body()
+	Net.mode = was
+	_check(on_server == null, "a server draws nobody so")
+	found.free()
+	her.free()
+	him.free()
+
+
+## _test_ride_path's walk: [param her] steps [param cells] at [param pace] while [param him] walks
+## [param way] 0.7 s (2.7 cells) ahead, his path begun a second before she sets off. Her drawn sideways
+## offsets from his line and her slides', once blended in; the most she is drawn off his line, from her
+## slides, her facing off his way, her nearest to him; the most her place along his path went back in a
+## frame, and her least ride once blended in. With [param stand] over 0 she stands that long between
+## her slides at [param stand_leg]'s start (no slide, none queued: a gap), he walking on.
+func _ride_walk(her: GridEntity, him: GridEntity, cells: Array[Vector2], way: Vector2, pace: float,
+		stand_leg := -1, stand := 0.0) -> Dictionary:
+	her._ride = 0.0
+	her._ride_path.clear()
+	her._ride_total = 0.0
+	her._ride_arc = -INF
+	var legs: Array[float] = []
+	for k in cells.size() - 1:
+		legs.append(cells[k].distance_to(cells[k + 1]) / pace)
+	var dt := 1.0 / 60.0
+	var lead := 0.7
+	var out := {"shown_side": [] as Array[float], "drawn_side": [] as Array[float], "most_off": 0.0, "most_from_slides": 0.0,
+			"worst_way": 0.0, "nearest_him": INF, "most_back": 0.0, "least_ride": 1.0}
+	for i in 60:
+		him.position = Iso.grid_to_local(way * pace * (lead - 1.0 + i * dt))
+		her._ride_drawn(cells[0], dt, false)
+	var time := 0.0
+	var leg := 0
+	var into := 0.0
+	var arc := -INF
+	var stood := 0.0
+	while leg < legs.size():
+		var standing := leg == stand_leg and stood < stand
+		var drawn := cells[leg].lerp(cells[leg + 1], into / legs[leg])
+		him.position = Iso.grid_to_local(way * pace * (time + lead))
+		var shown := her._ride_drawn(drawn, dt, not standing, standing)
+		if standing:
+			stood += dt
+			time += dt
+			out["least_ride"] = minf(out["least_ride"], her._ride)
+			continue
+		if time > GridEntity.RIDE_BLEND_SECONDS + 0.1:
+			(out["shown_side"] as Array[float]).append(way.cross(shown))
+			(out["drawn_side"] as Array[float]).append(way.cross(drawn))
+			out["most_off"] = maxf(out["most_off"], absf(way.cross(shown)))
+			out["least_ride"] = minf(out["least_ride"], her._ride)
+			if her._ride_way != Vector2.ZERO:
+				out["worst_way"] = maxf(out["worst_way"], absf(her._ride_way.angle_to(way)))
+		if arc != -INF and her._ride_arc != -INF:
+			out["most_back"] = maxf(out["most_back"], arc - her._ride_arc)
+		arc = her._ride_arc
+		out["most_from_slides"] = maxf(out["most_from_slides"], shown.distance_to(drawn))
+		out["nearest_him"] = minf(out["nearest_him"], shown.distance_to(way * pace * (time + lead)))
+		time += dt
+		into += dt
+		while leg < legs.size() and into >= legs[leg]:
+			into -= legs[leg]
+			leg += 1
+	return out
 
 
 ## The shown walk bends through the cell centre (decision 655).
