@@ -47,6 +47,20 @@ const POSTURE_ARM_BONES: Array[String] = ["LeftShoulder", "LeftUpperArm", "LeftL
 ## degrees, hips to shoulders). In a gait the rest of the posture plays at this share, eased with its arms
 ## (posture_arms: 1 at rest gives the whole posture, 0 in a gait gives this), so the lean is part of the bend.
 const POSTURE_GAIT_BODY := 0.65
+## The run's variation (977; Jeff, 11-17: "throwing in a some slight variation into movement so it's not just a strict
+## loop"): a people's rig (make's vary) adds two delta poses after its posture, each weighed -1 to +1 by an Add3 (its
+## "-" input the _Minus pose): "carry" (VARY_CARRY: the trunk's lean +-1.5 degrees, the elbows +-6, the shoulders' carry
+## +-2) and "look" (VARY_LOOK: the head's yaw +-4 and pitch +-2), tools/humanoid_clips.py's. Drawn only: each weight is
+## drawn from the rig's own generator (a local draw, nothing of whose body it is) at a footfall (each half of the base
+## clip's cycle) and eased to over VARY_EASE of a step (smoothstep: its steepest frame 1.5 times the even share), "carry"
+## at every footfall, "look" every VARY_LOOK_STEPS footfalls; in a gait only (gaits), eased to 0 over the blend
+## otherwise; "look" scaled by 1 - look_held (a head turned on purpose, Client3D's addressing look, has the head). The
+## legs, the timing and the pace never touched. vary_on false (the command line's --no-vary) turns the layer off.
+const VARY_CARRY: Array[String] = ["Vary_Carry_Minus", "Vary_Carry_Plus"]
+const VARY_LOOK: Array[String] = ["Vary_Look_Minus", "Vary_Look_Plus"]
+const VARY_EASE := 0.5
+const VARY_LOOK_STEPS := Vector2i(4, 10)
+static var vary_on := not "--no-vary" in OS.get_cmdline_user_args()
 ## A strike's speed is kept within these (a blow can be hurried or held back
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
@@ -111,6 +125,15 @@ var _busy_msec := 0  # A clip played once runs till then.
 var _legs := 0.0  # The legs layer's weight (legs_walk).
 var _strike_msec := 0  # A strike runs till then.
 var _rng: RandomNumberGenerator
+## The variation (VARY_CARRY): whether this rig has it, each weight's {"now", "from", "to", "eased"} ("eased" 0 to 1 over
+## VARY_EASE of a step), the footfall last drawn at ([clip, half]) and the footfalls till "look" draws again.
+var _vary := false
+var _vary_rng := RandomNumberGenerator.new()
+var _vary_w := {"carry": {"now": 0.0, "from": 0.0, "to": 0.0, "eased": 1.0}, "look": {"now": 0.0, "from": 0.0, "to": 0.0, "eased": 1.0}}
+var _vary_step: Array = ["", -1]
+var _vary_look_in := 0
+## How much of the head a purposeful turn holds (0 to 1; Client3D's addressing look): "look" yields so much.
+var look_held := 0.0
 
 
 ## A rig for [param scene] (its root node holds the skeleton) playing
@@ -118,7 +141,7 @@ var _rng: RandomNumberGenerator
 ## over [param blend_seconds]; [param upper]: whether it has the upper
 ## layer. Seeded by [param rng], loops start where they will.
 static func make(scene: Node3D, clips: AnimationLibrary, blend_seconds := 0.15, upper := true,
-		rng: RandomNumberGenerator = null) -> AnimRig:
+		rng: RandomNumberGenerator = null, vary := false) -> AnimRig:
 	var rig := AnimRig.new()
 	rig.name = "Rig"
 	rig.blend = blend_seconds
@@ -129,6 +152,8 @@ static func make(scene: Node3D, clips: AnimationLibrary, blend_seconds := 0.15, 
 	rig.player.root_node = NodePath("..")
 	rig.player.add_animation_library("", clips)
 	scene.add_child(rig)
+	rig._vary = vary and upper and VARY_CARRY.all(clips.has_animation) and VARY_LOOK.all(clips.has_animation)
+	rig._vary_rng.randomize()
 	rig._build(upper)
 	return rig
 
@@ -188,6 +213,19 @@ func _build(upper: bool) -> void:
 	_root.add_node("posture_arms", arms_add)
 	_root.connect_node("posture_arms", 0, "posture")
 	_root.connect_node("posture_arms", 1, "pose_arms")
+	var posed := "posture_arms"
+	if _vary:
+		for layer: String in ["carry", "look"]:
+			var poses: Array[String] = VARY_CARRY if layer == "carry" else VARY_LOOK
+			var add := AnimationNodeAdd3.new()
+			_root.add_node("vary_" + layer, add)
+			_root.connect_node("vary_" + layer, 1, posed)
+			for k in 2:
+				var pose := AnimationNodeAnimation.new()
+				pose.animation = poses[k]
+				_root.add_node("vary_%s_%d" % [layer, k], pose)
+				_root.connect_node("vary_" + layer, 2 * k, "vary_%s_%d" % [layer, k])
+			posed = "vary_" + layer
 	var action := AnimationNodeOneShot.new()
 	action.fadein_time = blend
 	action.fadeout_time = blend
@@ -197,7 +235,7 @@ func _build(upper: bool) -> void:
 	_root.connect_node("action_seek", 0, "action_clip")
 	_root.connect_node("action_speed", 0, "action_seek")
 	_root.add_node("action", action)
-	_root.connect_node("action", 0, "posture_arms")
+	_root.connect_node("action", 0, posed)
 	var struck := "action_speed"
 	if upper:
 		# The legs under a strike (legs_walk): the base's gait (a copy of it, legs_clip: a node's
@@ -232,6 +270,9 @@ func _build(upper: bool) -> void:
 		tree.set("parameters/sky/blend_amount", 0.0)
 	tree.set("parameters/posture/add_amount", 0.0)
 	tree.set("parameters/posture_arms/add_amount", 0.0)
+	if _vary:
+		tree.set("parameters/vary_carry/add_amount", 0.0)
+		tree.set("parameters/vary_look/add_amount", 0.0)
 	if upper:
 		tree.set("parameters/legs/blend_amount", 0.0)
 	tree.active = true
@@ -555,6 +596,57 @@ func _ease_posture_arms(delta: float) -> void:
 		tree.set("parameters/posture/add_amount", _posture_weight * posture_body())
 
 
+## Whether this rig draws the variation (VARY_CARRY; make's vary, and vary_on).
+func varies() -> bool:
+	return _vary and vary_on
+
+
+## The variation's weight [param layer] ("carry" or "look") now, -1 to +1 (look before look_held).
+func vary_weight(layer: String) -> float:
+	return float(_vary_w[layer]["now"]) if _vary else 0.0
+
+
+## Steps the variation by [param delta] seconds (_process; a test steps it): a footfall of a gait draws, else it eases.
+func _vary_ease(delta: float) -> void:
+	if not _vary:
+		return
+	var clip: String = _base_clip[_slot]
+	var length := player.get_animation(clip).length if clip != "" and player.has_animation(clip) else 0.0
+	var gait := vary_on and base_clip() in gaits and length > 0.0
+	var step_s := length / 2.0 / maxf(absf(_base_speed[_slot]), 0.01)
+	if gait:
+		var half := int(floor(base_position() / (length / 2.0)))
+		if clip != _vary_step[0] or half != _vary_step[1]:
+			_vary_step = [clip, half]
+			_vary_draw("carry")
+			_vary_look_in -= 1
+			if _vary_look_in <= 0:
+				_vary_look_in = _vary_rng.randi_range(VARY_LOOK_STEPS.x, VARY_LOOK_STEPS.y)
+				_vary_draw("look")
+	else:
+		_vary_step = ["", -1]
+		_vary_look_in = 0
+	for layer: String in _vary_w:
+		var w: Dictionary = _vary_w[layer]
+		if gait:
+			w["eased"] = minf(1.0, float(w["eased"]) + delta / maxf(step_s * VARY_EASE, 0.01))
+			w["now"] = lerpf(float(w["from"]), float(w["to"]), smoothstep(0.0, 1.0, float(w["eased"])))
+		else:
+			w["now"] = move_toward(float(w["now"]), 0.0, delta / maxf(blend, 0.01))
+			w["from"] = w["now"]
+			w["to"] = 0.0
+			w["eased"] = 1.0
+	tree.set("parameters/vary_carry/add_amount", float(_vary_w["carry"]["now"]))
+	tree.set("parameters/vary_look/add_amount", float(_vary_w["look"]["now"]) * (1.0 - clampf(look_held, 0.0, 1.0)))
+
+
+func _vary_draw(layer: String) -> void:
+	var w: Dictionary = _vary_w[layer]
+	w["from"] = w["now"]
+	w["to"] = _vary_rng.randf_range(-1.0, 1.0)
+	w["eased"] = 0.0
+
+
 ## How much of a strike's legs give way to the base's (0 its own footwork,
 ## 1 the base's gait under it): a body striking while it steps walks. Only
 ## on a rig with the upper layer (a humanoid).
@@ -672,6 +764,7 @@ func _process(delta: float) -> void:
 	_since += delta
 	_frames += 1
 	_ease_posture_arms(delta)
+	_vary_ease(delta)
 	if every <= 1 or _frames % every == 0:
 		tree.advance(_since)
 		_since = 0.0

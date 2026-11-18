@@ -264,6 +264,31 @@ CLIPS["People_Jog_Short_Loop"] = dict(CLIPS["People_Jog_Short_Loop"], arms=PEOPL
 	"settle_lag": PEOPLE_RUN_SETTLE_LAG})
 CLIPS["People_Sprint_Short_Loop"] = dict(CLIPS["People_Sprint_Short_Loop"], arms=PEOPLE_SPRINT_ARMS, body={
 	"unroll": PEOPLE_SPRINT_UNROLL, "settle": PEOPLE_RUN_SETTLE, "shoulders": PEOPLE_RUN_SHOULDERS, "settle_lag": PEOPLE_RUN_SETTLE_LAG})
+# The run's variation (977; Jeff, 11-17: "throwing in a some slight variation into movement so it's not just a strict
+# loop"): delta poses (the rest with a small bend, added as a posture is) that AnimRig's people rigs weigh -1 to +1,
+# re-drawn at each footfall; the legs never touched. "Carry": the spine bent VARY_LEAN degrees more over its three
+# bones (about 1.35 on the trunk's line, the hips to the shoulders, under the cap of 1.5: the bones turn above the
+# hips, 1.5 there read 0.64; the neck giving it back so the gaze stays), the elbows bent VARY_ELBOW more, the
+# shoulders carried VARY_SHOULDERS higher. "Look": the head turned VARY_LOOK_YAW to its left (4 there read 4.04 on
+# the woman's head, over the cap of 4) and VARY_LOOK_PITCH down (over the neck and the head). Each has its _Minus, the
+# same bend the other way (AnimationNodeAdd3's "-" input).
+VARY_LEAN = 3.2
+VARY_ELBOW = 6.0
+VARY_SHOULDERS = 2.0
+VARY_LOOK_YAW = 3.7
+VARY_LOOK_PITCH = 2.0
+def vary_carry(way: float) -> list:
+	return [("spine_01", LIFT, -VARY_LEAN * 0.3 * way), ("spine_02", LIFT, -VARY_LEAN * 0.35 * way),
+		("spine_03", LIFT, -VARY_LEAN * 0.35 * way), ("neck_01", LIFT, VARY_LEAN * way),
+		("clavicle_l", TILT, VARY_SHOULDERS * way), ("clavicle_r", TILT, -VARY_SHOULDERS * way)] + both(
+		"lowerarm", TURN, -VARY_ELBOW * way)  # The rest is a T: the forearm bends forward about the vertical.
+def vary_look(way: float) -> list:
+	return [("neck_01", TURN, VARY_LOOK_YAW * 0.5 * way), ("Head", TURN, VARY_LOOK_YAW * 0.5 * way),
+		("Head", LIFT, -VARY_LOOK_PITCH * way)]
+CLIPS["Vary_Carry_Plus"] = {"keys": [(0.0, P("rest", 0.0, vary_carry(1.0)))]}
+CLIPS["Vary_Carry_Minus"] = {"keys": [(0.0, P("rest", 0.0, vary_carry(-1.0)))]}
+CLIPS["Vary_Look_Plus"] = {"keys": [(0.0, P("rest", 0.0, vary_look(1.0)))]}
+CLIPS["Vary_Look_Minus"] = {"keys": [(0.0, P("rest", 0.0, vary_look(-1.0)))]}
 # The wade (775; Jeff: wading the hills' streams): the pack's walk with each knee lifted high out
 # of the water over its swing (the walk's swing windows, measured on its feet: the right foot off
 # the ground from 0.11 s to 0.67 s of its 1.33 s, the left half a cycle on), the arms held a little

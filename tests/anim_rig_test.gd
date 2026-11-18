@@ -45,6 +45,7 @@ func _ready() -> void:
 	await _test_people_feet()
 	_test_people_jog()
 	_test_run_body()
+	_test_run_vary()
 	await _test_gait_phases()
 	await _test_run_arms()
 	await _test_posture_arms()
@@ -3657,6 +3658,107 @@ func _test_run_body() -> void:
 			build[0], (s["trunk"] as Array).min(), (s["trunk"] as Array).max(), trunk, "; ".join(stances), hips_up, shoulders_up, lags[0] * 1000.0, lags[1] * 1000.0, pitch])
 		_check(bad.is_empty(), "%s: the jog leans from its feet, the body over the planted foot, the shoulders settling after the hips, the gaze steady (%s)" % [build[0], "; ".join(bad)])
 		model.free()
+
+
+## The run varies stride to stride (977; Jeff, 11-17: "throwing in a some slight variation into movement so it's not
+## just a strict loop"; the coordinator's terms: drawn only, the head's look yielding, a switch to turn it off). The man
+## and the woman jog VARY_SECONDS at 1/60 s on two people's rigs started together, one with the layer (AnimRig.make's
+## vary) and one without: every frame the legs (LEG_BONES and the hips) within VARY_LEGS of the plain body's, the trunk
+## (the hips to the shoulders' middle) within VARY_LEAN degrees of its lean and the head's yaw within VARY_HEAD_YAW; each
+## weight's step a frame no more than the ease's steepest (smoothstep's 1.5 times the even share of AnimRig.VARY_EASE of a
+## step); "carry" spread at least VARY_SPREAD each way and "look" drawn VARY_LOOKS times or more, and both seen in the
+## body (the lean's and the yaw's largest at least VARY_SEEN of their caps). Then: a look held (look_held 1) gives the
+## look none; vary_on false eases both to 0 within the blend; stood at Idle, both 0.
+const VARY_SECONDS := 30.0
+const VARY_LEGS := 0.001
+const VARY_LEAN := 1.5
+const VARY_HEAD_YAW := 4.0
+const VARY_SPREAD := 0.5
+const VARY_LOOKS := 4
+const VARY_SEEN := 0.5
+func _test_run_vary() -> void:
+	print("== the run varies stride to stride, drawn only ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var legs: Array[String] = ["Hips"]
+	legs.append_array(AnimRig.LEG_BONES)
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var bodies := []
+		for vary in [true, false]:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			var rig := AnimRig.make(model, lib, 0.15, true, null, vary)
+			rig.stood_as = "People_"
+			rig.gaits = PackedStringArray(["Walk", "Jog_Short", "Sprint_Short"])
+			rig.loop("Idle", 1.0, 0.0, true)
+			rig._process(0.0)
+			bodies.append([model, rig, model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D])
+		var rig: AnimRig = bodies[0][1]
+		var sk: Skeleton3D = bodies[0][2]
+		var plain_sk: Skeleton3D = bodies[1][2]
+		var bad: Array[String] = []
+		if not rig.varies() or (bodies[1][1] as AnimRig).varies():
+			bad.append("the layer on the vary rig %s, on the plain %s" % [rig.varies(), (bodies[1][1] as AnimRig).varies()])
+		for body: Array in bodies:
+			(body[1] as AnimRig).loop("Jog_Short", 1.0, 0.0, true)
+		var step_s := lib.get_animation(rig.as_played("Jog_Short")).length / 2.0
+		var steepest := 1.5 * 2.0 / (step_s * AnimRig.VARY_EASE * 60.0) + 0.0001
+		var g := func(k: Skeleton3D, b: String) -> Transform3D: return k.get_bone_global_pose(k.find_bone(b))
+		var trunk := func(k: Skeleton3D) -> float:
+			var t: Vector3 = (g.call(k, "LeftUpperArm").origin + g.call(k, "RightUpperArm").origin) * 0.5 - g.call(k, "Hips").origin
+			return rad_to_deg(atan2(t.z, t.y))
+		var yaw := func(k: Skeleton3D) -> float:
+			var z: Vector3 = g.call(k, "Head").basis.z
+			return rad_to_deg(atan2(z.x, z.z))
+		var most := {"legs": 0.0, "lean": 0.0, "yaw": 0.0, "step": 0.0, "carry_lo": 0.0, "carry_hi": 0.0}
+		var looks := {}
+		var frames := int(VARY_SECONDS * 60.0)
+		for i in frames:
+			var was := [rig.vary_weight("carry"), rig.vary_weight("look")]
+			for body: Array in bodies:
+				(body[1] as AnimRig)._process(1.0 / 60.0)
+			most["step"] = maxf(most["step"], maxf(absf(rig.vary_weight("carry") - float(was[0])), absf(rig.vary_weight("look") - float(was[1]))))
+			most["carry_lo"] = minf(most["carry_lo"], rig.vary_weight("carry"))
+			most["carry_hi"] = maxf(most["carry_hi"], rig.vary_weight("carry"))
+			looks[snappedf(float(rig._vary_w["look"]["to"]), 0.0001)] = true
+			for b: String in legs:
+				most["legs"] = maxf(most["legs"], (g.call(sk, b) as Transform3D).origin.distance_to((g.call(plain_sk, b) as Transform3D).origin))
+			most["lean"] = maxf(most["lean"], absf(float(trunk.call(sk)) - float(trunk.call(plain_sk))))
+			most["yaw"] = maxf(most["yaw"], absf(wrapf(float(yaw.call(sk)) - float(yaw.call(plain_sk)), -180.0, 180.0)))
+		if most["legs"] > VARY_LEGS:
+			bad.append("a leg %.4f m off the plain jog's" % most["legs"])
+		if most["lean"] > VARY_LEAN or most["lean"] < VARY_LEAN * VARY_SEEN:
+			bad.append("the lean %.2f deg off the plain jog's" % most["lean"])
+		if most["yaw"] > VARY_HEAD_YAW or most["yaw"] < VARY_HEAD_YAW * VARY_SEEN:
+			bad.append("the head's yaw %.2f deg off the plain jog's" % most["yaw"])
+		if most["step"] > steepest:
+			bad.append("a weight's step %.4f a frame (the ease's steepest %.4f)" % [most["step"], steepest])
+		if most["carry_lo"] > -VARY_SPREAD or most["carry_hi"] < VARY_SPREAD or looks.size() < VARY_LOOKS:
+			bad.append("carry %+.2f to %+.2f, look drawn %d times" % [most["carry_lo"], most["carry_hi"], looks.size()])
+		# A look held: the head is the turn's.
+		rig.look_held = 1.0
+		rig._process(1.0 / 60.0)
+		var held := float(rig.tree.get("parameters/vary_look/add_amount"))
+		rig.look_held = 0.0
+		# Switched off: both to 0 within the blend.
+		AnimRig.vary_on = false
+		for k in int(ceil(rig.blend * 60.0)) + 1:
+			rig._process(1.0 / 60.0)
+		var off := [rig.vary_weight("carry"), rig.vary_weight("look"), rig.varies()]
+		AnimRig.vary_on = true
+		for k in 60:
+			rig._process(1.0 / 60.0)
+		var back := absf(rig.vary_weight("carry")) + absf(rig.vary_weight("look"))
+		rig.loop("Idle", 1.0)
+		for k in int(ceil(rig.blend * 60.0)) + 30:
+			rig._process(1.0 / 60.0)
+		var stood := [rig.vary_weight("carry"), rig.vary_weight("look")]
+		if held != 0.0 or float(off[0]) != 0.0 or float(off[1]) != 0.0 or bool(off[2]) or back <= 0.0 or float(stood[0]) != 0.0 or float(stood[1]) != 0.0:
+			bad.append("the look held %.3f; switched off %s; on again %.2f; stood %s" % [held, off, back, stood])
+		print("  %s: %.0f s: legs %.5f m off, lean %.2f, head yaw %.2f deg at most; carry %+.2f to %+.2f, look drawn %d times; largest step %.4f a frame (cap %.4f)" % [
+			build[0], VARY_SECONDS, most["legs"], most["lean"], most["yaw"], most["carry_lo"], most["carry_hi"], looks.size(), most["step"], steepest])
+		_check(bad.is_empty(), "%s: the jog varies stride to stride within its caps, the legs untouched, the look yielding, off at rest and by the switch (%s)" % [build[0], "; ".join(bad)])
+		for body: Array in bodies:
+			(body[0] as Node3D).free()
 
 
 ## [param anim]'s stride on [param skeleton] over 240 samples: "pace", the planted toe's median backward

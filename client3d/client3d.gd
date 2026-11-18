@@ -25526,8 +25526,9 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	puppet.set_meta("moves", model.get("moves", {}))
 	if model.has("idle"):
 		puppet.set_meta("idle", str(model["idle"]))
+	# A person's run varies stride to stride (977: AnimRig.VARY_CARRY, drawn only).
 	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, ArtKit.feel("client3d.clip_blend", CLIP_BLEND), true,
-			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
+			puppet.get_meta("rng") if puppet.has_meta("rng") else null, bool(model.get("people_stance", false)))
 	if model.get("people_stance", false):
 		rig.stood_as = PEOPLE_PREFIX
 	# A posture's arms ease out through these (AnimRig.gaits, 953 amended (3)).
@@ -28650,6 +28651,9 @@ func _sync_addressing(resident: Resident, puppet: Node3D) -> void:
 	var step := clampf((Time.get_ticks_msec() - int(look.get_meta("eased_ms", Time.get_ticks_msec()))) / 1000.0 / LOOK_EASE, 0.0, 1.0)
 	look.set_meta("eased_ms", Time.get_ticks_msec())
 	turn.influence = move_toward(turn.influence, wanted, step)
+	var rig: AnimRig = puppet.get_meta("rig", null)
+	if rig != null:
+		rig.look_held = turn.influence  # The run's drawn look (977) gives the head to this.
 
 
 ## A resident watching someone fish (916's "watch") looks at the float: the drawn float (FishingView) of

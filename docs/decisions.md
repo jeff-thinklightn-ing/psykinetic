@@ -62023,3 +62023,20 @@ pelvis 11.6, roll 11.6; the sprint's 0.11 behind its trunk, elbows 56 at least, 
 A stop: the jog held STOP_HOLD (0.3 s) with a foot down, then crossed to Idle over CLIP_BLEND (0.15 s); the lean is
 in the clip's pelvis and leaves across that crossfade, no pop. The start/stop rows (7f78c899d) pass unchanged.
 Client only; protocol unchanged; no new class_name; no levels/ file.
+
+The variation (the second commit; Jeff, 11-17: "throwing in a some slight variation into movement so it's not just a
+strict loop"; the coordinator's terms: drawn only, a local draw, the look yielding to a head turned on purpose, a
+switch to turn it off). A people's rig (AnimRig.make's vary, Client3D's people_stance) adds two delta poses after its
+posture, each an AnimationNodeAdd3 weighed -1 to +1 (its "-" input the pose's _Minus, as Add3 adds that input at
+-amount): "carry" (the spine bent VARY_LEAN 3.2 degrees over its three bones, read 1.46 at most on the trunk's line
+under the cap of 1.5; the neck giving it back; the elbows VARY_ELBOW 6 and the shoulders' carry VARY_SHOULDERS 2) and
+"look" (the head's yaw VARY_LOOK_YAW 3.7, read 3.76 at most under the cap of 4, and pitch 2). Each weight is drawn
+from the rig's own generator (randomized: nothing of whose body it is) at a footfall, each half of the base clip's
+cycle or a change of clip, "carry" at each and "look" every 4 to 10, and eased to it over half a step by smoothstep;
+in a gait only, eased to 0 over the blend otherwise. The look is scaled by 1 - look_held, the addressing look's
+influence (Client3D._sync_addressing). The legs, the timing and the pace are never touched. --no-vary on the command
+line (AnimRig.vary_on) turns it off. anim_rig_poses_test's _test_run_vary jogs the man and the woman 30 s beside a
+plain rig: the legs 0.00000 m off, the steepest weight step 0.211 a frame under the ease's 0.218, carry over -0.92 to
++0.95 at least, the look drawn 9 times or more; a held look gives the head none, the switch and a stand bring both
+to 0. Cost, headless under the bench lock (40 jogging people, 1200 frames): 23.8 us a rig a frame with the layer, 16.9
+without, +6.9 us (0.27 ms a frame for 40). Client only; protocol unchanged; no new class_name; no levels/ file.
