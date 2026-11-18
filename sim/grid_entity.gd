@@ -1145,7 +1145,7 @@ func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false, sl
 	# Her place off her own slides moves by no more than her pace a frame (RIDE_OFFSET_PACE of it), so a
 	# ride's start, end, or a near point that leaps along his path never pops her across in one frame.
 	_ride_offset = _ride_offset.move_toward(aim, RIDE_OFFSET_PACE * maxf(pace, RIDE_ACROSS_PACE) * minf(delta, RIDE_BLEND_FRAME))
-	if _ride >= 0.5:
+	if _ride >= 0.5 and not near.is_empty():  # His path lost at this draw (a jump, a level's change): her slide's own way.
 		_ride_way = ride_ahead(_ride_path, near, LOOK_AHEAD)
 	_ride_shown = drawn + _ride_offset
 	_ride_shown_on = _ride > 0.0
@@ -1246,8 +1246,10 @@ static func ride_nearest(path: Array[Vector2], at: Vector2, least := -INF, most 
 
 
 ## 655 amended (3): the way from [param near] (ride_nearest's) to the point [param reach] on along
-## [param path] toward its newest point, or as far as it goes; ZERO with nowhere ahead.
+## [param path] toward its newest point, or as far as it goes; ZERO with nowhere ahead, or no near (an empty one).
 static func ride_ahead(path: Array[Vector2], near: Array, reach: float) -> Vector2:
+	if near.size() < 3:
+		return Vector2.ZERO
 	var from: Vector2 = near[0]
 	var left := reach
 	var point := from

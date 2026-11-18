@@ -34202,6 +34202,26 @@ ends, she is on her cell within a frame of its end and never stood off it on the
 pace in a 30th of a second; _test_ride_path's wide staircase never goes back along his way.
 Client only; protocol unchanged; no new class_name.
 
+655 amended (4) (decision_number.sh's label; the coordinator's call, 2026-11-18, the v0.1.233 cut held
+on net_test's "no instance printed errors (got 72, want 0)": phase 7's companion client, Jo's, printed
+12 of "SCRIPT ERROR: Out of bounds get index '0' (on base: 'Array') at: ride_ahead (grid_entity.gd:1251),
+from _process"): a ride whose path is lost at a draw. ride_nearest gives [] for a path of under two
+points (his drawn place jumped over RIDE_JUMP, a change of level or a link: the path begins again with
+one point) and for a ride's window with no point of his kept path in it (she behind all RIDE_KEPT of
+it); (3)'s look-ahead for her facing (_ride_way, while _ride is 0.5 or more) indexed it unguarded, while
+_ride, eased, was still up. Now it is taken only with a near point, and ride_ahead gives ZERO for none.
+On such a frame she is drawn on her own slides with what is left of her offset eased out at her pace
+(RIDE_OFFSET_PACE, as any ride's end: never popped, never undrawn), facing her slide's own way
+(_ride_way ZERO, _look_ahead), and rides again once his path has two points near her. The other
+indexings read: the three of near[0] and near[1] in _ride_drawn are behind not near.is_empty();
+ride_starts returns false on an empty near and indexes path[next] and path[next - 1] with next from 1
+to the path's last; _ride_note's back() is behind is_empty() and its slice from i - 1 has i at least 1;
+ride_ahead's loop runs from near[2], within the path. view_test _test_ride_lost_path: riding with an
+offset of 0.3, he jumps to another place, or her window is put behind all his kept path; on 057990653
+each printed the script error (9 in all, the scene failed on it); with this none, that frame drawn
+0.055 from the frame before (her pace a frame 0.110), ride way ZERO, on her own slide within 42 frames.
+Client only; protocol unchanged; no new class_name.
+
 ### The war hammer swings one-handed
 
 The coordinator, on the hand pass's cut: the war hammer (hands 1) shared Axe_Overhead, now

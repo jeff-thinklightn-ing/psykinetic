@@ -152,6 +152,7 @@ func _ready() -> void:
 		_test_ride_path()
 		_test_ride_set_off()
 		_test_ride_ends()
+		_test_ride_lost_path()
 		_test_pine_stands()
 		_test_ground_textures()
 		_test_canopy_mask()
@@ -22330,6 +22331,54 @@ func _test_ride_ends() -> void:
 	walk = _ride_end_walk(her, him, cells, way, pace, 1.0)
 	_check(float(walk["long_offset"]) <= GridEntity.RIDE_OFFSET_PACE * pace * GridEntity.RIDE_BLEND_FRAME + 0.0001,
 			"a 0.49 s frame mid-ride: her place off her own slides moves %.3f of a cell in it, no more than her pace in a 30th of a second" % float(walk["long_offset"]))
+	her.free()
+	him.free()
+
+
+## The v0.1.233 cut's net_test (phase 7, Jo's companion client): a ride whose path to his drawn place is
+## lost at a draw (12 of "Out of bounds get index '0'" at ride_ahead from _ride_drawn). Riding, he jumps
+## (a change of level: his path begins again, one point), or she falls behind all his kept path (nothing
+## in her window): she is drawn on her own slides with what is left of her offset eased out at her pace,
+## facing her slide's own way, never undrawn nor popped.
+func _test_ride_lost_path() -> void:
+	print("\n== a ride whose path is lost at a draw: back on her own slides, no error, no pop (655 amended (3)) ==")
+	var him := GridEntity.new()
+	him.owner_peer = 9
+	him.spawned = true
+	var her := GridEntity.new()
+	her.keeper_peer = 9
+	her._ride_keeper = him
+	var way := Vector2(1, 0)
+	var pace := 3.3
+	var cells: Array[Vector2] = [Vector2.ZERO]
+	for k in 10:
+		cells.append(cells.back() + way)
+	var dt := 1.0 / 60.0
+	var step_most := GridEntity.RIDE_OFFSET_PACE * maxf(pace, GridEntity.RIDE_ACROSS_PACE) * GridEntity.RIDE_BLEND_FRAME + 0.0001
+	var settle := int((GridEntity.RIDE_BLEND_SECONDS + GridEntity.RIDE_MOST / GridEntity.RIDE_ACROSS_PACE) / dt) + 2
+	for lost in ["he jumps (a change of level: his path one point)", "she is behind all his kept path (nothing in her window)"]:
+		_ride_walk(her, him, cells, way, pace)
+		# Riding, on a slide toward his path's newest point, her offset toward it.
+		var drawn: Vector2 = cells.back() - way * 1.5
+		her._ride = 1.0
+		her._ride_offset = Vector2(0.0, 0.3)
+		her._ride_shown_on = true
+		her._ride_last_drawn = drawn
+		var before: Vector2 = drawn + her._ride_offset
+		if lost.begins_with("he jumps"):
+			him.position = Iso.grid_to_local(Vector2(60, 40))
+		else:
+			her._ride_arc = her._ride_total - (GridEntity.RIDE_KEPT + 5.0)
+		var first: Variant = her._ride_drawn(drawn, dt, true, false, way, 0.2, pace)
+		var first_way := her._ride_way
+		var moved: float = (first as Vector2).distance_to(before) if first is Vector2 else INF
+		var got: Variant = first
+		for i in settle:
+			got = her._ride_drawn(drawn, dt, true, false, way, 0.2, pace)
+		var on_own: bool = got is Vector2 and (got as Vector2).distance_to(drawn) < 0.0001
+		_check(moved <= step_most and first_way == Vector2.ZERO and on_own,
+				"%s: that frame drawn %s, %.3f from the frame before (her pace a frame %.3f), facing her slide's way (ride way %s); on her own slide in %d frames (%s)" % [
+					lost, first, moved, step_most, first_way, settle, on_own])
 	her.free()
 	him.free()
 
