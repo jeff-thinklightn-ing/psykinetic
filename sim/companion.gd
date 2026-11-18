@@ -8653,8 +8653,12 @@ func _follow() -> void:
 	var distance := World.distance(tile, keeper.tile)
 	# Her player stalking: she keeps still till they are farther off, and
 	# closes less (decision 332), so fewer of her steps reach the animal.
-	var quiet := stalking() != null
-	if distance >= (STALK_START if quiet else heel.start) and not _catching_up:
+	# Only while they stand or creep (task 4): walking on, they are not keeping
+	# still for it, and the band was a stand then an unpaced run behind them
+	# on a road with a rabbit in sight (the probe's (219,201); not the ground).
+	# Her voice still hears they stalk it (stalking()).
+	var quiet := stalking() != null and not Heel.walking_on(keeper)
+	if distance >=(STALK_START if quiet else heel.start) and not _catching_up:
 		_catching_up = true
 	if quiet:
 		if _catching_up and distance <= STALK_CLOSE:

@@ -59,6 +59,9 @@ var start := START
 ## their own.
 var paces := false
 var base_ticks := -1.0
+## Her paced step time against his while she has fallen more than STOP + 1
+## behind him (task 4): a little quicker, never under her own (base_ticks).
+const CATCH_UP := 0.9
 ## The tick follow last set her pace (Companion._sim_tick unpaces once it is stale).
 var paced_tick := -1
 ## She has set off after the leader and not yet closed in.
@@ -236,7 +239,9 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 
 
 ## [param body]'s step time for a step toward [param goal] (paces, 485
-## amended (2)): onto a footstep of his (_trail) next to her while [param leader] walks on, the time he takes to cross a cell
+## amended (2), every step on his trail since task 4): any step of hers toward a footstep
+## of his (_trail) while [param leader] walks on, the time he takes to cross a cell
+## (CATCH_UP of it while she is more than STOP + 1 behind him)
 ## (World.step_ticks his way, a free body's slant at root two, not the
 ## grid's DIAGONAL_TICK_SCALE), as her move_ticks for her step's way
 ## (over what her own load, state and ground make of it), never under her
@@ -249,13 +254,21 @@ func _pace(body: GridEntity, leader: GridEntity, goal: Vector2i) -> void:
 	if base_ticks < 0.0:
 		base_ticks = body.move_ticks
 	var want := base_ticks
-	var way := goal - body.tile
-	if goal != NONE and _trail.has(goal) and walking_on(leader) and World.distance(body.tile, goal) == 1:
+	var way := Vector2i(signi(goal.x - body.tile.x), signi(goal.y - body.tile.y))
+	# Every step for one of his footsteps while he walks on, not only the one
+	# onto a footstep next to her (task 4, Jeff 11-17: "companion trails you
+	# still in a zig zag"): a step for one two cells off went at her own
+	# quicker pace, and she ran, then stood.
+	if goal != NONE and _on_trail and walking_on(leader) and goal != body.tile:
 		var his_way := travel(leader)
 		var his := World.step_ticks(leader, his_way, leader.tile)
 		if World.free_body(leader) and his_way.x != 0 and his_way.y != 0:
 			his = his / World.DIAGONAL_TICK_SCALE * sqrt(2.0)  # A free body's slant crosses a cell in its straight time times root two.
 		var hers := World.step_ticks(body, way, body.tile) / maxf(body.move_ticks, 0.0001)
+		# Fallen behind (more than STOP + 1 off him): a little quicker than he
+		# goes, so the gap closes evenly instead of a run and a stand.
+		if World.distance(body.tile, leader.tile) > STOP + 1:
+			his *= CATCH_UP
 		want = maxf(base_ticks, his / maxf(hers, 0.01))
 	if absf(body.move_ticks - want) > 0.001:
 		body.move_ticks = want

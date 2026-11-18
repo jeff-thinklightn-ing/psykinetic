@@ -7434,6 +7434,20 @@ Facts drop exact repeats, so a kind is noted once a place.
 Rejected: a companion who hunts on her own (she follows her
 player's lead); warning of wolves by day, when they leave people be unless
 in a pack (her sighting is still told as any sighting).
+
+332 amended (1): the stalk band only while he keeps still for it (the
+script's label; task 4, Jeff 11-17: "companion trails you still in a zig
+zag"; the coordinator's ruling on companions' probe of physics's road walk).
+The band (STALK_START 5, STALK_CLOSE 3) took her follow whenever any
+harmless animal was in his sight, a walking player too: on the wilds' road
+a rabbit at (230,207) came 7 off him at (223,201), and she stood four ticks,
+then ran unpaced to 3 off, then stood. That was the stand physics counted at
+(219,201), the stalk rule and not the ground. Now Companion._follow keeps the
+band only while he stands or creeps (not Heel.walking_on); walking on, she
+follows by Heel, paced (485 amended (6)), an animal in sight or not. Her
+quiet voice is kept: stalking() still says he stalks it. companion_test
+_test_wild (she hangs back when he stops near game) passes unchanged;
+_test_paced_past_game is the road walk.
 ## 318. A slain monster leaves its kind's drops where it fell
 
 A monster killed (World.damage at 0 hp, not spared) leaves what its kind's
@@ -17284,6 +17298,26 @@ on a straight walk, steps paced, and is back on her own pace once not
 following. Animation measures it on its laptop probe and physics on its
 client rerun (lag 0 and 150 ms): no standing frames mid-follow while he
 walks steadily, heading swings over 20 degrees in under 10% of windows.
+
+485 amended (6): every step on his trail paced, and a little quicker behind
+(the script's label; task 4, Jeff 11-17: "companion trails you still in a
+zig zag which is quite obvious to me visually"; physics's count,
+C:/dev/review/physics/trail_1118/count.txt, and the coordinator's approval).
+(2)'s pace held only for a step onto a footstep next to her: one toward a
+footstep two cells off went at her own quicker pace (move_ticks 2 against
+his 2.5 a cell on the wilds' road), so she ran up and stood. Heel._pace now
+paces any step of hers toward a footstep of his (on his trail, _on_trail)
+while he walks on, for that step's own way; while she is more than STOP + 1
+off him she takes CATCH_UP (0.9) of his time, never under base_ticks, so a
+gap closes evenly instead of in a run and a stand. The stand physics found
+at (219,201) on that road was 332's stalk rule (332 amended (1)), not the
+ground: the probe read both cells' step ticks at 2.5, and her trail and goal
+frozen from the tick a rabbit at (230,207) came 7 off him. companion_test
+_test_paced_past_game: physics's road walk, (207,201) east to (232,201) with
+that rabbit in sight; she stands no longer than 3 ticks while he walks, no
+step of hers on his trail takes under 0.9 of his, and she is at his heel
+when he stops (on main: a 4-tick stand, and her steps from (221,201) on at
+2.0 ticks). Server only; protocol unchanged; no new class_name.
 
 Amended (Jeff: "no birds at night, maybe owls bats"): birds belong to the
 day only. The drips' take with birds (freesound 841641) is dropped, and the

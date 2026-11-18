@@ -180,6 +180,7 @@ func _ready() -> void:
 	_test_lead_to_near_water()  # Loads the wilds and back.
 	_test_return_cell_his_side()  # Loads the wilds and back.
 	_test_fight_leash()  # Loads the wilds and back.
+	_test_paced_past_game()  # Loads the wilds and back.
 	_test_greets_once_across_zones()  # Moves by the console to sample and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_speech_floor()  # Late: its five calm quarter hours move the clock on (917).
@@ -4871,6 +4872,80 @@ func _test_first_words() -> void:
 ## some other line of hers went out, and ui-design's Mughouse tour (main f71c32a66) heard "Well,
 ## here we are in Umbrage" after each of its seven console moves in 165 s. Her greeting alone here:
 ## no wish follows it (told), as indoors where a yes could do nothing.
+## Physics's road walk (task 4, Jeff 11-17: "companion trails you still in a
+## zig zag"), the wilds' road (207,201) east to (232,201), a rabbit at
+## (230,207) coming into his sight on the way: she follows on his footsteps
+## at his pace the whole walk, no stand longer than a step's gap, no step of
+## hers on his line quicker than CATCH_UP of his. On main the rabbit put her
+## on 332's stalk band from (223,201): a stand till he was 5 off, an unpaced
+## run to 3, a stand again.
+## Heel.CATCH_UP, written out so the row runs (and fails) on a main without it.
+const CATCH_UP_TICKS := 0.9
+
+func _test_paced_past_game() -> void:
+	print("\n== the road past a rabbit: she walks his footsteps at his pace, no stalk stand while he walks (task 4) ==")
+	var was := String(World.zone.name)
+	if not _main.load_map("wilds"):
+		_check(false, "the wilds load")
+		return
+	var owner := _player()
+	var pet := _companion()
+	if owner == null or pet == null or not pet.spawned or pet.zone != "wilds":
+		_check(false, "a player and her companion in the wilds (%s, %s)" % [owner, pet])
+		_main.load_map(was)
+		return
+	_kill_monsters()
+	var owner_was := owner.tile
+	var rabbit := _spawn_wild("rabbit", Vector2i(230, 207))
+	_put(owner, Vector2i(207, 201))
+	owner.free_pos = Vector2(207, 201)
+	_put(pet, Vector2i(205, 203))
+	_settle(pet)
+	for i in 20:
+		World.free_input(owner, Vector2.ZERO, World.TICK_DT)
+		World.step()
+	var his_ticks := World.step_ticks(owner, Vector2i(1, 0))
+	var her_was := pet.tile
+	var started := false
+	var stand := 0
+	var longest := 0
+	var stalked := 0
+	var quick: Array[String] = []
+	var steps := 0
+	for i in 120:
+		var go := Vector2(1, 0) if owner.free_pos.x < 231.0 else Vector2(minf(1.0, maxf(0.0, 232.0 - owner.free_pos.x) * his_ticks), 0)
+		World.free_input(owner, go, World.TICK_DT)
+		World.step()
+		var walking := owner.free_pos.x < 231.99
+		if pet.stalking() == rabbit and walking:
+			stalked += 1
+		var stepped := pet.tile != her_was
+		if stepped:
+			steps += 1
+			# The step's own time (a diagonal one is longer than move_ticks).
+			var took := World.step_ticks(pet, pet.tile - her_was, her_was)
+			if walking and started and pet.heel._on_trail and took < his_ticks * CATCH_UP_TICKS - 0.01:
+				quick.append("%s in %.2f" % [pet.tile, took])
+		her_was = pet.tile
+		var moving := stepped or World.tick < pet.step_until
+		started = started or stepped
+		if started and walking and not moving:
+			stand += 1
+			longest = maxi(longest, stand)
+		else:
+			stand = 0
+		if not walking and not moving and World.tick > pet.step_until + 10:
+			break
+	_check(stalked > 0, "(the rabbit came into his sight on the road: %d ticks)" % stalked)
+	_check(longest <= 3 and steps >= 20, "she never stands longer than a step's gap while he walks (longest %d ticks, 3 at most; %d steps)" % [longest, steps])
+	_check(quick.is_empty(), "no step of hers on his footsteps quicker than %.1f of his %.2f ticks (%s)" % [CATCH_UP_TICKS, his_ticks, quick])
+	_check(World.distance(pet.tile, owner.tile) <= Heel.STOP + 1, "and she is at his heel when he stops (%s, him %s)" % [pet.tile, owner.tile])
+	World.despawn(rabbit)
+	_put(owner, owner_was)
+	_put(pet, _main._nearest_free(owner_was + Vector2i(1, 0)))
+	_main.load_map(was)
+
+
 func _test_greets_once_across_zones() -> void:
 	print("\n== her first words once: a change of level does not greet her player again (929 amended (2)) ==")
 	_kill_monsters()
