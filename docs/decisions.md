@@ -34158,7 +34158,24 @@ two are before she rides (her server's first step, from in front of him to his s
 (drawn from his path onto her own cell); her drawn speed over her gait's pace, by tenths of a second,
 has a median of 0.91 there and 0.99 to 1.05 on the road, the diagonal and the square. His own clicked
 route on a slant (a few legs with a half-cell kink, 4 swings in 18 cells) is left as it is: she copies
-it. view_test _test_ride_path: her staircase under his 2:1 slant is drawn with 0 swings (14 for her
+it. On the diagonal the look branch drew her 4 swings, up to 0.19 off his line, where main drew 1: she
+had followed him to the walk's start, so she stood on the path he came by, in front of him, and as he
+set off toward her and her server stepped her back through him, the ride took her onto that path (its
+stretch there runs against the way he now walks), then off again as he passed. So a ride starts only
+once she is behind him (not ahead of his newest point along his last RIDE_BEHIND of path) with her
+slide heading within RIDE_HEADS (cosine 0.5) of both his last way and his path where it is nearest her
+(ride_starts); riding, the rule is as before, and until it starts she is drawn on her cells as on main.
+Joined with it, on the look branch's other takes, with a second client (another player standing in sight)
+logging her too: the diagonal 0 swings on both clients (she set off beside him that run, so the row
+below stands for the set-off in front of him), the slant 6 against his 4 on his own client and 4 against
+his 2 on the second (his drawn line there, from the server's snapshots, swings less); on both, her drawn
+place is a median 0.000 off his drawn path, at most 0.98 (the slant's set-off, on her own cells); never
+under 0.5 of him; every frame she is drawn ahead of him is one on her own cells, at a set-off.
+view_test _test_ride_set_off: he came down his line and stood, she in front of him on that way in, he
+sets off through her as her server steps her back: no ride while she steps back and he passes, then
+riding from her second step on behind him, on his line, never drawn ahead of him; ride_starts takes a
+slide along his path or a slant of it behind him, never one across it, against it, standing, or ahead
+of him. view_test _test_ride_path: her staircase under his 2:1 slant is drawn with 0 swings (14 for her
 cell steps alone), within 0.02 of his line, facing within 2 degrees of it, never over 0.75 from her own
 slides, her place along his path never going back; a staircase whose corners lie 0.89 off his line is
 ridden all the way; a 0.25 s stand between her slides keeps her riding; 1.2 cells off his path she is

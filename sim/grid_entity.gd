@@ -140,7 +140,10 @@ const STOP_EASE_TICKS := 2.0
 ## path only goes on, by no more a frame than twice her own slides' move and RIDE_ON_SLACK (the nearest
 ## point otherwise leapt back to an earlier stretch of his, 0.7 of a cell in a frame). She is never
 ## drawn more than RIDE_MOST from where her own slides put her, and blends on and off over RIDE_BLEND_SECONDS. Her gait still reads her slide's pace
-## (step_pace). Drawing only, on any view that draws her (her keeper's, another player's, a host's):
+## (step_pace). A ride starts only once she is behind him (not ahead of his newest point along his last
+## way) and her slide heads his way (within RIDE_HEADS of his path where it is nearest her): set off from in
+## front of him, she was drawn onto the path he came by while her server stepped her aside as he passed
+## (the joined diagonal, 4 swings against her cells' 1). Drawing only, on any view that draws her (her keeper's, another player's, a host's):
 ## never a server's.
 const RIDE_KEPT := 6.0
 const RIDE_SAMPLE := 0.1
@@ -151,6 +154,8 @@ const RIDE_GAP_SECONDS := 0.3
 const RIDE_ON_SLACK := 0.02
 const RIDE_MOST := 0.75
 const RIDE_BEHIND := 0.5
+## The least cosine between her slide and his path where a ride may start (60 degrees).
+const RIDE_HEADS := 0.5
 const RIDE_BLEND_SECONDS := 0.3
 ## A keeper not found is looked for again after this long (the roster is read once).
 const RIDE_FIND_MSEC := 500
@@ -883,7 +888,7 @@ func _process(delta: float) -> void:
 			# 655 amended (3): a companion behind her keeper drawn on his path.
 			var rides := sliding and not knocked and not _present and not _settle and _told.is_empty()
 			var between := not sliding and not _present and not _settle and _told.is_empty()
-			position = Iso.grid_to_local(_ride_drawn(drawn, delta, rides, between) if keeper_peer != 0 else drawn)
+			position = Iso.grid_to_local(_ride_drawn(drawn, delta, rides, between, Vector2(to - _from_tile)) if keeper_peer != 0 else drawn)
 			stepping = sliding and not knocked
 			step_pace = 0.0
 			if stepping and _move_duration > 0.0:
@@ -1032,9 +1037,10 @@ func _look_ahead(drawn: Vector2, to: Vector2i) -> Vector2:
 ## 655 amended (3): where a body with a keeper is drawn this frame: [param drawn] (where its own slides
 ## put it), or toward the nearest point of its keeper's drawn path, by _ride; [param rides] whether this
 ## frame's slide may ride (stepping, not knocked, pushed, settling or told); [param between] whether it
-## stands between slides, none of those (a gap a ride keeps for RIDE_GAP_SECONDS). Keeps the path, eases
+## stands between slides, none of those (a gap a ride keeps for RIDE_GAP_SECONDS); [param slide_way] her
+## slide's own way, cells (a ride starts only with one heading his way, ride_starts). Keeps the path, eases
 ## _ride, and sets _ride_way.
-func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false) -> Vector2:
+func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false, slide_way := Vector2.ZERO) -> Vector2:
 	_ride_way = Vector2.ZERO
 	var him := _ride_keeper_body()
 	if him == null:
@@ -1057,7 +1063,7 @@ func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false) ->
 	_ride_gap = 0.0 if rides else _ride_gap + delta
 	var going := rides or between and _ride > 0.0 and _ride_gap <= RIDE_GAP_SECONDS
 	var reach := RIDE_KEEP if _ride > 0.0 else RIDE_NEAR
-	if going and not near.is_empty() and float(near[1]) >= RIDE_BEHIND and (near[0] as Vector2).distance_to(drawn) <= reach:
+	if going and not near.is_empty() and float(near[1]) >= RIDE_BEHIND and (near[0] as Vector2).distance_to(drawn) <= reach 			and (_ride > 0.0 or ride_starts(_ride_path, near, drawn, slide_way)):
 		want = 1.0
 	_ride = move_toward(_ride, want, delta / RIDE_BLEND_SECONDS)
 	if _ride <= 0.0:
@@ -1070,6 +1076,30 @@ func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false) ->
 	if _ride >= 0.5:
 		_ride_way = ride_ahead(_ride_path, near, LOOK_AHEAD)
 	return shown
+
+
+## 655 amended (3): whether a ride may start: [param at] (her drawn place) not ahead of his newest point
+## along his last RIDE_BEHIND of path, and [param way] (her slide's) within RIDE_HEADS both of that last way
+## of his and of his path where it is nearest her ([param near], ride_nearest's): the path he came by can
+## run against the way he walks now (he turned back through her). False with no way.
+static func ride_starts(path: Array[Vector2], near: Array, at: Vector2, way: Vector2) -> bool:
+	if way == Vector2.ZERO or near.is_empty():
+		return false
+	var next := int(near[2])
+	var along := path[next] - path[next - 1]
+	if along == Vector2.ZERO or way.normalized().dot(along.normalized()) < RIDE_HEADS:
+		return false
+	var newest: Vector2 = path.back()
+	var back := newest
+	var left := RIDE_BEHIND
+	for k in range(path.size() - 2, -1, -1):
+		left -= path[k].distance_to(path[k + 1])
+		back = path[k]
+		if left <= 0.0:
+			break
+	if newest == back:
+		return true
+	return (newest - at).dot(newest - back) >= 0.0 and way.normalized().dot((newest - back).normalized()) >= RIDE_HEADS
 
 
 ## 655 amended (3): adds [param his] (his drawn place) to the kept path, a point each RIDE_SAMPLE, the

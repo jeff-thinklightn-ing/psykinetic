@@ -150,6 +150,7 @@ func _ready() -> void:
 		_test_cone_lift()
 		_test_bent_walk()
 		_test_ride_path()
+		_test_ride_set_off()
 		_test_pine_stands()
 		_test_ground_textures()
 		_test_canopy_mask()
@@ -22210,6 +22211,97 @@ func _test_ride_path() -> void:
 	him.free()
 
 
+## 655 amended (3), the joined diagonal: he came to his start with her following, so she stands on the
+## path he came by, in front of him, and he sets off toward her; her server steps her back toward him as he
+## comes on (he walks through her), then on behind him. She rides only once behind him with her slide heading his way: until then she is
+## drawn on her cells (a ride onto the path he came by drew her 0.19 off her steps, 4 swings).
+func _test_ride_set_off() -> void:
+	print("\n== a companion he sets off toward is drawn on her cells until she is behind him, heading his way (655 amended (3)) ==")
+	var him := GridEntity.new()
+	him.owner_peer = 9
+	him.spawned = true
+	var her := GridEntity.new()
+	her.keeper_peer = 9
+	her._ride_keeper = him
+	var way := Vector2(1, 1).normalized()
+	var pace := 3.9
+	var dt := 1.0 / 60.0
+	# He came down his line from (6, 6) to (0, 0) and stood a second; she stands at (2, 2), on that way in.
+	for i in 140:
+		var t := i * dt
+		him.position = Iso.grid_to_local(Vector2(6, 6).lerp(Vector2.ZERO, minf(t * pace / Vector2(6, 6).length(), 1.0)))
+		her._ride_drawn(Vector2(2, 2), dt, false, true)
+	# Her slides, as joined ((192,190) to (191,189) as he set off from (190,188)): back toward him as he comes
+	# on, through her; a stand while he passes; then on behind him, (1, 1) each.
+	var slides: Array = [[0.1, Vector2(2, 2), Vector2(1, 1)]]
+	var at := 0.8
+	var cell := Vector2(1, 1)
+	for k in 10:
+		slides.append([at, cell, cell + Vector2(1, 1)])
+		cell += Vector2(1, 1)
+		at += Vector2(1, 1).length() / pace
+	var shown_side: Array[float] = []
+	var drawn_side: Array[float] = []
+	var ridden_early := 0.0
+	var ridden_late := 1.0  # The least while she follows, once blended in, to her last slide's end.
+	var ahead := 0
+	var time := 0.0
+	while time < at + 0.4:
+		him.position = Iso.grid_to_local(way * pace * time)
+		var drawn: Vector2 = slides[0][1]
+		var slide_way := Vector2.ZERO
+		var sliding := false
+		for s: Array in slides:
+			var length := (s[2] as Vector2).distance_to(s[1]) / pace
+			if time >= float(s[0]):
+				drawn = s[2]
+				if time < float(s[0]) + length:
+					drawn = (s[1] as Vector2).lerp(s[2], (time - float(s[0])) / length)
+					slide_way = (s[2] as Vector2) - (s[1] as Vector2)
+					sliding = true
+		var shown := her._ride_drawn(drawn, dt, sliding, not sliding, slide_way)
+		shown_side.append(way.cross(shown))
+		drawn_side.append(way.cross(drawn))
+		if time < 0.8:
+			ridden_early = maxf(ridden_early, her._ride)
+		elif time > 0.8 + Vector2(1, 1).length() / pace + GridEntity.RIDE_BLEND_SECONDS and time < at:
+			ridden_late = minf(ridden_late, her._ride)
+		if time > 0.8 and way.dot(shown) > way.dot(way * pace * time) - 0.3:
+			ahead += 1
+		time += dt
+	var swings := func(side: Array[float]) -> int:
+		var count := 0
+		var direction := 0
+		var anchor := side[0]
+		for p in side:
+			var d := p - anchor
+			if direction == 0 and absf(d) >= 0.05:
+				direction = int(signf(d))
+				anchor = p
+			elif direction != 0 and signf(d) == direction:
+				anchor = p
+			elif direction != 0 and absf(d) >= 0.05:
+				count += 1
+				direction = -direction
+				anchor = p
+		return count
+	var her_swings: int = swings.call(shown_side)
+	var steps_swings: int = swings.call(drawn_side)
+	_check(ridden_early == 0.0, "set off toward her: on her own cells while she steps back against his way and he passes (ride at most %.2f)" % ridden_early)
+	_check(her_swings <= steps_swings + 1 and ridden_late == 1.0 and absf(shown_side.back()) < 0.02,
+			"then riding behind him from her second step on (least %.2f), on his line: %d sideways swings drawn (her cell steps alone %d), %.3f off it at the end" % [ridden_late, her_swings, steps_swings, absf(shown_side.back())])
+	_check(ahead == 0, "never drawn ahead of him or through him once she follows (%d frames within 0.3 of him along his way)" % ahead)
+	# A slide across his path, or against it, starts no ride; along it, behind him, one does.
+	var path: Array[Vector2] = [Vector2(0, 0), Vector2(1, 0), Vector2(2, 0), Vector2(3, 0)]
+	var near := GridEntity.ride_nearest(path, Vector2(1, 0.2))
+	_check(GridEntity.ride_starts(path, near, Vector2(1, 0.2), Vector2(1, 0)) and GridEntity.ride_starts(path, near, Vector2(1, 0.2), Vector2(1, -1))
+			and not GridEntity.ride_starts(path, near, Vector2(1, 0.2), Vector2(0, -1)) and not GridEntity.ride_starts(path, near, Vector2(1, 0.2), Vector2(-1, 0))
+			and not GridEntity.ride_starts(path, near, Vector2(1, 0.2), Vector2.ZERO) and not GridEntity.ride_starts(path, GridEntity.ride_nearest(path, Vector2(3.4, 0)), Vector2(3.4, 0), Vector2(1, 0)),
+			"a ride starts on a slide along his path or a slant of it behind him; never across it, against it, standing, or ahead of him")
+	her.free()
+	him.free()
+
+
 ## _test_ride_path's walk: [param her] steps [param cells] at [param pace] while [param him] walks
 ## [param way] 0.7 s (2.7 cells) ahead, his path begun a second before she sets off. Her drawn sideways
 ## offsets from his line and her slides', once blended in; the most she is drawn off his line, from her
@@ -22241,7 +22333,7 @@ func _ride_walk(her: GridEntity, him: GridEntity, cells: Array[Vector2], way: Ve
 		var standing := leg == stand_leg and stood < stand
 		var drawn := cells[leg].lerp(cells[leg + 1], into / legs[leg])
 		him.position = Iso.grid_to_local(way * pace * (time + lead))
-		var shown := her._ride_drawn(drawn, dt, not standing, standing)
+		var shown := her._ride_drawn(drawn, dt, not standing, standing, cells[leg + 1] - cells[leg])
 		if standing:
 			stood += dt
 			time += dt
