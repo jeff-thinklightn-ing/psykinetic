@@ -34179,8 +34179,27 @@ of him. view_test _test_ride_path: her staircase under his 2:1 slant is drawn wi
 cell steps alone), within 0.02 of his line, facing within 2 degrees of it, never over 0.75 from her own
 slides, her place along his path never going back; a staircase whose corners lie 0.89 off his line is
 ridden all the way; a 0.25 s stand between her slides keeps her riding; 1.2 cells off his path she is
-held within 0.75 and back on her slides in 0.3 s; her keeper is found
+held within 0.75 and back on her slides in 0.68 s; her keeper is found
 by keeper_peer, the row's keeper another player's (peer 9, the view's own 1); a server finds none.
+Her ends (ui-design's laptop look of the look branch, the coordinator's terms, 11-18): at his stop on
+every slant and diagonal walk she reached the end of his path, stood there 250 to 290 ms in Jog_Short
+0.1 to 0.4 short of her cell (Client3d's STOP_HOLD plays the gait 0.3 s past a stand), then eased 0.4
+to 0.6 s across; a ride's start or end popped her 0.27 to 0.38 of a cell in one frame, and a 491 ms
+frame slid her sideways off her standing cell at set-off. Now once his drawn path has not grown for
+RIDE_STILL_SECONDS (0.1) he stands: no ride starts or keeps, and hers fades by what is left of her
+queued slides (with none left, across at her pace, RIDE_ACROSS_PACE (2.0) at least), so she is drawn
+onto her cell the frame her own slides land her there. Her place off her own slides is eased toward the
+ride's by at most RIDE_OFFSET_PACE (1.0) of her pace a frame, and a frame's share of the blend and of
+that is taken from at most RIDE_BLEND_FRAME (1/30 s) of it. Riding, held by RIDE_MOST off a cell step
+that goes off his line, she is kept on that ring no farther back along his way than the frame before
+(the hold alone dragged her back with the step, 3 frames standing). Joined (the probe, his client and a
+second's, the diagonal, two 2:1 slants, a steep slant and the road): drawn on her cell 0 ms after her
+own slides land her there on every walk, never stood off it, never in a moving clip while standing;
+her largest frame step by a ride's start or end 0.076 to 0.138 against a median 0.066 to 0.071; no
+turn-back drawn but her cells' own. view_test _test_ride_ends: he stops 0.6 s before her last slide
+ends, she is on her cell within a frame of its end and never stood off it on the way, her largest step
+(by the ride's ends too) at most twice her median, a 0.49 s frame moves her offset no more than her
+pace in a 30th of a second; _test_ride_path's wide staircase never goes back along his way.
 Client only; protocol unchanged; no new class_name.
 
 ### The war hammer swings one-handed

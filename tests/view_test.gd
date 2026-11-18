@@ -151,6 +151,7 @@ func _ready() -> void:
 		_test_bent_walk()
 		_test_ride_path()
 		_test_ride_set_off()
+		_test_ride_ends()
 		_test_pine_stands()
 		_test_ground_textures()
 		_test_canopy_mask()
@@ -22171,8 +22172,9 @@ func _test_ride_path() -> void:
 	var wide_steps: float = 0.0
 	for p: float in walk["drawn_side"]:
 		wide_steps = maxf(wide_steps, absf(p))
-	_check(float(walk["least_ride"]) == 1.0 and float(walk["most_off"]) <= wide_steps - GridEntity.RIDE_MOST + 0.01 and wide_steps > 0.85,
-			"a staircase whose corners lie %.2f off his line: ridden all the way, drawn at most %.3f off it" % [wide_steps, float(walk["most_off"])])
+	_check(float(walk["least_ride"]) == 1.0 and float(walk["most_off"]) <= wide_steps - GridEntity.RIDE_MOST + 0.01 and wide_steps > 0.85
+			and float(walk["shown_back"]) < 0.0001,
+			"a staircase whose corners lie %.2f off his line: ridden all the way, drawn at most %.3f off it, never back along his way (%.4f)" % [wide_steps, float(walk["most_off"]), float(walk["shown_back"])])
 	# Joined on the slant she stood 0.22 s between two slides while he walked on: she keeps riding.
 	walk = _ride_walk(her, him, cells, way, pace, 6, 0.25)
 	_check(float(walk["least_ride"]) == 1.0 and float(walk["most_back"]) < 0.0001,
@@ -22181,12 +22183,14 @@ func _test_ride_path() -> void:
 	var here := Vector2(cells.back())
 	var off := here + Vector2(1, 2).normalized() * 1.2
 	var held := true
-	for i in int(GridEntity.RIDE_BLEND_SECONDS / dt) + 2:
+	# Back on them once the blend has gone and her offset has eased in at RIDE_ACROSS_PACE (no pace given).
+	var settle := GridEntity.RIDE_BLEND_SECONDS + GridEntity.RIDE_MOST / GridEntity.RIDE_ACROSS_PACE
+	for i in int(settle / dt) + 2:
 		held = held and her._ride_drawn(off, dt, true).distance_to(off) <= GridEntity.RIDE_MOST + 0.0001
 	_check(held and her._ride == 0.0 and her._ride_drawn(off, dt, true) == off,
-			"a step 1.2 cells off his path: held within %.2f of her own slides, back on them in %.1f s" % [GridEntity.RIDE_MOST, GridEntity.RIDE_BLEND_SECONDS])
+			"a step 1.2 cells off his path: held within %.2f of her own slides, back on them in %.2f s" % [GridEntity.RIDE_MOST, settle])
 	her._ride = 1.0
-	for i in int(GridEntity.RIDE_BLEND_SECONDS / dt) + 2:
+	for i in int(settle / dt) + 2:
 		her._ride_drawn(here, dt, false)
 	_check(her._ride == 0.0 and her._ride_drawn(here, dt, false) == here, "her slide easing to a stop: back on her own cells as it ends")
 	# Whose companion: found by her keeper_peer among the sought, this view's own player or not.
@@ -22302,6 +22306,110 @@ func _test_ride_set_off() -> void:
 	him.free()
 
 
+## 655 amended (3), the ride's ends (task 4, the coordinator's laptop look of 11-18): at his stop on a slant
+## she stood 250 to 290 ms in Jog_Short 0.1 to 0.4 short of her cell, then eased across; she popped 0.27 to
+## 0.38 a cell in a frame as a ride began or ended, and slid sideways after a 491 ms frame.
+func _test_ride_ends() -> void:
+	print("\n== a companion's ride ends as her slides do at his stop, and never pops (655 amended (3)) ==")
+	var him := GridEntity.new()
+	him.owner_peer = 9
+	him.spawned = true
+	var her := GridEntity.new()
+	her.keeper_peer = 9
+	her._ride_keeper = him
+	var way := Vector2(2, -1).normalized()
+	var pace := 3.9
+	var cells: Array[Vector2] = [Vector2.ZERO]
+	for k in 12:
+		cells.append(cells.back() + (Vector2(1, -1) if k % 2 == 0 else Vector2(1, 0)))
+	var walk := _ride_end_walk(her, him, cells, way, pace)
+	_check(float(walk["stood_off"]) == 0.0 and float(walk["on_after_end"]) <= 1.0 / 60.0 + 0.0001,
+			"he stops, her last slides end %.2f s later: on her own cell %.3f s after they end, never stood off it on the way (%.3f s)" % [float(walk["left_at_stop"]), float(walk["on_after_end"]), float(walk["stood_off"])])
+	_check(float(walk["edge_most"]) <= 2.0 * float(walk["median"]) and float(walk["most"]) <= 2.0 * float(walk["median"]),
+			"her largest frame step %.3f (%.3f by the ride's start or end) against her median %.3f: never over twice it" % [float(walk["most"]), float(walk["edge_most"]), float(walk["median"])])
+	walk = _ride_end_walk(her, him, cells, way, pace, 1.0)
+	_check(float(walk["long_offset"]) <= GridEntity.RIDE_OFFSET_PACE * pace * GridEntity.RIDE_BLEND_FRAME + 0.0001,
+			"a 0.49 s frame mid-ride: her place off her own slides moves %.3f of a cell in it, no more than her pace in a 30th of a second" % float(walk["long_offset"]))
+	her.free()
+	him.free()
+
+
+## _test_ride_ends' walk: [param him] walks [param way] at [param pace] 0.7 s ahead of [param her] on
+## [param cells] and stops 0.6 s before her last slide ends; with [param long_at] at or over 0, one frame
+## that long into her walk is 0.49 s. Her moving steps' median and largest (shown), the largest within 5
+## frames of her ride starting or ending, how long after her last slide's end she is on her last cell and
+## how long she stood drawn still off it after his stop, and the long frame's change of her offset.
+func _ride_end_walk(her: GridEntity, him: GridEntity, cells: Array[Vector2], way: Vector2, pace: float, long_at := -1.0) -> Dictionary:
+	her._ride = 0.0
+	her._ride_path.clear()
+	her._ride_total = 0.0
+	her._ride_arc = -INF
+	her._ride_offset = Vector2.ZERO
+	her._ride_shown_on = false
+	her._ride_still = 0.0
+	var legs: Array[float] = []
+	var total := 0.0
+	for k in cells.size() - 1:
+		legs.append(cells[k].distance_to(cells[k + 1]) / pace)
+		total += legs.back()
+	var lead := 0.7
+	var stop := total - 0.6
+	for i in 60:
+		him.position = Iso.grid_to_local(way * pace * (lead - 1.0 + i / 60.0))
+		her._ride_drawn(cells[0], 1.0 / 60.0, false)
+	var shown_at: Array[Vector2] = []
+	var rides: Array[float] = []
+	var times: Array[float] = []
+	var long_offset := 0.0
+	var time := 0.0
+	var long_done := false
+	while time < total + 0.6:
+		var dt := 1.0 / 60.0
+		if long_at >= 0.0 and time >= long_at and not long_done:
+			dt = 0.49
+			long_done = true
+		time += dt
+		him.position = Iso.grid_to_local(way * pace * (minf(time, stop) + lead))
+		var leg := 0
+		var into := minf(time, total)
+		while leg < legs.size() - 1 and into > legs[leg]:
+			into -= legs[leg]
+			leg += 1
+		var drawn := cells[leg].lerp(cells[leg + 1], minf(into / legs[leg], 1.0))
+		var sliding := time < total
+		var before := her._ride_offset
+		shown_at.append(her._ride_drawn(drawn, dt, sliding, not sliding, cells[leg + 1] - cells[leg], maxf(total - time, 0.0), pace))
+		if dt > 0.1:
+			long_offset = her._ride_offset.distance_to(before)
+		rides.append(her._ride)
+		times.append(time)
+	var steps: Array[float] = [0.0]
+	for i in range(1, shown_at.size()):
+		steps.append(shown_at[i].distance_to(shown_at[i - 1]) if times[i] - times[i - 1] < 0.1 else 0.0)
+	var moving: Array[float] = []
+	for s in steps:
+		if s > 0.005:
+			moving.append(s)
+	moving.sort()
+	var edge_most := 0.0
+	for i in range(1, rides.size()):
+		if (rides[i - 1] <= 0.0) != (rides[i] <= 0.0):
+			for j in range(maxi(1, i - 5), mini(steps.size(), i + 6)):
+				edge_most = maxf(edge_most, steps[j])
+	var on := INF
+	var stood_off := 0.0
+	for i in range(1, shown_at.size()):
+		if times[i] < stop:
+			continue
+		var off := shown_at[i].distance_to(cells.back())
+		if off <= 0.02 and on == INF:
+			on = times[i]
+		if on == INF and steps[i] <= 0.001 and off > 0.02:
+			stood_off += times[i] - times[i - 1]
+	return {"median": moving[moving.size() / 2], "most": moving.back(), "edge_most": edge_most, "on_after_end": on - total,
+			"stood_off": stood_off, "left_at_stop": total - stop, "long_offset": long_offset}
+
+
 ## _test_ride_path's walk: [param her] steps [param cells] at [param pace] while [param him] walks
 ## [param way] 0.7 s (2.7 cells) ahead, his path begun a second before she sets off. Her drawn sideways
 ## offsets from his line and her slides', once blended in; the most she is drawn off his line, from her
@@ -22314,13 +22422,17 @@ func _ride_walk(her: GridEntity, him: GridEntity, cells: Array[Vector2], way: Ve
 	her._ride_path.clear()
 	her._ride_total = 0.0
 	her._ride_arc = -INF
+	her._ride_offset = Vector2.ZERO
+	her._ride_shown_on = false
+	her._ride_still = 0.0
 	var legs: Array[float] = []
 	for k in cells.size() - 1:
 		legs.append(cells[k].distance_to(cells[k + 1]) / pace)
 	var dt := 1.0 / 60.0
 	var lead := 0.7
 	var out := {"shown_side": [] as Array[float], "drawn_side": [] as Array[float], "most_off": 0.0, "most_from_slides": 0.0,
-			"worst_way": 0.0, "nearest_him": INF, "most_back": 0.0, "least_ride": 1.0}
+			"worst_way": 0.0, "nearest_him": INF, "most_back": 0.0, "least_ride": 1.0, "shown_back": 0.0}
+	var last_on := -INF
 	for i in 60:
 		him.position = Iso.grid_to_local(way * pace * (lead - 1.0 + i * dt))
 		her._ride_drawn(cells[0], dt, false)
@@ -22343,6 +22455,9 @@ func _ride_walk(her: GridEntity, him: GridEntity, cells: Array[Vector2], way: Ve
 			(out["shown_side"] as Array[float]).append(way.cross(shown))
 			(out["drawn_side"] as Array[float]).append(way.cross(drawn))
 			out["most_off"] = maxf(out["most_off"], absf(way.cross(shown)))
+			if last_on != -INF:
+				out["shown_back"] = maxf(out["shown_back"], last_on - way.dot(shown))
+			last_on = way.dot(shown)
 			out["least_ride"] = minf(out["least_ride"], her._ride)
 			if her._ride_way != Vector2.ZERO:
 				out["worst_way"] = maxf(out["worst_way"], absf(her._ride_way.angle_to(way)))

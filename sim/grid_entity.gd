@@ -142,8 +142,15 @@ const STOP_EASE_TICKS := 2.0
 ## drawn more than RIDE_MOST from where her own slides put her, and blends on and off over RIDE_BLEND_SECONDS. Her gait still reads her slide's pace
 ## (step_pace). A ride starts only once she is behind him (not ahead of his newest point along his last
 ## way) and her slide heads his way (within RIDE_HEADS of his path where it is nearest her): set off from in
-## front of him, she was drawn onto the path he came by while her server stepped her aside as he passed
-## (the joined diagonal, 4 swings against her cells' 1). Drawing only, on any view that draws her (her keeper's, another player's, a host's):
+## front of him, she was drawn onto the path he came by while her server stepped her back through him as
+## he passed (the joined diagonal, 4 swings against her cells' 1). Her ends: once his path has not grown
+## for RIDE_STILL_SECONDS he stands, and her ride ends as her queued slides do, so she is drawn onto her
+## cell as her own slides land her there (at his stop on a slant she stood 250 to 290 ms short of it in a
+## moving clip, then eased across). Her place off her own slides changes a frame by at most
+## RIDE_OFFSET_PACE of her pace (RIDE_ACROSS_PACE at least), over at most RIDE_BLEND_FRAME of a frame (a
+## ride's start or end popped her 0.27 to 0.38 of a cell in a frame, and a 491 ms frame slid her sideways),
+## and while the RIDE_MOST hold binds her place along his way never goes back (a cell step off his line
+## dragged her back with it). Drawing only, on any view that draws her (her keeper's, another player's, a host's):
 ## never a server's.
 const RIDE_KEPT := 6.0
 const RIDE_SAMPLE := 0.1
@@ -157,6 +164,15 @@ const RIDE_BEHIND := 0.5
 ## The least cosine between her slide and his path where a ride may start (60 degrees).
 const RIDE_HEADS := 0.5
 const RIDE_BLEND_SECONDS := 0.3
+## A frame's share of the blend is taken from at most this much of it: a long frame's (a hitch, 491 ms)
+## blend would leap her sideways.
+const RIDE_BLEND_FRAME := 1.0 / 30.0
+## He stands once his drawn path has not grown this long; her ride then ends as her slides do.
+const RIDE_STILL_SECONDS := 0.1
+## The least pace (cells a second) she is drawn across onto her cell at once her slides have ended.
+const RIDE_ACROSS_PACE := 2.0
+## How fast, against her own pace, her ride's offset from her own slides may change a frame.
+const RIDE_OFFSET_PACE := 1.0
 ## A keeper not found is looked for again after this long (the roster is read once).
 const RIDE_FIND_MSEC := 500
 ## His path takes this much of a jump as a new path (a link, a respawn): RIDE_KEPT's points are dropped.
@@ -458,6 +474,16 @@ var _ride_gap := 0.0
 var _ride_total := 0.0
 var _ride_arc := -INF
 var _ride_last_drawn := Vector2.ZERO
+## How long his drawn path has not grown (seconds): over RIDE_STILL_SECONDS he stands.
+var _ride_still := 0.0
+## Her drawn place off her own slides' (grid units): eased toward the ride's each frame.
+var _ride_offset := Vector2.ZERO
+## Whether the last frame drew her by the ride (_process): a frame drawn some other way (told, knocked,
+## set down) starts her offset again from where she was shown.
+var _ride_rode := false
+## Where the ride drew her last frame (grid units), and whether she was riding then.
+var _ride_shown := Vector2.ZERO
+var _ride_shown_on := false
 var _from_tile := Vector2i.ZERO
 ## Where the slide being shown starts, in grid space: _from_tile's cell, or
 ## wherever the body was drawn when a present push took it (see _present).
@@ -677,6 +703,8 @@ func _notification(what: int) -> void:
 func forget(gone: GridEntity) -> void:
 	if shelter_lead == gone:
 		shelter_lead = null
+	if _ride_keeper == gone:
+		_ride_keeper = null  # Found again by keeper_peer the next frame, if he is still drawn (655 amended (3)).
 	if action_target == gone:
 		action_order = Order.NONE
 		action_target = null
@@ -774,6 +802,8 @@ func _display_caught_up() -> void:
 
 
 func _process(delta: float) -> void:
+	var rode := _ride_rode
+	_ride_rode = false
 	var wanted := Vector2(facing)
 	var rate := TURN_RATE
 	var by_cells := false  # Drawn by its cell slides (a grid body), not a free body's centre.
@@ -888,7 +918,20 @@ func _process(delta: float) -> void:
 			# 655 amended (3): a companion behind her keeper drawn on his path.
 			var rides := sliding and not knocked and not _present and not _settle and _told.is_empty()
 			var between := not sliding and not _present and not _settle and _told.is_empty()
-			position = Iso.grid_to_local(_ride_drawn(drawn, delta, rides, between, Vector2(to - _from_tile)) if keeper_peer != 0 else drawn)
+			var at := drawn
+			if keeper_peer != 0:
+				# What is left of her slides on the clock she is drawn by (seconds), and this one's pace.
+				var end := _move_tick + _move_duration
+				for slide: Dictionary in _slides:
+					end = maxf(end, float(slide["tick"]) + float(slide["duration"]))
+				var left := maxf(end - now, 0.0) * World.TICK_DT
+				var pace := _from_pos.distance_to(Vector2(to)) / (_move_duration * World.TICK_DT) if _move_duration > 0.0 else 0.0
+				if not rode:
+					_ride_offset = Iso.local_to_grid(position) - drawn
+					_ride_shown_on = false
+				at = _ride_drawn(drawn, delta, rides, between, Vector2(to - _from_tile), left, pace)
+				_ride_rode = true
+			position = Iso.grid_to_local(at)
 			stepping = sliding and not knocked
 			step_pace = 0.0
 			if stepping and _move_duration > 0.0:
@@ -1040,15 +1083,23 @@ func _look_ahead(drawn: Vector2, to: Vector2i) -> Vector2:
 ## stands between slides, none of those (a gap a ride keeps for RIDE_GAP_SECONDS); [param slide_way] her
 ## slide's own way, cells (a ride starts only with one heading his way, ride_starts). Keeps the path, eases
 ## _ride, and sets _ride_way.
-func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false, slide_way := Vector2.ZERO) -> Vector2:
+func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false, slide_way := Vector2.ZERO, left := 0.0, pace := 0.0) -> Vector2:
 	_ride_way = Vector2.ZERO
 	var him := _ride_keeper_body()
 	if him == null:
 		_ride_path.clear()
 		_ride = 0.0
 		_ride_arc = -INF
+		_ride_offset = Vector2.ZERO
+		_ride_shown_on = false
 		return drawn
+	if _ride_offset.length() > RIDE_JUMP or _ride_last_drawn.distance_to(drawn) > RIDE_JUMP:
+		_ride_offset = Vector2.ZERO
+	var noted := _ride_total
+	var points := _ride_path.size()
 	_ride_note(Iso.local_to_grid(him.position))
+	_ride_still = 0.0 if _ride_total != noted or _ride_path.size() != points else _ride_still + delta
+	var stands := _ride_still >= RIDE_STILL_SECONDS
 	var near := []
 	if _ride > 0.0 and _ride_arc != -INF:
 		# Riding: her place along his path goes on from the last frame's, never back, and by no more than
@@ -1061,21 +1112,44 @@ func _ride_drawn(drawn: Vector2, delta: float, rides: bool, between := false, sl
 	_ride_arc = _ride_total - float(near[1]) if not near.is_empty() else -INF
 	var want := 0.0
 	_ride_gap = 0.0 if rides else _ride_gap + delta
-	var going := rides or between and _ride > 0.0 and _ride_gap <= RIDE_GAP_SECONDS
+	var going := not stands and (rides or between and _ride > 0.0 and _ride_gap <= RIDE_GAP_SECONDS)
 	var reach := RIDE_KEEP if _ride > 0.0 else RIDE_NEAR
 	if going and not near.is_empty() and float(near[1]) >= RIDE_BEHIND and (near[0] as Vector2).distance_to(drawn) <= reach 			and (_ride > 0.0 or ride_starts(_ride_path, near, drawn, slide_way)):
 		want = 1.0
-	_ride = move_toward(_ride, want, delta / RIDE_BLEND_SECONDS)
+	var blend := minf(delta, RIDE_BLEND_FRAME) / RIDE_BLEND_SECONDS
+	if want == 0.0 and stands and _ride > 0.0 and not near.is_empty():
+		# He stands: off his path as her slides end, so she comes onto her own cell as she stops on it,
+		# never first stood short of it on his path and eased across; with none left, across at her pace.
+		var off := (near[0] as Vector2).distance_to(drawn)
+		var by := _ride * minf(minf(delta, RIDE_BLEND_FRAME) / left, 1.0) if left > 0.0 else 0.0
+		if left <= 0.0 and off > 0.0:
+			by = maxf(pace, RIDE_ACROSS_PACE) * minf(delta, RIDE_BLEND_FRAME) / off
+		blend = maxf(blend, by)
+	_ride = move_toward(_ride, want, blend)
 	if _ride <= 0.0:
 		_ride_arc = -INF
-	if _ride <= 0.0 or near.is_empty():
-		return drawn
-	var shown := drawn.lerp(near[0] as Vector2, _ride)
-	if shown.distance_to(drawn) > RIDE_MOST:
-		shown = drawn + (shown - drawn).limit_length(RIDE_MOST)
+	var aim := Vector2.ZERO
+	if _ride > 0.0 and not near.is_empty():
+		var whole := drawn.lerp(near[0] as Vector2, _ride) - drawn
+		aim = whole.limit_length(RIDE_MOST)
+		var ahead := ride_ahead(_ride_path, near, LOOK_AHEAD)
+		if want == 1.0 and _ride_shown_on and ahead != Vector2.ZERO and whole.length() > RIDE_MOST:
+			# Riding, held within RIDE_MOST of a cell step that goes off his line: kept on that ring no
+			# farther back along his way than last frame (the clamp alone dragged her back with the step).
+			var dir := ahead.normalized()
+			var a := _ride_shown.dot(dir) - drawn.dot(dir)
+			if aim.dot(dir) < a:
+				var side := Vector2(-dir.y, dir.x)
+				var b := sqrt(maxf(RIDE_MOST * RIDE_MOST - a * a, 0.0)) * (1.0 if side.dot(aim) >= 0.0 else -1.0)
+				aim = dir * clampf(a, -RIDE_MOST, RIDE_MOST) + side * b
+	# Her place off her own slides moves by no more than her pace a frame (RIDE_OFFSET_PACE of it), so a
+	# ride's start, end, or a near point that leaps along his path never pops her across in one frame.
+	_ride_offset = _ride_offset.move_toward(aim, RIDE_OFFSET_PACE * maxf(pace, RIDE_ACROSS_PACE) * minf(delta, RIDE_BLEND_FRAME))
 	if _ride >= 0.5:
 		_ride_way = ride_ahead(_ride_path, near, LOOK_AHEAD)
-	return shown
+	_ride_shown = drawn + _ride_offset
+	_ride_shown_on = _ride > 0.0
+	return _ride_shown
 
 
 ## 655 amended (3): whether a ride may start: [param at] (her drawn place) not ahead of his newest point
