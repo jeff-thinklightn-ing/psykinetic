@@ -38719,8 +38719,25 @@ _test_hitch_eased: after a 0.1 s frame his largest drawn step is 0.085 of a cell
 0.074 (without this, 0.400 against 0.066), drawn out within 80 frames, and the server walks 0.40
 cells more than the same walk without the long frame. Joined (the probe on the look branch, a 519 ms
 frame on the road): his largest drawn step 0.105 against a median 0.067, the frame after a 24 ms one.
-controls_test and level_test (the niche's rows) pass beside it. Client only; protocol unchanged; no
-new class_name.
+controls_test and level_test (the niche's rows) pass beside it. ui-design's laptop look (11-18): on
+atlas, where frames ran about 11 and 30 ms by turns (a still saved every third frame), the frames after
+a stall read 0.19 to 0.23 of a cell against 0.10 to 0.12 on even frames: judged against the frame before
+alone, every 30 ms frame after an 11 ms one was eased, its walk drawn on the short frames after, so his
+steps ran longest on the shortest frames, and one of a stall's two frames after was a save's 30 ms one.
+So a frame is judged against the longest of the last HITCH_FRAMES (8), each counted as at most
+HITCH_TYPICAL_MOST (0.05 s): an uneven but steady rate eases nothing, and a 0.1 s frame among 11 and 30
+ms ones still is. free_net_test _test_hitch_eased: frames of 11 and 30 ms by turns hold under 0.01 of a
+cell back and are drawn at 3.98 to 4.05 cells a second (judged against the frame before alone, 0.70 held
+and 2.11 to 6.32); a 0.1 s frame among them is eased, his speed after it 4.97 against his pace 4.00 (7.06).
+ui-design's second look, joined (11-18, 22 forced 500 ms stalls a walk): his largest step in a stall's
+frame and the 2 after is 0.120 (atlas h_road) and 0.210 (atlas hc_road, saving stills), against main's
+0.40, and 0.171 (2.5 times his median) on lenovo's h_road with no stills saved, so the coordinator's row
+of twice his median is not met joined. Lenovo's hc_road gave one 0.496 step (7.3 times) at its first
+stall (dt 534 ms), its others 0.17 to 0.18: that stall came two frames after a 480 ms frame that was no
+forced stall, and the 0.496 was the 11 ms frame after it, more than the lag's drawing out gives a frame
+that short (about 4% of it), so what was held back was likely drawn at once, as a correction shown at
+once drops the lag; that run logged no lag or correction, so the cause is not shown.
+Client only; protocol unchanged; no new class_name.
 
 ## 688, combat's side: blows and shots from a free body
 

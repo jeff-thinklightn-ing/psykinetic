@@ -161,26 +161,36 @@ class Own:
 	## A frame of [param delta] seconds holding [param intent]: the commands
 	## to send now ([] between sends). Standing still makes none: the walk's
 	## last command goes as it stops, and is sent again twice more.
-	## 688 amended (15): a frame over HITCH_RATIO times the one before (a
-	## hitch: Main gives it up to 0.1 s of walk) is drawn moving only the
-	## frame before's share of it, the rest put in [member lag] and drawn out
+	## 688 amended (15): a frame over HITCH_RATIO times the frames before it
+	## (the longest of the last HITCH_FRAMES, each taken as at most
+	## HITCH_TYPICAL_MOST: a laptop's frames ran 11 and 30 ms by turns, and
+	## against the one before alone every 30 ms one was eased, his steps then
+	## longest on the short frames) is a hitch (Main gives it up to 0.1 s of
+	## walk), drawn moving only those frames' share of it, the rest put in [member lag] and drawn out
 	## over HITCH_BLEND_SECONDS (at most about 0.3 of his pace on top: the
 	## correction's BLEND_SECONDS put a 0.07 step on a 0.07 one, the frame
 	## after); the commands carry the whole time.
 	func hold(entity: GridEntity, intent: Vector2, delta: float) -> Array[Dictionary]:
 		var before := shown(entity) if base != Vector2.INF else Vector2.INF
 		var out := _hold(entity, intent, delta)
-		var last := _last_delta
-		_last_delta = delta
+		var last := 0.0
+		for d in _recent_deltas:
+			last = maxf(last, d)
+		_recent_deltas.append(minf(delta, HITCH_TYPICAL_MOST))
+		if _recent_deltas.size() > HITCH_FRAMES:
+			_recent_deltas.remove_at(0)
 		if before != Vector2.INF and last > 0.0 and delta > last * HITCH_RATIO:
 			var step := shown(entity) - before
 			if step.length() < BLEND_MAX:
 				lag -= step * (1.0 - last / delta)
 		return out
 
-	## The frame before's delta (hold), 0 before the first.
-	var _last_delta := 0.0
-	## How many times the frame before a frame must be to be eased as a hitch (688 amended (15)).
+	## The last HITCH_FRAMES frames' deltas (hold), each at most HITCH_TYPICAL_MOST, oldest first.
+	var _recent_deltas: Array[float] = []
+	## How many frames before a frame its length is judged against, and the most one of them counts as (s).
+	const HITCH_FRAMES := 8
+	const HITCH_TYPICAL_MOST := 0.05
+	## How many times the frames before a frame it must be to be eased as a hitch (688 amended (15)).
 	const HITCH_RATIO := 2.0
 	## The share of a long frame's walk not yet drawn (hold), drawn out over HITCH_BLEND_SECONDS.
 	var lag := Vector2.ZERO

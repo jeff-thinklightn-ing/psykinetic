@@ -596,6 +596,43 @@ func _test_hitch_eased() -> void:
 	var more := walked - (player.free_pos.x - 1.0)
 	_check(absf(more - 0.1 * pace) < 0.05 and agrees,
 			"the server walked the long frame's 0.1 s too (%.2f cells more than the same walk without it, at %.2f a second), and the view agrees" % [more, pace])
+	# ui-design's laptop (atlas, hc_road): frames of 11 and 30 ms by turns, a still saved every third. Judged
+	# against the frame before alone, every 30 ms one was eased: his steps ran longest on the short frames,
+	# and the frames after a stall (one of them a save's 30 ms) read 0.19 to 0.23 against 0.10 on even ones.
+	player = _build(OPEN, Vector2i(1, 2))
+	player.owner_peer = Net.local_id
+	own = FreeNet.Own.new()
+	player.free_view = own
+	var clock := [0.0]
+	var uneven := func(delta: float) -> float:
+		var before := own.shown(player)
+		var sent := own.hold(player, Vector2.RIGHT, delta)
+		if not sent.is_empty():
+			player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+			World.take_free(player, sent)
+		clock[0] += delta
+		while clock[0] >= World.TICK_DT:
+			clock[0] -= World.TICK_DT
+			World.step()
+			player.pack_free()
+		return own.shown(player).distance_to(before) / delta
+	for i in 40:  # Its first frames (judged against fewer than HITCH_FRAMES) may leave a little lag, drawn out.
+		uneven.call(0.011 if i % 3 != 2 else 0.030)
+	var most_lag := 0.0
+	var speeds: Array[float] = []
+	for i in 60:
+		speeds.append(uneven.call(0.011 if i % 3 != 2 else 0.030))
+		most_lag = maxf(most_lag, own.lag.length())
+	speeds.sort()
+	_check(most_lag < 0.01 and speeds[speeds.size() - 3] <= speeds[2] * 1.25,
+			"frames of 11 and 30 ms by turns are none of them a hitch (lag at most %.4f), his drawn speed alike on each (%.2f to %.2f cells a second)" % [most_lag, speeds[2], speeds[speeds.size() - 3]])
+	uneven.call(0.1)
+	var eased := own.lag.length() > 0.01
+	var after := 0.0
+	for i in 6:
+		after = maxf(after, uneven.call(0.011 if i % 3 != 2 else 0.030))
+	_check(eased and after <= pace * 1.5,
+			"a 0.1 s frame among them is eased (%s), his drawn speed the frames after at most %.2f cells a second against his pace %.2f" % [eased, after, pace])
 
 
 ## Cells a second a player walks the open room east at (its free glide's pace).
