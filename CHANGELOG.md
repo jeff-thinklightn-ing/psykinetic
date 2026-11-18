@@ -17,6 +17,9 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, keep their count when you die, log out or travel, and a bundle you pick up with your bow out joins those in your hand (619 amended (4), 619 amended (5)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.233
+
 - Your companion follows along the path you walked, facing the way they go, keeps your pace on a road, and when you set off through them steps aside once and falls in behind you; after a long stall your own character walks smoothly on (655 amended (3)).
 
 ## v0.1.232
