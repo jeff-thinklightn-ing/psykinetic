@@ -21777,6 +21777,7 @@ func _far_jump_to(entity: GridEntity, cell: Vector2i, how: String) -> Vector2:
 			var own: FreeNet.Own = entity.free_view
 			own.base = Vector2.INF
 			own.error = Vector2.ZERO
+			own.lag = Vector2.ZERO
 			own.pending.clear()
 			own.open_intent = Vector2.ZERO
 			own.open_seconds = 0.0

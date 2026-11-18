@@ -78,6 +78,7 @@ static func put(rig: Client3D, entity: GridEntity, cell: Vector2i) -> void:
 		var own: FreeNet.Own = entity.free_view
 		own.base = Vector2.INF
 		own.error = Vector2.ZERO
+		own.lag = Vector2.ZERO
 		own.pending.clear()
 		own.open_intent = Vector2.ZERO
 		own.open_seconds = 0.0

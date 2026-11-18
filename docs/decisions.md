@@ -38702,6 +38702,26 @@ beside a rush along the next row, his centre 0.15 off its cells, he holds his li
 this he was put out to 1.00); his centre in a told cell, the rush meets him there. Server only,
 protocol unchanged, no new class_name.
 
+688 amended (15) (decision_number.sh's label; the coordinator's task 4, the hitch take; run beside
+dungeon's niche rows, 608 amended (10)): a long frame's walk is drawn eased in, not in one frame.
+Physics' trail probe, a headless client joined to a local server, on the road with one 532 ms frame
+made on purpose: he was drawn 0.067 of a cell a frame (median), stood through the long frame, then
+drawn 0.399 in one 27 ms frame. Main._free_drive gives a frame up to 0.1 s of walk (minf(delta,
+0.1)), and FreeNet.Own closed it and glided its view by it at once. Now FreeNet.Own.hold draws a
+frame over HITCH_RATIO (2) times the one before moving only the frame before's share of its step;
+the rest goes into its lag (FreeNet.Own.lag, apart from the correction's error), drawn out over
+HITCH_BLEND_SECONDS (0.3), at most about 0.3 of his pace on top of a frame's (under BLEND_MAX only; a
+bigger step is drawn as before). First built into the error, it blended out over BLEND_SECONDS (0.1)
+and joined put a 0.07 step on his 0.07 the frame after (0.143 against a 0.067 median). The commands
+still carry the whole time, so the server walks him as before and the niche's lean (608 amended
+(10)) spends the same held time. A steady frame rate, however slow, eases nothing. free_net_test
+_test_hitch_eased: after a 0.1 s frame his largest drawn step is 0.085 of a cell against a median
+0.074 (without this, 0.400 against 0.066), drawn out within 80 frames, and the server walks 0.40
+cells more than the same walk without the long frame. Joined (the probe on the look branch, a 519 ms
+frame on the road): his largest drawn step 0.105 against a median 0.067, the frame after a 24 ms one.
+controls_test and level_test (the niche's rows) pass beside it. Client only; protocol unchanged; no
+new class_name.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float

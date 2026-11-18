@@ -161,8 +161,34 @@ class Own:
 	## A frame of [param delta] seconds holding [param intent]: the commands
 	## to send now ([] between sends). Standing still makes none: the walk's
 	## last command goes as it stops, and is sent again twice more.
+	## 688 amended (15): a frame over HITCH_RATIO times the one before (a
+	## hitch: Main gives it up to 0.1 s of walk) is drawn moving only the
+	## frame before's share of it, the rest put in [member lag] and drawn out
+	## over HITCH_BLEND_SECONDS (at most about 0.3 of his pace on top: the
+	## correction's BLEND_SECONDS put a 0.07 step on a 0.07 one, the frame
+	## after); the commands carry the whole time.
 	func hold(entity: GridEntity, intent: Vector2, delta: float) -> Array[Dictionary]:
+		var before := shown(entity) if base != Vector2.INF else Vector2.INF
+		var out := _hold(entity, intent, delta)
+		var last := _last_delta
+		_last_delta = delta
+		if before != Vector2.INF and last > 0.0 and delta > last * HITCH_RATIO:
+			var step := shown(entity) - before
+			if step.length() < BLEND_MAX:
+				lag -= step * (1.0 - last / delta)
+		return out
+
+	## The frame before's delta (hold), 0 before the first.
+	var _last_delta := 0.0
+	## How many times the frame before a frame must be to be eased as a hitch (688 amended (15)).
+	const HITCH_RATIO := 2.0
+	## The share of a long frame's walk not yet drawn (hold), drawn out over HITCH_BLEND_SECONDS.
+	var lag := Vector2.ZERO
+	const HITCH_BLEND_SECONDS := 0.3
+
+	func _hold(entity: GridEntity, intent: Vector2, delta: float) -> Array[Dictionary]:
 		error = error.move_toward(Vector2.ZERO, error.length() * minf(delta / BLEND_SECONDS, 1.0) + 0.0001)
+		lag = lag.move_toward(Vector2.ZERO, lag.length() * minf(delta / HITCH_BLEND_SECONDS, 1.0) + 0.0001)
 		if base == Vector2.INF:
 			base = entity.free_pos
 			held = entity.tile
@@ -255,6 +281,8 @@ class Own:
 			if released:
 				blends = blends and clear_line(entity, base + off, base)
 			error = off if blends else Vector2.ZERO
+			if not blends:
+				lag = Vector2.ZERO  # Shown at once (a push, a link): nothing of a long frame's left to draw out.
 
 	## Where to draw the body this frame, in cells.
 	func shown(entity: GridEntity) -> Vector2:
@@ -263,7 +291,7 @@ class Own:
 		var at := base
 		if open_intent != Vector2.ZERO and open_seconds > 0.0 and not held_by_server(entity):
 			at = World.free_glide(entity, base, open_intent, open_seconds * World.TICK_RATE, held)[0]
-		return at + error
+		return at + error + lag
 
 	## The pace its held way would glide at, cells a second, while its way is not yet a step's (a start: way is
 	## still zero till its first command is sent, or under the 0.05 cells a tick GridEntity counts as stepping,

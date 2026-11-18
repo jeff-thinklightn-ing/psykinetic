@@ -55,6 +55,7 @@ func _ready() -> void:
 	_test_resend()
 	_test_throttle_steady()
 	_test_blow_stands()
+	_test_hitch_eased()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -540,6 +541,66 @@ func _test_resend() -> void:
 	var unchanged := FreeNet.unpack_state(player.free_state, World.tick)
 	_check((unchanged["pos"] as Vector2) == player.free_pos and int(unchanged["acked"]) == player.free_acked & 0xFFFF,
 			"the same centre and ack, only its tick new")
+
+
+## 688 amended (15) (task 4: on the road, joined, one 532 ms frame made on purpose drew the player 0.399
+## of a cell in the next frame against a median 0.067): a frame over HITCH_RATIO times the one before is
+## drawn moving the frame before's share, the rest blended out as a small correction; the server is
+## sent the whole time.
+func _test_hitch_eased() -> void:
+	print("
+== a long frame's walk drawn eased in, not in one frame (688 amended (15)) ==")
+	var player := _build(OPEN, Vector2i(1, 2))
+	player.owner_peer = Net.local_id
+	var own := FreeNet.Own.new()
+	player.free_view = own
+	_frames(player, own, Vector2.RIGHT, 30)
+	var steps: Array[float] = []
+	var last: Array[Vector2] = [own.shown(player)]  # A lambda keeps its own copy of a local: the last drawn place held in an array.
+	var step_at := func() -> void:
+		var now := own.shown(player)
+		steps.append(now.distance_to(last[0]))
+		last[0] = now
+	for i in 10:
+		_frames(player, own, Vector2.RIGHT, 1)
+		step_at.call()
+	var commands := own.hold(player, Vector2.RIGHT, 0.1)  # The hitch: Main's capped 0.1 s of a long frame.
+	if not commands.is_empty():
+		player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+		World.take_free(player, commands)
+	step_at.call()
+	for i in 20:
+		_frames(player, own, Vector2.RIGHT, 1)
+		step_at.call()
+	var largest := 0.0
+	for i in range(10, steps.size()):
+		largest = maxf(largest, steps[i])
+	var sorted := steps.duplicate()
+	sorted.sort()
+	var median: float = sorted[sorted.size() / 2]
+	_check(largest <= median * 2.0 and median > 0.04,
+			"after a 0.1 s frame his largest drawn step %.3f of a cell, his median %.3f (at most twice it)" % [largest, median])
+	_frames(player, own, Vector2.ZERO, 60)
+	_check(own.lag.length() < 0.02 and own.error.length() < 0.02,
+			"and the long frame's walk is drawn out within 80 frames (%.3f left)" % (own.lag + own.error).length())
+	var walked := player.free_pos.x - 1.0
+	var agrees := own.shown(player).distance_to(player.free_pos) < 0.01
+	var pace := own_pace(player)
+	# The same walk with no long frame in it: its 60 short frames alike.
+	player = _build(OPEN, Vector2i(1, 2))
+	player.owner_peer = Net.local_id
+	own = FreeNet.Own.new()
+	player.free_view = own
+	_frames(player, own, Vector2.RIGHT, 60)
+	_frames(player, own, Vector2.ZERO, 30)
+	var more := walked - (player.free_pos.x - 1.0)
+	_check(absf(more - 0.1 * pace) < 0.05 and agrees,
+			"the server walked the long frame's 0.1 s too (%.2f cells more than the same walk without it, at %.2f a second), and the view agrees" % [more, pace])
+
+
+## Cells a second a player walks the open room east at (its free glide's pace).
+func own_pace(player: Player) -> float:
+	return (World.free_glide(player, Vector2(1, 2), Vector2.RIGHT, 1.0, Vector2i(1, 2))[1] as Vector2).length() / World.TICK_DT
 
 
 ## World stepped [param frames] frames with [param own] holding [param intent], a host's way.
