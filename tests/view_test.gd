@@ -240,6 +240,7 @@ func _ready() -> void:
 		await _test_told_sweep()  # After tell_killed: the player it strikes flinches, still standing.
 		_test_told_kinds_known()
 		await _test_gait_holds()  # It lets frames run (the hold's rows).
+		_test_hold_feet()  # 869 amended (5): after gait_holds, its own two puppets.
 		_test_run_arms_held()
 		_test_vary_calm()  # 977 amended (2): after run_arms_held, its player bare-handed and still standing.
 		await _test_shield_seen()
@@ -21306,7 +21307,8 @@ func _test_gait_holds() -> void:
 	var stood := stop.find(Client3D.CLIP_IDLE)
 	_check(stood >= int(Client3D.STOP_HOLD * 60.0) - 1 and stood <= 24, "a real stop stands after STOP_HOLD, by 0.4 s (frame %d)" % stood)
 	# The hold's legs (_hold_gait; the coordinator's ruling on ui-design's hops2): a jog held inside the right foot's
-	# stance stops where it is; one held in the flight after the left's plays on at its rate (to the next foot down).
+	# stance stops where it is; one held in the air, past its first still frame, goes at its rate to the nearer foot
+	# down (869 amended (5)): back to the left's just after its stance, on to the right's just before its own.
 	# The first of its gaits past the walk that this rig plays and that has stances (its list differs by body).
 	var jog := ""
 	for gait: String in gaits.slice(1):
@@ -21317,16 +21319,61 @@ func _test_gait_holds() -> void:
 	var spans: Array = Client3D.GAIT_STANCES.get(rig.as_played(jog), [])
 	var held := {}
 	if spans.size() == 2:
-		for case: Array in [["down", fposmod(float(spans[1][0]) + 0.05, 1.0)], ["air", fposmod(float(spans[0][1]) + 0.05, 1.0)]]:
+		for case: Array in [["down", fposmod(float(spans[1][0]) + 0.05, 1.0)], ["air", fposmod(float(spans[0][1]) + 0.05, 1.0)],
+				["late", fposmod(float(spans[1][0]) - 0.05, 1.0)]]:
+			puppet.remove_meta("hold")
 			rig.loop(Client3D.CLIP_IDLE, 1.0)
 			rig.loop(jog, 0.0, 0.0, false, float(case[1]) * jog_length)
 			rig.tree.advance(0.0)  # The seek taken now: a frame would let the view stand the still body in Idle.
 			rig.set_speed(1.2)
 			_rig._hold_gait(puppet, rig)
 			held[case[0]] = [rig.speed(), Client3D.foot_down(rig, jog, float(case[1])), rig.base_clip(), snappedf(rig.base_position() / jog_length, 0.001)]
-	_check(held.size() == 2 and float(held["down"][0]) == 0.0 and bool(held["down"][1]) and is_equal_approx(float(held["air"][0]), 1.2)
-			and not bool(held["air"][1]) and held["down"][2] == jog and held["air"][2] == jog,
-			"held with a foot down the jog stops where it is, held in the air it plays on to the next (%s: [speed, a foot down, clip, share] %s)" % [jog, held])
+	_check(held.size() == 3 and float(held["down"][0]) == 0.0 and bool(held["down"][1]) and is_equal_approx(float(held["air"][0]), -1.2)
+			and not bool(held["air"][1]) and is_equal_approx(float(held["late"][0]), 1.2) and not bool(held["late"][1])
+			and held["down"][2] == jog and held["air"][2] == jog and held["late"][2] == jog,
+			"held with a foot down the jog stops where it is, held in the air it goes to the nearer foot down, back after a stance and on before one (%s: [speed, a foot down, clip, share] %s)" % [jog, held])
+	# Under a strike (AnimRig.speed() the action's then): a catch goes at the gait's own rate, and the footfalls are
+	# the base layer's, heard on and skipped stepping back (869 amended (5), the coordinator's mend before the look).
+	if spans.size() == 2:
+		puppet.remove_meta("hold")
+		rig.loop(Client3D.CLIP_IDLE, 1.0)  # Out of the jog first, or the loop keeps its place (the late case's).
+		rig.loop(jog, 0.0, 0.0, false, fposmod(float(spans[0][1]) + 0.05, 1.0) * jog_length)
+		rig.tree.advance(0.0)
+		rig.set_speed(1.2)
+		rig.strike(Client3D.CLIP_ATTACK, 0.17, 0.085, 0.6)
+		var action_speed := rig.speed()
+		_rig._hold_gait(puppet, rig)
+		var struck_catch := [rig.striking(), snappedf(action_speed, 0.01), snappedf(rig.base_speed(), 0.01), snappedf(rig.speed(), 0.01),
+				snappedf(rig.base_position() / jog_length, 0.001)]
+		_check(rig.striking() and not is_equal_approx(action_speed, 1.2) and is_equal_approx(rig.base_speed(), -1.2),
+				"a catch begun while a strike plays goes at the gait's own rate: [striking, the action's speed, the base's after, speed(), share] %s" % [struck_catch])
+		var id := player.get_instance_id()
+		var slot_was: Variant = _rig._step_slot.get(id)
+		_rig._step_slot[id] = "sfx.footstep_stone_medium"
+		var heard := {}
+		for way: float in [1.2, -1.2]:
+			puppet.remove_meta("footfall_at")
+			var count := 0
+			for frame in int(jog_length * 60.0) + 1:
+				var seconds := frame / 60.0 if way > 0.0 else jog_length - frame / 60.0
+				rig.base_at(jog, clampf(seconds, 0.0, jog_length - 0.0001))
+				rig.set_speed(way)
+				rig.tree.advance(0.0)
+				_rig._last_step_ms[id] = Time.get_ticks_msec()  # Still moving.
+				var before := _rig.sfx.played.size()
+				_rig._footfall_sounds(player, puppet, rig)
+				count += 1 if _rig.sfx.played.size() > before else 0
+			heard["on" if way > 0.0 else "back"] = [count, rig.striking(), snappedf(rig.speed(), 0.01)]
+		var falls := Client3D.footfalls_of(rig, jog).size()
+		_check(falls > 0 and int(heard["on"][0]) == falls and int(heard["back"][0]) == 0 and bool(heard["on"][1]) and bool(heard["back"][1]),
+				"under a strike the gait's footfalls are heard going on (%d a cycle) and skipped stepping back: [heard, striking, speed()] %s" % [falls, heard])
+		if slot_was == null:
+			_rig._step_slot.erase(id)
+		else:
+			_rig._step_slot[id] = slot_was
+		rig.cancel_strike()
+		puppet.remove_meta("footfall_at")
+	puppet.remove_meta("hold")
 	drive.call([[1.0, 1.5]])
 	var walked := rig.base_clip()
 	player.step_pace = 4.0 * pace  # A real burst: the body's own step goes at it (869 amended (4)).
@@ -21427,6 +21474,249 @@ func _test_stop_settles(player: Player, puppet: Node3D, rig: AnimRig, pace: floa
 			+ "(off: %.1f, %.1f, %.1f); the feet at the hold's end %.4f m from the held gait's") % [on["jog"], on["stop"],
 			float(on["stop"]) / maxf(float(on["stride"]), 0.001), on["stride"], off["stop"], float(off["stop"]) / maxf(float(off["stride"]), 0.001),
 			off["stride"], on["first"], on["held"], on["last"], off["first"], off["held"], off["last"], moved])
+
+
+## 869 amended (5) (TASK 11: the companion's jog on the spot at her step aside, her 250 ms stands, the coordinator's
+## approval of animation's plan, 11-19): a people's puppet of each body (Client3D.HUMAN, HUMAN_F) driven through
+## _animate at 60 fps, jogging at 4 m/s, stopped at 20 shares of its jog. Each stop still 250 ms, then on: the clip
+## moves at most half a flight while still (the nearer foot down), the free sole within 2 cm of the ground at the
+## hold's end and never under it, the base clip the jog throughout, the free foot's largest frame move in the 0.15 s
+## after stepping on no more than the steady jog's own. Each stop again stood out: the feet's slide (each foot's
+## ground travel, its sole under STANCE_SOLE, from the stop to 0.9 s on) no more than main's. A stand-step-stand-step
+## over 1.2 s holds the jog with the free foot down at each stand's end; a single still frame plays as main's (the
+## rate it had in the air, 0 with a foot down; no leg settle). The cost: _settle_free_leg a held rig a frame.
+func _test_hold_feet() -> void:
+	print("\n== 869 amended (5): a held gait's feet: to the nearer foot down, the free leg put down ==")
+	const FPS := 60.0
+	const STOPS := 20
+	const STANCE_SOLE := 0.03
+	# Main's slide on this measure (6a4376448, both bodies' 20 stops each, read 0.2764): the mean of each stop's two feet.
+	const MAIN_SLIDE := 0.276
+	AnimRig._clock_movie = 1
+	var clock := [float(Time.get_ticks_msec())]
+	var results := {}
+	for body: Array in [["man", Client3D.HUMAN], ["woman", Client3D.HUMAN_F]]:
+		var puppet := Node3D.new()
+		_rig.add_child(puppet)
+		puppet.add_child(Client3D._make_model(body[1], puppet))
+		var rig := puppet.get_meta("rig") as AnimRig
+		rig.every = 1
+		var sk := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var pace: float = puppet.get_meta("pace", 1.0)
+		var bones := {}
+		for side: String in ["Left", "Right"]:
+			bones[side] = [sk.find_bone(side + "Foot"), sk.find_bone(side + "Toes")]
+		var sole := func(side: String) -> float:
+			var b: Array = bones[side]
+			return minf(sk.get_bone_global_pose(b[0]).origin.y - sk.get_bone_global_rest(b[0]).origin.y,
+					sk.get_bone_global_pose(b[1]).origin.y - sk.get_bone_global_rest(b[1]).origin.y)
+		var foot_at := func(side: String) -> Vector3:
+			return sk.global_transform * sk.get_bone_global_pose(bones[side][0]).origin
+		var record := func() -> Dictionary:
+			var clip := rig.base_clip()
+			var length := maxf(rig.length(clip), 0.001)
+			var leg: Variant = rig.get("_leg")
+			return {"clip": clip, "share": fposmod(rig.base_position(), length) / length, "length": length, "speed": rig.speed(),
+					"Left": sole.call("Left"), "Right": sole.call("Right"), "at_Left": foot_at.call("Left"), "at_Right": foot_at.call("Right"),
+					"leg": float(leg) if leg != null else 0.0}
+		# [m/s at pace 1, seconds]: each frame's record.
+		var drive := func(legs: Array) -> Array:
+			var seen := []
+			for leg: Array in legs:
+				for i in int(roundf(float(leg[1]) * FPS)):
+					clock[0] += 1000.0 / FPS
+					AnimRig._clock_frame = Engine.get_process_frames()
+					AnimRig._clock_msec = int(roundf(clock[0]))
+					puppet.position += Vector3(float(leg[0]) * pace / FPS, 0.0, 0.0)
+					_rig._animate(puppet)
+					rig._process(1.0 / FPS)
+					seen.append(record.call())
+			return seen
+		var fresh := func() -> void:
+			for key: String in ["speed", "gait_speed", "still_since", "gait_want", "gait_want_at", "burst_since", "burst_gait", "burst_at", "step_speed", "hold"]:
+				puppet.remove_meta(key)
+			puppet.set_meta("last_ms", int(roundf(clock[0])))
+			puppet.set_meta("last_at", puppet.position)
+			rig.loop(Client3D.CLIP_IDLE, 1.0)
+			drive.call([[0.0, 0.5]])
+			drive.call([[4.0, 1.2]])
+		# Jogging on to [param target] (a share of the jog): the frames to it.
+		var run_to := func(target: float) -> void:
+			for i in 120:
+				var now: Dictionary = record.call()
+				var step := absf(float(now["speed"])) / FPS / float(now["length"])
+				if fposmod(float(now["share"]) - target, 1.0) < step:
+					return
+				drive.call([[4.0, 1.0 / FPS]])
+		var stances := func(share: float, spans: Array) -> Array:
+			var down := []
+			for span: Array in spans:
+				var from := float(span[0])
+				var to := float(span[1])
+				down.append((share >= from and share <= to) if from <= to else (share >= from or share <= to))
+			return down
+		fresh.call()
+		var jog := rig.base_clip()
+		var spans: Array = Client3D.GAIT_STANCES.get(rig.as_played(jog), [])
+		if spans.size() != 2:
+			_check(false, "%s: a 4 m/s jog with two stances (%s as %s)" % [body[0], jog, rig.as_played(jog)])
+			puppet.queue_free()
+			continue
+		var half_flight := minf(fposmod(float(spans[1][0]) - float(spans[0][1]), 1.0), fposmod(float(spans[0][0]) - float(spans[1][1]), 1.0)) / 2.0
+		# The steady jog's own largest frame move of a foot, over a stride.
+		var stride: Array = drive.call([[4.0, 1.0]])
+		var steady := 0.0
+		for i in range(1, stride.size()):
+			for side: String in ["Left", "Right"]:
+				steady = maxf(steady, ((stride[i]["at_" + side] as Vector3) - (stride[i - 1]["at_" + side] as Vector3)).length())
+		var stops := []
+		for k in STOPS:
+			var target := float(k) / STOPS
+			fresh.call()
+			run_to.call(target)
+			var before: Dictionary = record.call()
+			var held: Array = drive.call([[0.0, 0.25]])
+			var hold: Dictionary = (puppet.get_meta("hold", {}) as Dictionary).duplicate()
+			var on: Array = drive.call([[4.0, 0.15]])
+			var moved := 0.0
+			var last := float(before["share"])
+			var down_ms := -1.0
+			var changes := 0
+			var lowest := INF
+			for i in held.size():
+				var frame: Dictionary = held[i]
+				var d := fposmod(float(frame["share"]) - last + 0.5, 1.0) - 0.5
+				moved += d
+				last = float(frame["share"])
+				changes += 1 if frame["clip"] != jog else 0
+				if down_ms < 0.0 and float(frame["speed"]) == 0.0:
+					down_ms = (i + 1) * 1000.0 / FPS
+				if float(frame["speed"]) == 0.0:
+					var down: Array = stances.call(float(frame["share"]), spans)
+					if down[0] != down[1]:
+						lowest = minf(lowest, float(frame["Right" if down[0] else "Left"]))
+			var end: Dictionary = held[-1]
+			var end_down: Array = stances.call(float(end["share"]), spans)
+			var free := "" if end_down[0] == end_down[1] else ("Right" if end_down[0] else "Left")
+			var pop := 0.0
+			if free != "":
+				var was: Vector3 = end["at_" + free]
+				for frame: Dictionary in on:
+					pop = maxf(pop, ((frame["at_" + free] as Vector3) - was).length())
+					was = frame["at_" + free]
+			var start_down: Array = stances.call(float(before["share"]), spans)
+			# Forward only (the coordinator's term 2): on to the next stance, frozen in the air past half a flight.
+			var ahead := 1.0
+			var behind := 1.0
+			for span: Array in spans:
+				ahead = minf(ahead, fposmod(float(span[0]) - float(before["share"]), 1.0))
+				behind = minf(behind, fposmod(float(before["share"]) - float(span[1]), 1.0))
+			stops.append({"share": before["share"], "flight": not (start_down[0] or start_down[1]), "moved": moved, "down_ms": down_ms,
+					"changes": changes, "free": free, "free_sole": float(end[free]) if free != "" else 0.0, "lowest": lowest,
+					"leg": end["leg"], "pop": pop, "dir": str(hold.get("dir", "")), "caught": int(hold.get("caught", -1)),
+					"ahead": ahead, "behind": behind, "rate": absf(float(before["speed"])), "length": before["length"],
+					"step": absf(float(before["speed"])) / FPS / float(before["length"])})
+			# Stood out: the slide.
+			fresh.call()
+			run_to.call(target)
+			var stood: Array = [record.call()]
+			stood.append_array(drive.call([[0.0, 0.9]]))
+			var slide := 0.0
+			var low_stand := INF
+			for i in range(1, stood.size()):
+				for side: String in ["Left", "Right"]:
+					if float(stood[i][side]) < STANCE_SOLE and float(stood[i - 1][side]) < STANCE_SOLE:
+						var step: Vector3 = (stood[i]["at_" + side] as Vector3) - (stood[i - 1]["at_" + side] as Vector3)
+						slide += Vector2(step.x, step.z).length()
+					low_stand = minf(low_stand, float(stood[i][side]))
+			stops[-1]["slide"] = slide / 2.0
+			stops[-1]["low_stand"] = low_stand
+			stops[-1]["stood"] = stood[-1]["clip"]
+		# A single still frame, in a flight and in a stance: as main's.
+		var single := []
+		for share: float in [fposmod(float(spans[0][1]) + 0.05, 1.0), fposmod(float(spans[1][0]) + 0.05, 1.0)]:
+			fresh.call()
+			run_to.call(share)
+			var rate := rig.speed()
+			var one: Dictionary = drive.call([[0.0, 1.0 / FPS]])[0]
+			var down: Array = stances.call(float(one["share"]), spans)
+			single.append([snappedf(float(one["share"]), 0.001), down[0] or down[1], snappedf(float(one["speed"]), 0.001), snappedf(rate, 0.001), float(one["leg"]),
+					(float(one["speed"]) == 0.0) if (down[0] or down[1]) else is_equal_approx(float(one["speed"]), rate)])
+			drive.call([[4.0, 0.3]])
+		# Stand, step, stand, step over 1.2 s (her aside's rhythm).
+		fresh.call()
+		var rhythm: Array = drive.call([[0.0, 0.25], [4.0, 0.35], [0.0, 0.25], [4.0, 0.35]])
+		var rhythm_changes := 0
+		for frame: Dictionary in rhythm:
+			rhythm_changes += 1 if frame["clip"] != jog else 0
+		var rhythm_soles := []
+		for i: int in [14, 50]:
+			var down: Array = stances.call(float(rhythm[i]["share"]), spans)
+			rhythm_soles.append(snappedf(float(rhythm[i]["Right" if down[0] else "Left"]), 0.001) if down[0] != down[1] else -1.0)
+		# The cost: the free leg a held rig a frame, its share at 1.
+		fresh.call()
+		run_to.call(fposmod(float(spans[0][0]) + 0.1, 1.0))
+		drive.call([[0.0, 0.25]])
+		var cost := -1.0
+		if rig.has_method("_settle_free_leg") and float(rig.get("_leg")) > 0.0:
+			var t0 := Time.get_ticks_usec()
+			for i in 2000:
+				rig._settle_free_leg()
+			cost = (Time.get_ticks_usec() - t0) / 2000.0 / 1000.0
+		results[body[0]] = {"jog": jog, "half": half_flight, "steady": steady, "stops": stops, "single": single,
+				"rhythm_changes": rhythm_changes, "rhythm_soles": rhythm_soles, "cost": cost}
+		puppet.queue_free()
+	AnimRig._clock_movie = -1
+	AnimRig._clock_frame = -1
+	var slides := []
+	for who: String in results:
+		var r: Dictionary = results[who]
+		var stops: Array = r["stops"]
+		var moved_most := 0.0
+		var free_most := -INF
+		var free_least := INF
+		var lowest := INF
+		var changes := 0
+		var pop := 0.0
+		var counts := {"on": [], "back": [], "none": []}
+		var forward_only := []
+		var stood_all := true
+		for stop: Dictionary in stops:
+			moved_most = maxf(moved_most, absf(float(stop["moved"])) - float(stop["step"]))
+			if str(stop["free"]) != "":
+				free_most = maxf(free_most, float(stop["free_sole"]))
+				free_least = minf(free_least, float(stop["free_sole"]))
+			lowest = minf(lowest, float(stop["lowest"]))
+			changes += int(stop["changes"])
+			pop = maxf(pop, float(stop["pop"]))
+			slides.append(float(stop["slide"]))
+			stood_all = stood_all and stop["stood"] == Client3D.CLIP_IDLE
+			if bool(stop["flight"]):
+				(counts[str(stop["dir"]) if str(stop["dir"]) != "" else "none"] as Array).append(int(stop["caught"]))
+				var clip_s := float(stop["length"]) / maxf(float(stop["rate"]), 0.01)
+				forward_only.append([snappedf(float(stop["share"]), 0.01), roundi(minf(float(stop["ahead"]), r["half"]) * clip_s * 1000.0),
+						float(stop["ahead"]) > float(r["half"])])
+			print("  %s stop at %.3f (%s): moved %+.3f, a foot down at %d ms, %s caught %d ms, free %s sole %.3f (least held %.3f, leg %.2f), pop %.3f m, slide %.3f m, least through the stand %.3f" % [
+					who, stop["share"], "flight" if stop["flight"] else "stance", stop["moved"], int(stop["down_ms"]), stop["dir"], stop["caught"],
+					stop["free"], stop["free_sole"], stop["lowest"], stop["leg"], stop["pop"], stop["slide"], stop["low_stand"]])
+		var stranded := forward_only.filter(func(f: Array) -> bool: return f[2])
+		print("  %s forward only: [share, ms to a foot down or frozen, frozen in the air] %s" % [who, forward_only])
+		_check(moved_most <= float(r["half"]) and changes == 0 and free_least >= 0.0 and free_most <= 0.02 and lowest >= 0.0 and stood_all,
+				("%s's 20 stops from the jog (%s), each still 250 ms: the clip moved at most %.3f of a cycle past a frame's step (half a flight %.3f), %d base changes, "
+				+ "the free sole at the hold's end %.3f to %.3f m, the least held with a foot down %.3f; flights caught on %s ms, back %s ms, none %s") % [
+				who, r["jog"], moved_most, r["half"], changes, free_least, free_most, lowest, counts["on"], counts["back"], counts["none"]])
+		_check(pop <= float(r["steady"]),
+				"%s stepping on from a 250 ms stand: the free foot's largest frame move in 0.15 s %.3f m, the steady jog's own %.3f" % [who, pop, r["steady"]])
+		_check((r["single"] as Array).all(func(s: Array) -> bool: return s[5] and float(s[4]) == 0.0),
+				"%s's single still frame plays as main's: [share, a foot down, speed, rate before, leg, as main's] %s" % [who, r["single"]])
+		_check(int(r["rhythm_changes"]) == 0 and (r["rhythm_soles"] as Array).all(func(s: float) -> bool: return s >= 0.0 and s <= 0.02),
+				"%s stand, step, stand, step over 1.2 s: %d base changes, the free sole at each stand's end %s" % [who, r["rhythm_changes"], r["rhythm_soles"]])
+		print("  %s: the free leg %.4f ms a held rig a frame; forward only would leave %d of %d flights frozen in the air" % [who, r["cost"], stranded.size(), forward_only.size()])
+	var mean := 0.0
+	for slide: float in slides:
+		mean += slide / maxf(slides.size(), 1.0)
+	_check(MAIN_SLIDE <= 0.0 or mean <= MAIN_SLIDE + 0.005,
+			"the feet's slide stood out from 4 m/s, both bodies' 40 stops: a mean %.3f m a foot (main's %.3f)" % [mean, MAIN_SLIDE])
 
 
 ## 869 amended (4): a burst at the body's own pace only; a burst's sprint drops back at its dwell's end. The client's

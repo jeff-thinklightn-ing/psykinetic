@@ -24688,7 +24688,8 @@ func _footfall_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 	var at := fposmod(rig.base_position(), length) / length
 	var was: Variant = puppet.get_meta("footfall_at") if puppet.has_meta("footfall_at") else null
 	puppet.set_meta("footfall_at", [clip, at])
-	if not (was is Array and was[0] == clip and footfall_between(float(was[1]), at, falls)):
+	# A hold's catch back to the last foot down (869 amended (5)) steps back over a footfall already heard.
+	if rig.base_speed() < 0.0 or not (was is Array and was[0] == clip and footfall_between(float(was[1]), at, falls)):
 		return
 	var id := entity.get_instance_id()
 	if Time.get_ticks_msec() - int(_last_step_ms.get(id, -1000000)) > FOOTFALL_MOVING_MS:
@@ -29182,6 +29183,8 @@ func _animate(puppet: Node3D) -> void:
 		puppet.set_meta("moved_at", clock)  # A fidget waits FIDGET_SETTLE from here.
 	elif seconds > 0.0 and not puppet.has_meta("still_since"):
 		puppet.set_meta("still_since", clock)
+	if puppet.has_meta("hold") and not (puppet.has_meta("still_since") and _gait_held(puppet, rig)):
+		_hold_done(puppet, rig)
 	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
 	if puppet.get_meta("teetering", false) and rig.has(CLIP_TEETER) and entity != null and not _sliding(puppet, entity):
 		# On a rim (783 amended): arms wheeling, once its push's slide has shown; the knock it
@@ -29489,19 +29492,76 @@ static func foot_down(rig: AnimRig, clip: String, share: float) -> bool:
 ## 869's hold (a body in a gait reading standing, STOP_HOLD from its stop), its legs come to rest with a foot down
 ## (the coordinator's ruling on ui-design's hops, 11-16: they had cycled on, easing, over a body that had stopped,
 ## then blended into Idle from wherever they were, the feet sliding a median 0.6 m): with a foot down
-## (foot_down), the clip stops where it is; in the air between two, it plays on at the rate it had to the next
-## foot down (at most a flight's time), then stops. Moving again, _gait takes it on from there; stood out the
-## hold, Idle blends in over that foot. Measured on the clip at a player's 4 m/s, a stop's feet slid a mean 0.42 m
-## as built and 0.26 so (stopped at once, 0.15, but held in the air a third of the time).
+## (foot_down), the clip stops where it is; in the air between two, it plays on at the rate it had, then stops.
+## Moving again, _gait takes it on from there; stood out the hold, Idle blends in over that foot. Measured on the
+## clip at a player's 4 m/s, a stop's feet slid a mean 0.42 m as built and 0.26 so (stopped at once, 0.15, but
+## held in the air a third of the time). 869 amended (5) (TASK 11: the companion's jog on the spot at her step
+## aside, a flight playing on through her 250 ms stands): from its second still frame in the air, the clip goes to the
+## nearer foot down at its own rate, on to the next stance's start or back to the last's end (at most half a
+## flight); with a foot down, the free leg comes to its stance's pose and down to the ground (AnimRig.settle_leg).
+## Its first still frame plays as it did, the free leg the gait's. Each hold is kept on the puppet ("hold") for --hold-log.
 func _hold_gait(puppet: Node3D, rig: AnimRig) -> void:
 	var clip := rig.base_clip()
 	var length := rig.length(clip)
 	if length <= 0.0:
 		return
-	if foot_down(rig, clip, fposmod(rig.base_position(), length) / length):
+	var clock := AnimRig.now_msec()
+	var since := int(puppet.get_meta("still_since", clock))
+	var share := fposmod(rig.base_position(), length) / length
+	var down := foot_down(rig, clip, share)
+	var hold: Dictionary = puppet.get_meta("hold", {})
+	if int(hold.get("since", -1)) != since:
+		hold = {"since": since, "clip": clip, "share": share, "down": down, "dir": "", "catch_at": -1, "caught": -1}
+		puppet.set_meta("hold", hold)
+	var caught := clock > since
+	if down:
 		rig.set_speed(0.0)
+		if str(hold["dir"]) != "" and int(hold["caught"]) < 0:
+			hold["caught"] = clock - int(hold["catch_at"])
+		if caught:
+			rig.settle_leg(free_leg(rig, clip, share))
+	elif str(hold["dir"]) == "" and caught:
+		var spans: Array = GAIT_STANCES.get(rig.as_played(clip), GAIT_STANCES.get(clip, []))
+		var ahead := 1.0
+		var behind := 1.0
+		for span: Array in spans:
+			ahead = minf(ahead, fposmod(float(span[0]) - share, 1.0))
+			behind = minf(behind, fposmod(share - float(span[1]), 1.0))
+		hold["dir"] = "back" if behind < ahead else "on"
+		hold["catch_at"] = clock
+		rig.set_speed(-absf(rig.base_speed()) if behind < ahead else absf(rig.base_speed()))
 	# The trunk comes upright from the hold's first frame, over the hold and the stand's blend (869 amended (4)).
 	rig.settle(_idle_clip(puppet), ArtKit.feel("client3d.stop_hold", STOP_HOLD) + rig.blend)
+
+
+## The leg in the air at [param share] of [param clip] as [param rig] plays it: "Left" or "Right" with one foot down
+## in GAIT_STANCES ([left, right]), else "" (both down, neither, or a clip with none).
+static func free_leg(rig: AnimRig, clip: String, share: float) -> String:
+	var spans: Array = GAIT_STANCES.get(rig.as_played(clip), GAIT_STANCES.get(clip, []))
+	if spans.size() != 2:
+		return ""
+	var down := []
+	for span: Array in spans:
+		var from := float(span[0])
+		var to := float(span[1])
+		down.append((share >= from and share <= to) if from <= to else (share >= from or share <= to))
+	if down[0] == down[1]:
+		return ""
+	return "Right" if down[0] else "Left"
+
+
+## A hold over (moved on, or stood out STOP_HOLD): --hold-log's line (AnimRig.hold_log, debug builds) of the rig
+## (its instance and model's kind, nothing of a player), the clip, the share it stopped at in a stance or a flight,
+## the catch (on or back, and its ms to a foot down), the free leg's share and the ms it was held.
+func _hold_done(puppet: Node3D, rig: AnimRig) -> void:
+	var hold: Dictionary = puppet.get_meta("hold")
+	puppet.remove_meta("hold")
+	if not AnimRig.hold_log:
+		return
+	var clock := AnimRig.now_msec()
+	print("HOLD_LOG t=%d rig=%d kind=%s clip=%s share=%.3f %s catch=%s %dms leg=%.2f held=%dms %s" % [clock, rig.get_instance_id(),
+			rig.kind, hold["clip"], hold["share"], "stance" if hold["down"] else "flight", hold["dir"] if str(hold["dir"]) != "" else "none",
+			int(hold["caught"]), rig.leg_settled(), clock - int(hold["since"]), "moved" if not puppet.has_meta("still_since") else "stood"])
 
 
 ## Whether [param puppet], in a gait and reading standing, holds it yet (869: still under STOP_HOLD,
