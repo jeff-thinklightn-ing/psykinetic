@@ -83,16 +83,6 @@ const VARY_STAND_CARRY := Vector2(4.0, 9.0)
 const VARY_STAND_CARRY_EASE := 1.5
 const VARY_STAND_RATE := Vector2(0.92, 1.08)
 static var vary_log := OS.is_debug_build() and "--vary-log" in OS.get_cmdline_user_args()
-## A debug build's --hold-log (869 amended (5)): Client3D prints a line for each of a gait's holds (never a released one).
-static var hold_log := OS.is_debug_build() and "--hold-log" in OS.get_cmdline_user_args()
-## The free leg's sole at a hold (settle_leg), metres over its rest's: the gait's own stances stand 0.004 to 0.025.
-const LEG_SOLE := 0.01
-## The free leg comes down over this (settle_leg; it goes back over the blend): down by the hold's end from any stop.
-const LEG_EASE := 0.1
-## The free leg's swing over before it comes down: its turn is done at this share of LEG_EASE, its height lags.
-const LEG_TURN := 0.6
-## The free foot's lift, metres at its height, as it steps from its held stance into the stand's blend (a step, not a drag).
-const LEG_STEP := 0.06
 ## A strike's speed is kept within these (a blow can be hurried or held back
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
@@ -187,15 +177,6 @@ var _settle_from := ""
 var _settle_rising := false
 var _settle_stood := 0.0
 var _settle_skeleton: Skeleton3D
-## A hold's free leg (settle_leg): its share now (0 to 1), whether it rises, its side ("Left" or "Right"), the gait
-## clip (as played) it was held in and the seconds into it where that leg's own stance stands (half a cycle on);
-## per side, its bones [upper leg, lower leg, foot, toes] and their rests' heights.
-var _leg := 0.0
-var _leg_rising := false
-var _leg_side := ""
-var _leg_clip := ""
-var _leg_at := 0.0
-var _leg_bones := {}
 ## How much of the head a purposeful turn holds (0 to 1; Client3D's addressing look): "look" yields so much.
 var look_held := 0.0
 
@@ -709,119 +690,9 @@ func settle(clip: String, seconds: float) -> void:
 	_settle_stood = 0.0
 
 
-## Moving again: the settle given back over the blend, the free leg's too.
+## Moving again: the settle given back over the blend.
 func unsettle() -> void:
 	_settle_rising = false
-	_leg_rising = false
-
-
-## 869 amended (5) (TASK 11, the companion's jog on the spot at her step aside): a gait held with a foot down, the
-## other leg ([param side], "Left" or "Right"), caught in the air, eases over LEG_EASE to its own stance's pose, the
-## base clip's rotations for it half a cycle on (so both feet stand as the gait plants them), and its ankle is put
-## down to LEG_SOLE over the ground by a two-bone reach in the knee's own plane, the foot's turn kept. The planted
-## leg and the hips stay the gait's. Called each held frame; given back over the blend when the body moves on
-## (unsettle) or the base plays anything else (the stand's blend: the stand's legs take over). A different leg
-## while one eases out waits for it to be out. A rig without the layer (not a people's) ignores it.
-func settle_leg(side: String) -> void:
-	if not _vary or not side in ["Left", "Right"]:
-		return
-	var clip := str(_base_clip[_slot])
-	if not player.has_animation(clip):
-		return
-	if _leg > 0.0 and (side != _leg_side or clip != _leg_clip):
-		_leg_rising = false
-		return
-	var length := player.get_animation(clip).length
-	_leg_side = side
-	_leg_clip = clip
-	_leg_at = fposmod(base_position() + length / 2.0, length)
-	_leg_rising = true
-
-
-## The free leg's share now (settle_leg).
-func leg_settled() -> float:
-	return _leg
-
-
-func _leg_ease(delta: float) -> void:
-	if not _vary or (_leg <= 0.0 and not _leg_rising):
-		return
-	if _leg_rising and str(_base_clip[_slot]) == _leg_clip:
-		_leg = minf(1.0, _leg + delta / LEG_EASE)
-	else:
-		_leg_rising = false
-		_leg = maxf(0.0, _leg - delta / maxf(blend, 0.01))
-
-
-## A side's leg bones and their rests' heights (settle_leg), found once; empty where the skeleton lacks one.
-func _leg_of(sk: Skeleton3D, side: String) -> Array:
-	if not _leg_bones.has(side):
-		var bones := []
-		for part: String in ["UpperLeg", "LowerLeg", "Foot", "Toes"]:
-			bones.append(sk.find_bone(side + part))
-		var found: Array = [] if bones.has(-1) else [bones, sk.get_bone_global_rest(bones[2]).origin.y,
-				sk.get_bone_global_rest(bones[3]).origin.y]
-		_leg_bones[side] = found
-	return _leg_bones[side]
-
-
-## The lower of foot and toes over their rests' (the ground), skeleton space: anim_rig_test _test_gait_phases' sole.
-static func _sole_of(sk: Skeleton3D, leg: Array) -> float:
-	return minf(sk.get_bone_global_pose(leg[0][2]).origin.y - float(leg[1]), sk.get_bone_global_pose(leg[0][3]).origin.y - float(leg[2]))
-
-
-func _settle_free_leg() -> void:
-	if _leg <= 0.0 or _leg_side == "" or not player.has_animation(_leg_clip):
-		return
-	var sk := _trunk_skeleton()
-	if sk == null:
-		return
-	var leg := _leg_of(sk, _leg_side)
-	if leg.is_empty():
-		return
-	var bones: Array = leg[0]
-	var held := player.get_animation(_leg_clip)
-	var before := _sole_of(sk, leg)
-	var parts := ["UpperLeg", "LowerLeg", "Foot", "Toes"]
-	# Coming down it swings over first, then down; stood out of the hold (the base the stand's) it steps, lifted.
-	var turn := minf(1.0, _leg / LEG_TURN) if _leg_rising else _leg
-	var lift := LEG_STEP * sin(PI * _leg) if not _leg_rising and str(_base_clip[_slot]) != _leg_clip else 0.0
-	for i in 4:
-		var track := held.find_track(NodePath("%GeneralSkeleton:" + _leg_side + parts[i]), Animation.TYPE_ROTATION_3D)
-		if track >= 0:
-			var own := held.rotation_track_interpolate(track, _leg_at)
-			sk.set_bone_pose_rotation(bones[i], sk.get_bone_pose_rotation(bones[i]).slerp(own, turn).normalized())
-	var rise := lerpf(before, LEG_SOLE, _leg) + lift - _sole_of(sk, leg)
-	if absf(rise) > 0.0002:
-		_reach_ankle(sk, bones[0], bones[1], bones[2], rise)
-
-
-## The ankle (foot) moved [param rise] metres up (down when under 0) by the thigh and the shin, the knee kept on its
-## side of the plane through the hip, the knee and the new ankle; the foot's turn kept. Short of reach it goes as far
-## as the leg does.
-static func _reach_ankle(sk: Skeleton3D, upper: int, lower: int, foot: int, rise: float) -> void:
-	var hip_pose := sk.get_bone_global_pose(upper)
-	var hip := hip_pose.origin
-	var knee := sk.get_bone_global_pose(lower).origin
-	var ankle_pose := sk.get_bone_global_pose(foot)
-	var thigh := (knee - hip).length()
-	var shin := (ankle_pose.origin - knee).length()
-	var to := ankle_pose.origin + Vector3(0.0, rise, 0.0) - hip
-	var plane := (knee - hip).cross(to)
-	if thigh < 0.0001 or shin < 0.0001 or to.length_squared() < 0.000001 or plane.length_squared() < 0.0000000001:
-		return
-	plane = plane.normalized()
-	var reach := clampf(to.length(), absf(thigh - shin) + 0.0001, thigh + shin - 0.0001)
-	var along := to.normalized()
-	var bend := acos(clampf((thigh * thigh + reach * reach - shin * shin) / (2.0 * thigh * reach), -1.0, 1.0))
-	var new_knee := hip + along.rotated(plane, -bend) * thigh
-	sk.set_bone_global_pose(upper, Transform3D(Basis(Quaternion((knee - hip).normalized(), (new_knee - hip).normalized())) * hip_pose.basis, hip))
-	var shin_pose := sk.get_bone_global_pose(lower)
-	var ankle_now := sk.get_bone_global_pose(foot).origin
-	var new_ankle := hip + along * reach
-	sk.set_bone_global_pose(lower, Transform3D(Basis(Quaternion((ankle_now - shin_pose.origin).normalized(),
-			(new_ankle - shin_pose.origin).normalized())) * shin_pose.basis, shin_pose.origin))
-	sk.set_bone_global_pose(foot, Transform3D(ankle_pose.basis, sk.get_bone_global_pose(foot).origin))
 
 
 ## The stop's settle share now (settle).
@@ -853,9 +724,12 @@ func _settle_ease(delta: float) -> void:
 func _settle_trunk() -> void:
 	if _settle <= 0.0 or _settle_clip == "" or not player.has_animation(_settle_clip):
 		return
-	var sk := _trunk_skeleton()
-	if sk == null:
-		return
+	if _settle_skeleton == null:
+		var root := player.get_node_or_null(player.root_node)
+		_settle_skeleton = root.find_child("GeneralSkeleton", true, false) as Skeleton3D if root != null else null
+		if _settle_skeleton == null:
+			return
+	var sk := _settle_skeleton
 	var hips := sk.find_bone("Hips")
 	var spine := sk.find_bone("Spine")
 	var stand := player.get_animation(_settle_clip)
@@ -866,14 +740,6 @@ func _settle_trunk() -> void:
 	var stood := stand.rotation_track_interpolate(track, float(at) if at != null else 0.0)
 	var turn := (sk.get_bone_pose_rotation(hips).inverse() * stood).normalized()
 	sk.set_bone_pose_rotation(spine, (Quaternion.IDENTITY.slerp(turn, _settle) * sk.get_bone_pose_rotation(spine)).normalized())
-
-
-## The body's skeleton (its GeneralSkeleton), found once; null where it has none.
-func _trunk_skeleton() -> Skeleton3D:
-	if _settle_skeleton == null:
-		var root := player.get_node_or_null(player.root_node)
-		_settle_skeleton = root.find_child("GeneralSkeleton", true, false) as Skeleton3D if root != null else null
-	return _settle_skeleton
 
 
 func _vary_ease(delta: float) -> void:
@@ -1028,11 +894,6 @@ func speed() -> float:
 	return _action_speed if striking() else _base_speed[_slot]
 
 
-## The base layer's own speed (below 0 backwards), a strike on top or not: a gait's rate.
-func base_speed() -> float:
-	return _base_speed[_slot]
-
-
 ## Seconds into the clip on top.
 func position() -> float:
 	return _action_time() if striking() else base_position()
@@ -1085,12 +946,10 @@ func _process(delta: float) -> void:
 	_ease_posture_arms(delta)
 	_vary_ease(delta)
 	_settle_ease(delta)
-	_leg_ease(delta)
 	if every <= 1 or _frames % every == 0:
 		tree.advance(_since)
 		_since = 0.0
 		_settle_trunk()
-		_settle_free_leg()
 
 
 ## A change takes now, not at the tree's next frame: what plays (and where)
@@ -1098,7 +957,6 @@ func _process(delta: float) -> void:
 func _apply() -> void:
 	tree.advance(0.0)
 	_settle_trunk()
-	_settle_free_leg()
 
 
 static func _slot_name(slot: int) -> String:
