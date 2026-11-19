@@ -4823,11 +4823,18 @@ today's counts (main.gd companion_arg 1, id_arg 3; sim/economy.gd companion_arg 
 sim/production.gd relay_print 2; sim/stockpile.gd relay_print 1; sim/towns.gd relay_print 1), economy's
 econprint take mends them, and a file's id_arg line goes when it reaches 0, so from then an id handed to a
 printer fails outright as the direct rule. Some companion_arg sites may only ever see a resident; the tool
-cannot tell, and the count only falls. The check runs in about 2.5 s (it was 0.3). tests/print_names_test.sh:
-11 new rows (her id to stockpile.deposit and to a printer of main.gd's own, over; the printer itself over its
+cannot tell, and the count only falls. World.masked (the coordinator, 11-19, after perf read it): it puts
+each companion of the printing World as her tag and leaves a player's id raw, so it covers her name and never
+an id: the id walk reads a print with masked's insides kept and takes no masked(...) out as a lookup, and its
+arguments hand an id on only outside a lookup call (an id inside _players.get(_peer_of(id)) is not handed).
+Masked knows only the companions of the World that prints; the walk is static and cannot tell whether a
+companion_arg site prints for a companion outside that zone, so it credits masked there as everywhere, and
+such a site is tagged at the call (the coordinator's word to economy). The check runs in about 2.5 s (it was
+0.3). tests/print_names_test.sh: 14 new rows (her id to stockpile.deposit and to a printer of main.gd's own, over; the printer itself over its
 relay_print line; a card's name, over; inside Companion.tag, passes; a printer that only tests the parameter,
 passes; a whole id, over; an id only looked up, passes; the peer table's id, over; deposit's print through
-tags brings stockpile.gd's relay_print and economy.gd's companion_arg under their lines). PASS. Tools and
+tags brings stockpile.gd's relay_print and economy.gd's companion_arg under their lines; a player id through
+a printer's World.masked, over; her id so, passes; an id handed inside World.masked(...), over). PASS. Tools and
 tests only; protocol unchanged; no class_name; no bullet.
 
 284 amended (3): a player's id off every server print (TASK 9, the coordinator's call of 2026-11-19

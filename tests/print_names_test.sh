@@ -119,6 +119,16 @@ reset
 relay 'str(_peer_ids.get(peer, ""))'
 PN; check $(fails_with $? "id_arg lines, over") "the peer-to-id table's id handed on is over"
 reset
+# World.masked hides a companion of the printing zone, never a player's id (the coordinator, 11-19).
+relay '"sale:%s" % player_id' 'World.masked(by)'
+PN; check $(fails_with $? "id_arg lines, over") "a player id handed to a printer that shows it through World.masked is over: masked keeps an id raw"
+reset
+relay '"companion:%s" % pet_id' 'World.masked(by)'
+PN; check $? "her id handed to a printer that shows it through World.masked passes (masked tags her)"
+reset
+relay 'World.masked("sale:%s" % player_id)'
+PN; check $(fails_with $? "id_arg lines, over") "a player id handed inside World.masked(...) is over: masked is no tag for an id"
+reset
 cp "$work/sim/stockpile.gd" "$tmp/stockpile.gd.good"
 python - "$work/sim/stockpile.gd" <<'EOF'
 import sys
@@ -128,7 +138,7 @@ a = '[by if by != "" else "someone", amount,'
 b = 'what, place, from if from != "" else "nowhere said", now()])'
 assert s.count(a) == 1 and s.count(b) == 1
 s = s.replace(a, '[Companion.tag(by) if by != "" else "someone", amount,')
-s = s.replace(b, 'what, place, World.masked(from) if from != "" else "nowhere said", now()])')
+s = s.replace(b, 'what, place, Companion.tag(from) if from != "" else "nowhere said", now()])')
 open(p, "w", encoding="utf-8", newline="").write(s)
 EOF
 PN; check $(fails_with $? "sim/stockpile.gd: 0 relay_print lines, under its line of 1") "stockpile.deposit's print through tags: under stockpile.gd's relay_print line, lower it in the same commit"

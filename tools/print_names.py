@@ -86,7 +86,9 @@ SELF_NAME = re.compile(r"(?<![\w.])name\b(?!\s*=)")  # Her own node name, in sim
 HANDED = re.compile(r'"(?:folk|companion):%[sd]"\s*%|\bwho\s*(?:\[\s*|\.get\(\s*)"name"')
 MASKED = re.compile(r"(?<![\w])(?:World\.)?masked\(")
 # A call that only looks the id up (_players.get(_peer_of(id))): any call but str(), taken out for the id rule.
-LOOKUP = re.compile(r"(?<![\w.])(?!str\(|_peer_ids\.get\()(?:\w+\.)*\w+\(")
+# World.masked is no lookup: it hides a companion of the printing zone, never a player's id.
+LOOKUP = re.compile(r"(?<![\w.])(?!str\(|_peer_ids\.get\(|(?:World\.)?masked\()(?:\w+\.)*\w+\(")
+NEVER = re.compile(r"(?!)")  # Takes nothing out.
 FUNC = re.compile(r"^(?:static\s+)?func\s+(\w+)\(", re.M)
 ANY_CALL = re.compile(r"(?<![\w.])((?:\w+\.)*)(\w+)\(")  # A call: its receiver (if any) and name.
 BUDGETED = [
@@ -263,65 +265,75 @@ def handed():
 		found = [m for m in ANY_CALL.finditer(body) if _in_code(body, m.start())]
 		made = [(callees(f, m.group(1).rstrip(".").split(".")[-1] if m.group(1) else "", m.group(2)), l, split_args(c))
 			for m, (l, c, _) in zip(found, calls(body, ANY_CALL))]
-		# World.masked puts each companion of the zone as her tag (279 amended (4)): a name inside it is not hers.
-		shown = [(l, c, _blanked(_untagged(_untagged(c), MASKED))) for l, c, s in calls(body) if not s.startswith("[test]")]
+		# World.masked puts each companion of the zone as her tag (279 amended (4)): a name inside it is not
+		# hers. A player's id goes through it raw, so the id is followed in the print as written (the
+		# coordinator's ruling, 11-19).
+		shown = [(l, c, _blanked(_untagged(_untagged(c), MASKED)), _blanked(_untagged(c)))
+			for l, c, s in calls(body) if not s.startswith("[test]")]
 		funcs[(f, name)] = (params, line, made, shown)
 
-	def handed_bare(made, param, slots_of):
-		# The (callee, slot) pairs [param] is handed to bare, among the slots [slots_of] gives each callee.
+	def handed_bare(made, param, slots_of, lookups=False):
+		# The (callee, slot) pairs [param] is handed to bare, among the slots [slots_of] gives each callee;
+		# with [lookups], an argument that only looks it up (_players.get(_peer_of(id))) hands nothing on.
 		for keys, _, args in made:
 			for key in keys:
 				for slot in slots_of.get(key, ()):
-					if slot < len(args) and _bare(param, _blanked(_untagged(args[slot]))):
+					if slot < len(args) and _bare(param, _blanked(_untagged(_untagged(args[slot]), LOOKUP if lookups else NEVER))):
 						yield key, slot
 
-	# The slots each function prints raw: itself, or by handing them on to such a slot (a fixed point).
-	printed = {}
-	for key, (params, _, _, shown) in funcs.items():
-		for _, _, code in shown:
-			printed.setdefault(key, set()).update(i for i, p in enumerate(params) if _shown(p, code))
-	changed = True
-	while changed:
-		changed = False
-		for key, (params, _, made, _) in funcs.items():
-			for i, p in enumerate(params):
-				if i not in printed.get(key, ()) and any(handed_bare(made, p, printed)):
-					printed.setdefault(key, set()).add(i)
-					changed = True
-	# The calls that hand her into a printed slot; then onward, from those slots alone.
-	# A whole player id handed the same way is counted apart (id_arg): 279 amended (3)'s rule, met
-	# through a printer (Economy.pay_loan's "debt:<id>", 11-17).
-	whole_id = dict(RULES)["player_id"]
-	reach, gave, ids = {}, [], []
-	for (f, _), (params, line, made, _) in funcs.items():
-		for keys, l, args in made:
-			hit = {}
-			for key in keys:
-				for found, form in ((gave, lambda arg: HANDED.search(_untagged(arg))),
-						(ids, lambda arg: whole_id.search(_blanked(_untagged(_untagged(arg), LOOKUP))))):
-					got = [slot for slot in printed.get(key, ()) if slot < len(args) and form(args[slot])]
-					if got:
-						hit[id(found)] = found
-						reach.setdefault(key, set()).update(got)
-			for found in hit.values():
-				found.append((f, line + l - 1, "%s(%s)" % (keys[0][1], ", ".join(args))))
-	changed = True
-	while changed:
-		changed = False
-		for key, (params, _, made, _) in funcs.items():
-			for i in list(reach.get(key, ())):
-				if i >= len(params):
-					continue
-				for callee, slot in list(handed_bare(made, params[i], printed)):
-					if slot not in reach.setdefault(callee, set()):
-						reach[callee].add(slot)
+	def follow(col, forms):
+		# The walk for one kind: shown's column [col] is the prints as it reads them.
+		# The slots each function prints raw: itself, or by handing them on to such a slot (a fixed point).
+		printed = {}
+		for key, (params, _, _, shown) in funcs.items():
+			for code in [each[col] for each in shown]:
+				printed.setdefault(key, set()).update(i for i, p in enumerate(params) if _shown(p, code))
+		changed = True
+		while changed:
+			changed = False
+			for key, (params, _, made, _) in funcs.items():
+				for i, p in enumerate(params):
+					if i not in printed.get(key, ()) and any(handed_bare(made, p, printed, col == 3)):
+						printed.setdefault(key, set()).add(i)
 						changed = True
-	relays = []
-	for (f, name), (params, line, _, shown) in funcs.items():
-		for l, c, code in shown:
-			if any(i < len(params) and _shown(params[i], code) for i in reach.get((f, name), ())):
-				relays.append((f, line + l - 1, c))
-	return sorted(gave), sorted(ids), sorted(relays)
+		# The calls that hand her into a printed slot; then onward, from those slots alone.
+		# A whole player id handed the same way is counted apart (id_arg): 279 amended (3)'s rule, met
+		# through a printer (Economy.pay_loan's "debt:<id>", 11-17).
+		reach = {}
+		for (f, _), (params, line, made, _) in funcs.items():
+			for keys, l, args in made:
+				hit = {}
+				for key in keys:
+					for found, form in forms:
+						got = [slot for slot in printed.get(key, ()) if slot < len(args) and form(args[slot])]
+						if got:
+							hit[id(found)] = found
+							reach.setdefault(key, set()).update(got)
+				for found in hit.values():
+					found.append((f, line + l - 1, "%s(%s)" % (keys[0][1], ", ".join(args))))
+		changed = True
+		while changed:
+			changed = False
+			for key, (params, _, made, _) in funcs.items():
+				for i in list(reach.get(key, ())):
+					if i >= len(params):
+						continue
+					for callee, slot in list(handed_bare(made, params[i], printed, col == 3)):
+						if slot not in reach.setdefault(callee, set()):
+							reach[callee].add(slot)
+							changed = True
+		relays = []
+		for (f, name), (params, line, _, shown) in funcs.items():
+			for l, c, code in [(each[0], each[1], each[col]) for each in shown]:
+				if any(i < len(params) and _shown(params[i], code) for i in reach.get((f, name), ())):
+					relays.append((f, line + l - 1, c))
+		return relays
+
+	whole_id = dict(RULES)["player_id"]
+	gave, ids = [], []
+	relays = follow(2, [(gave, lambda arg: HANDED.search(_untagged(arg)))])
+	relays += follow(3, [(ids, lambda arg: whole_id.search(_blanked(_untagged(_untagged(arg), LOOKUP))))])
+	return sorted(gave), sorted(ids), sorted(set(relays))
 
 
 def scan():
