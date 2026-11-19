@@ -5779,7 +5779,29 @@ func _test_bubbles_kept_on_screen() -> void:
 	var under := bubbles.tail_of(1) == SpeechBubbles.Tail.DOWN
 	_check(not rect.intersects(wide) and inside.encloses(rect) and (not under or (down_head.x >= rect.position.x and down_head.x <= rect.end.x)),
 			"a block over her head stepped the bubble off, its tail still on her (%s, tail %d)" % [rect, bubbles.tail_of(1)])
+	# D: no side clear after a step (people on both): the stepped place stays on the screen, the tail down; it is not laid over a block or off the
+	# screen (ui-design's bubble_take5: P6_map_185_208_z10 a bubble at x 4044 of 3840, P6_map_218_221_z10 one on the map).
+	var left_band := Rect2(Vector2(0.0, down_head.y - 400.0), Vector2(down_plate.position.x - 5.0, 800.0))
+	var right_band := Rect2(Vector2(down_plate.end.x + 5.0, down_head.y - 400.0), Vector2(screen.size.x - down_plate.end.x - 5.0, 800.0))
+	bubbles.people = func() -> Array: return [left_band, right_band]
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	_check(inside.encloses(rect) and not rect.intersects(wide) and bubbles.tail_of(1) == SpeechBubbles.Tail.DOWN,
+			"no side clear of the people: the stepped place stays, on the screen, off the block, the tail down (%s, tail %d)" % [rect, bubbles.tail_of(1)])
+	# C: beside a top speaker's plate, the side toward the middle meets a person (the player's name and face): the other side (ui-design's
+	# P7_hint_218_221_z04: Rhea's bubble over Tourbot's name and head).
+	bubbles.keep_off = func() -> Array: return []
+	bubbles.anchor_of = func(_key: int) -> Variant: return top_head
+	bubbles.plate_of = func(_key: int) -> Rect2: return top_plate
+	var player_box := Rect2(Vector2(face.end.x + 2.0, 0.0), Vector2(900.0, 400.0))
+	bubbles.people = func() -> Array: return [player_box]
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	_check(inside.encloses(rect) and not rect.intersects(player_box) and bubbles.tail_of(1) == SpeechBubbles.Tail.RIGHT and not rect.intersects(top_plate),
+			"the side toward the middle meets the player's name and face: the bubble goes to the other side, tail sideways (%s)" % rect)
+	bubbles.people = Callable()
 	# D: a HUD block where the bubble would stand: it steps off by the shortest way that stays on the screen and off the plate.
+	bubbles.keep_off = func() -> Array: return []
 	bubbles.anchor_of = func(_key: int) -> Variant: return head
 	bubbles.plate_of = func(_key: int) -> Rect2: return plate
 	var block := Rect2(head + Vector2(-150.0, -150.0), Vector2(300.0, 140.0))

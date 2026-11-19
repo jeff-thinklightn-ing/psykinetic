@@ -57,6 +57,9 @@ var plate_of: Callable
 ## The HUD's own blocks a bubble keeps off (the compass and its place name, the minimap, the hint
 ## lines): a Callable returning Rects in HUD px; empty ones are skipped (D).
 var keep_off: Callable
+## People who are not speaking, each their name row and the face under it as one Rect2 in HUD px (the
+## player's): a bubble laid beside its speaker's plate passes over a side that meets one (865 amended (10)).
+var people: Callable
 
 var _bubbles: Dictionary[int, Bubble] = {}
 
@@ -216,7 +219,7 @@ func _layout() -> void:
 				rect = Rect2(Vector2(at.x - bubble.size.x * 0.5, inside.position.y), bubble.size)
 			else:
 				# The plate drawn, or the head on the screen with its plate hidden (behind another person: the anchor's own): beside it, the tail sideways.
-				var beside := _beside(bubble, scale_now, own_name, face, inside, blocks)
+				var beside := _beside(bubble, scale_now, own_name, face, inside, blocks + _others(key, own_name, taken, faces))
 				rect = beside[0]
 				aim = beside[1]
 		rect = _held(rect, inside)
@@ -239,10 +242,15 @@ func _layout() -> void:
 				rect = steps[0]
 				stepped_off = true
 		if stepped_off and bubble.tail == Tail.DOWN and (at.x < rect.position.x or at.x > rect.end.x):
-			# A step that left the speaker outside the bubble's width: beside its plate instead, the tail still on the speaker.
-			var beside := _beside(bubble, scale_now, own_name, face, inside, blocks)
-			rect = beside[0]
-			aim = beside[1]
+			# A step that left the speaker outside the bubble's width: beside its plate instead, the tail still on the speaker, when a side
+			# is on the screen and clear of the blocks and the other people; else the stepped place stays, the tail down as before.
+			var beside := _beside(bubble, scale_now, own_name, face, inside, blocks + _others(key, own_name, taken, faces))
+			if beside[2]:
+				rect = beside[0]
+				aim = beside[1]
+			else:
+				bubble.point(Tail.DOWN)
+				bubble.fit(scale_now)
 		taken.append(rect)
 		bubble.position = rect.position
 		var pad := CORNER * 2.0 * scale_now
@@ -253,9 +261,11 @@ func _layout() -> void:
 
 
 ## [param bubble] beside the speaker's plate [param own_name], its tail sideways: [rect, where the
-## tail points]. The side toward the screen's middle first; a side is passed over that is off the
-## screen or on one of [param blocks], and the places clear of the speaker's [param face] come before
-## those that only clear the plate. The bubble is left set for the side it is given.
+## tail points, whether that side is on the screen and clear]. The side toward the screen's middle
+## first; a side is passed over that is off the screen or on one of [param blocks], and the places
+## clear of the speaker's [param face] come before those that only clear the plate. With no side
+## clear the first is given, held on the screen in y only, and the last element is false. The bubble
+## is left set for the side it is given.
 func _beside(bubble: Bubble, scale_now: float, own_name: Rect2, face: Rect2, inside: Rect2, blocks: Array) -> Array:
 	var rights := [true, false] if own_name.get_center().x < inside.get_center().x else [false, true]
 	var first := []
@@ -269,11 +279,29 @@ func _beside(bubble: Bubble, scale_now: float, own_name: Rect2, face: Rect2, ins
 			if first.is_empty():
 				first = [rect, aim, right]
 			if inside.encloses(rect) and _clear(rect, blocks):
-				return [rect, aim]
+				return [rect, aim, true]
 	# No side is clear: the first (clear of the face, toward the middle), held on the screen after.
 	bubble.point(Tail.LEFT if first[2] else Tail.RIGHT)
 	bubble.fit(scale_now)
-	return [first[0], first[1]]
+	return [first[0], first[1], false]
+
+
+## What a bubble laid beside [param own_name] must not cover besides the HUD's blocks: every other speaker's
+## plate and face, the bubbles already placed (all in [param taken], the speaker's own plate left out), and
+## the other people [member people] gives (the player's plate and face), except one on the speaker's own plate.
+func _others(key: int, own_name: Rect2, taken: Array[Rect2], faces: Dictionary) -> Array:
+	var out: Array = []
+	for other: Rect2 in taken:
+		if other != own_name:
+			out.append(other)
+	for other_key: int in faces:
+		if other_key != key:
+			out.append(faces[other_key])
+	if people.is_valid():
+		for person: Rect2 in people.call():
+			if not person.intersects(own_name):
+				out.append(person)
+	return out
 
 
 ## Whether [param rect] meets none of [param blocks].

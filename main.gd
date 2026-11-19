@@ -19386,6 +19386,7 @@ func _build_talk() -> void:
 	bubbles.tile_px = _bubble_tile_px
 	bubbles.plate_of = _bubble_plate
 	bubbles.keep_off = _bubble_keep_off
+	bubbles.people = _bubble_people
 	$HUD.add_child(bubbles)
 	$HUD.move_child(bubbles, 0)
 	gains = Gains.new()
@@ -19776,6 +19777,20 @@ func _bubble_plate(key: int) -> Rect2:
 
 ## The HUD blocks a bubble keeps off, as drawn (865 amended (10), D): the compass and its place name,
 ## the minimap, the hint lines.
+## The people on the screen who are not speaking, as a bubble laid beside its speaker must keep off them: the local player's name row
+## with the face under it, one Rect2 (865 amended (10): ui-design's P7_hint_218_221_z04, Rhea's bubble over the player's name and head).
+func _bubble_people() -> Array:
+	var out: Array = []
+	var me := _local_player()
+	if me != null and name_plates != null:
+		var plate := name_plates.placed_rect(me.get_instance_id())
+		if plate.has_area():
+			var tile := _bubble_tile_px()
+			var face := Rect2(Vector2(plate.get_center().x - SpeechBubbles.FACE_SIZE.x * tile * 0.5, plate.end.y), SpeechBubbles.FACE_SIZE * tile)
+			out.append(plate.merge(face))
+	return out
+
+
 func _bubble_keep_off() -> Array:
 	var out: Array = []
 	for block: Variant in [compass, compass.get("_place") if compass != null else null, _context_hint, _talk_hint]:
