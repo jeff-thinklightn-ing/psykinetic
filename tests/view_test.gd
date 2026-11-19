@@ -122,6 +122,7 @@ func _ready() -> void:
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
+		_test_face_own()
 		_test_face_light()
 		_test_heard_over()
 		_test_knight_stands()
@@ -3370,8 +3371,9 @@ func _test_face_light() -> void:
 	_check(lantern_rows.all(func(r: Array) -> bool: return (r[0] as Vector3).is_equal_approx(hung) and int(r[1]) == all_layers and bool(r[2]) \
 			and is_equal_approx(float(r[3]), _rig._lantern_lit_energy() * _rig._lantern_dark_at(player.tile))),
 			"the lantern as main hangs it: over the head at %s, every layer, its shadows, its energy by the dark, however the body turns (%s)" % [hung, lantern_rows])
-	_check(not light.shadow_enabled and light.light_cull_mask == Client3D.FACE_LAYER and light.omni_range > 0.0 and light.omni_range <= Client3D.FACE_LIGHT_RANGE,
-			"the face light: no shadows, on FACE_LAYER alone (%d), %.2f m (FACE_LIGHT_RANGE %.1f at the most)" % [light.light_cull_mask, light.omni_range, Client3D.FACE_LIGHT_RANGE])
+	var mine := int(puppet.get_meta("face_layer", -1))
+	_check(not light.shadow_enabled and light.light_cull_mask == mine and Client3D.FACE_LAYERS.has(mine) and light.omni_range > 0.0 and light.omni_range <= Client3D.FACE_LIGHT_RANGE,
+			"the face light: no shadows, on its carrier's face layer alone (%d), %.2f m (FACE_LIGHT_RANGE %.1f at the most)" % [light.light_cull_mask, light.omni_range, Client3D.FACE_LIGHT_RANGE])
 	# By night: on, at FACE_LIGHT_ENERGY, along the body's drawn yaw at the eyes' height.
 	var turned := body.rotation.y + 1.0
 	body.rotation.y = turned
@@ -3440,33 +3442,35 @@ func _test_face_light() -> void:
 	Client3D.night_look_2 = look_was
 	_rig._outdoor = true
 	_rig._process(0.0)
-	# Who carries FACE_LAYER: a person's skinned parts and worn pieces; not its held things, its lantern, a creature.
+	# Who carries a face layer (451 amended (12)): a carrier's own skinned parts and worn pieces, its own layer
+	# alone; not its held things, its lantern, a townsperson, a creature.
 	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	var own := skeleton.get_children().filter(func(n: Node) -> bool: return n is MeshInstance3D)
 	var belt := (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r") as Node3D
 	var lamp := belt.get_node_or_null("LanternBody") if belt != null else null
 	var lamp_meshes: Array = lamp.find_children("*", "MeshInstance3D", true, false) if lamp != null else []
-	_check(not own.is_empty() and own.all(func(m: MeshInstance3D) -> bool: return m.layers & Client3D.FACE_LAYER and m.layers & 1)
-			and not lamp_meshes.is_empty() and lamp_meshes.all(func(m: MeshInstance3D) -> bool: return not m.layers & Client3D.FACE_LAYER),
-			"the player's own %d skinned parts on FACE_LAYER, their own layer kept; the hung lantern's %d meshes not" % [own.size(), lamp_meshes.size()])
+	_check(not own.is_empty() and own.all(func(m: MeshInstance3D) -> bool: return m.layers & Client3D.FACE_LAYERS_ALL == mine and m.layers & 1)
+			and not lamp_meshes.is_empty() and lamp_meshes.all(func(m: MeshInstance3D) -> bool: return not m.layers & Client3D.FACE_LAYERS_ALL),
+			"the player's own %d skinned parts on its face layer alone, their own layer kept; the hung lantern's %d meshes on none" % [own.size(), lamp_meshes.size()])
 	var strays := []
 	var tagged := []
 	for node: Node in get_tree().root.find_children("*", "GeometryInstance3D", true, false):
-		if not (node as VisualInstance3D).layers & Client3D.FACE_LAYER:
+		var bits := (node as VisualInstance3D).layers & Client3D.FACE_LAYERS_ALL
+		if not bits:
 			continue
 		tagged.append(node)
 		var up := node.get_parent()
 		var worn := node.name == &"Worn"
-		var person := false
+		var carrier := false
 		while up != null:
 			if up.has_meta("entity_id"):
-				person = up.has_meta("face_lit") or up.has_meta("look")
+				carrier = up.has_meta("face_order") and bits == int(up.get_meta("face_layer", -1))
 				break
 			worn = worn or up.name == &"Worn"
 			up = up.get_parent()
-		if not (node is MeshInstance3D and person and (node.get_parent() is Skeleton3D or worn)):
+		if not (node is MeshInstance3D and carrier and (node.get_parent() is Skeleton3D or worn)):
 			strays.append(node.get_path())
-	_check(not tagged.is_empty() and strays.is_empty(), "only people's own drawn parts carry FACE_LAYER (%d; others %s)" % [tagged.size(), strays])
+	_check(not tagged.is_empty() and strays.is_empty(), "only carriers' own drawn parts carry a face layer, each its carrier's alone (%d; others %s)" % [tagged.size(), strays])
 	# Every other light and camera reaches each of those as it did without the bit.
 	var differ := []
 	var masks := []
@@ -3483,9 +3487,9 @@ func _test_face_light() -> void:
 		var mask := int(pair[1])
 		for mesh: Node in tagged:
 			var layers := (mesh as VisualInstance3D).layers
-			if (mask & layers != 0) != (mask & (layers & ~Client3D.FACE_LAYER) != 0):
+			if (mask & layers != 0) != (mask & (layers & ~Client3D.FACE_LAYERS_ALL) != 0):
 				differ.append("%s on %s" % [pair[0], mesh.get_path()])
-	_check(masks.size() > 1 and differ.is_empty(), "every other light and camera (%d) reaches people's parts as without the bit (%s)" % [masks.size(), differ])
+	_check(masks.size() > 1 and differ.is_empty(), "every other light and camera (%d) reaches people's parts as without the face bits (%s)" % [masks.size(), differ])
 	# A wall in this room: from a cell beside it, facing it, the light stays inside the cell.
 	var found := false
 	var at_wall := -1.0
@@ -3582,7 +3586,8 @@ func _test_face_light() -> void:
 	if pet != null:
 		var hers: Node3D = _rig._puppets[pet.get_instance_id()]
 		var her_face := hers.get_node_or_null("FaceLight") as OmniLight3D
-		_check(her_face != null and her_face.light_cull_mask == Client3D.FACE_LAYER and not her_face.shadow_enabled, "the companion's face light the same")
+		_check(her_face != null and her_face.light_cull_mask == int(hers.get_meta("face_layer", -1)) and Client3D.FACE_LAYERS.has(her_face.light_cull_mask)
+				and not her_face.shadow_enabled, "the companion's face light the same, on her own face layer")
 	# Its dark, the carried lantern's (_lantern_dark_at; 451 amended (9)): an inside the clock lights by how
 	# much of the day reaches that floor (inside_lantern_dark, ambient_share); any other room or underground
 	# full; out of doors by the open's day.
@@ -3641,6 +3646,135 @@ func _test_face_light() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(toward != Vector2i.ZERO and shut_inside and open_behind and not shut_outside,
 			"the floor's end with no wall on it (the upstairs room's %s going %s): shut indoors, the floor behind open, open out of doors" % [end, toward])
+
+
+## Each face light its own carrier's face alone (451 amended (12)): a player's and a companion's own parts
+## each on a face layer of its own (FACE_LAYERS), carriers within FACE_APART on different ones, a clash
+## settled within FACE_RANGE_AGAIN, six within it sharing (a sixth shares, none goes without); the
+## carrier's own fill the same as main's (client3d.face_own_only 0) out of doors and under a roof the
+## clock doesn't light (a crypt's).
+func _test_face_own() -> void:
+	print("\n== each face light lights its own carrier's face alone: carriers near each other on face layers of their own ==")
+	var player := _player()
+	var light_was := DayNight.light
+	var outdoor_was: bool = _rig._outdoor
+	var lit_was := player.emit_light
+	var look_was := Client3D.night_look_2
+	Client3D.night_look_2 = false  # 858's fill would stand in for the face light out of doors.
+	DayNight.light = DayNight.NIGHT
+	_rig._outdoor = true
+	player.emit_light = Player.LANTERN
+	# Five companions in the cells round the player (every two of the six under FACE_APART apart).
+	var cells := []
+	for cell: Vector2i in _cells_round(player.tile, 1):
+		if cell != player.tile and World.is_walkable(cell) and World.get_entity_at(cell) == null:
+			cells.append(cell)
+	var pets: Array[Companion] = []
+	for i in mini(5, cells.size()):
+		var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "FaceOwn%d" % i, "props": {"max_hp": 10}}) as Companion
+		pet.keeper_peer = Net.local_id
+		if World.spawn(pet, cells[i]):
+			pet._display_caught_up()  # Drawn at its cell from the first frame (no frames pass here).
+			pets.append(pet)
+		else:
+			pet.free()
+	_check(pets.size() == 5, "five companions round the player (%d of %d cells free)" % [pets.size(), cells.size()])
+	if pets.size() < 5:
+		for pet: Companion in pets:
+			World.despawn(pet)
+		DayNight.light = light_was
+		_rig._outdoor = outdoor_was
+		player.emit_light = lit_was
+		Client3D.night_look_2 = look_was
+		return
+	var mine: Node3D = _rig._puppets[player.get_instance_id()]
+	var layer_of := func(puppet: Node3D) -> int: return int(puppet.get_meta("face_layer", -1))
+	var agrees := func(puppet: Node3D) -> bool:
+		var parts: Dictionary = Client3D.face_parts(puppet)
+		return int(parts["parts"]) > 0 and parts["on"] == parts["parts"] and int(parts["layer"]) == layer_of.call(puppet) \
+				and int(parts["mask"]) == layer_of.call(puppet) and Client3D.FACE_LAYERS.has(layer_of.call(puppet))
+	player._display_caught_up()
+	# Two: the player and one companion beside him, the rest away (despawned and spawned again below).
+	for pet: Companion in pets.slice(1):
+		World.despawn(pet)
+	_rig._process(0.0)
+	var hers: Node3D = _rig._puppets[pets[0].get_instance_id()]
+	var apart: float = mine.position.distance_to(hers.position)
+	_check(apart < Client3D.FACE_APART and layer_of.call(mine) != layer_of.call(hers) and agrees.call(mine) and agrees.call(hers),
+			"two carriers %.1f m apart on face layers of their own (%d, %d), each one's parts and light on its own alone (%s, %s)" % [
+			apart, layer_of.call(mine), layer_of.call(hers), Client3D.face_parts(mine), Client3D.face_parts(hers)])
+	# A clash (both put on his) settled within FACE_RANGE_AGAIN of the last settling.
+	_rig._set_face_layer(hers, layer_of.call(mine))
+	var from := Time.get_ticks_msec()
+	_rig._face_settle_at = from + roundi(Client3D.FACE_RANGE_AGAIN * 1000.0)
+	var took := -1
+	while Time.get_ticks_msec() - from < 1500:
+		OS.delay_msec(25)
+		_rig._process(0.0)
+		if layer_of.call(mine) != layer_of.call(hers):
+			took = Time.get_ticks_msec() - from
+			break
+	_check(took >= 0 and took <= roundi(Client3D.FACE_RANGE_AGAIN * 1000.0) + 60 and agrees.call(mine) and agrees.call(hers),
+			"a clash settled in %d ms (FACE_RANGE_AGAIN %.1f s), the first come keeping his (%d), she moved (%d)" % [
+			took, Client3D.FACE_RANGE_AGAIN, layer_of.call(mine), layer_of.call(hers)])
+	# Six within FACE_APART: five layers, every one in use; the sixth shares one, lit as main lit them all.
+	for i in range(1, 5):
+		var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "FaceOwnB%d" % i, "props": {"max_hp": 10}}) as Companion
+		pet.keeper_peer = Net.local_id
+		pets[i] = pet if World.spawn(pet, cells[i]) else null
+		if pets[i] != null:
+			pet._display_caught_up()
+	_rig._face_settle_at = 0
+	_rig._process(0.0)
+	var six: Array[Node3D] = [mine]
+	for pet: Companion in pets:
+		if pet != null:
+			six.append(_rig._puppets[pet.get_instance_id()])
+	var made := six.size()
+	# Any carrier the room already has near (its own companion) counts with them.
+	for puppet: Node3D in _rig._puppets.values():
+		if puppet.has_meta("face_order") and not six.has(puppet) and puppet.position.distance_to(mine.position) < Client3D.FACE_APART:
+			six.append(puppet)
+	var used := {}
+	var near := true
+	for a: Node3D in six:
+		used[layer_of.call(a)] = true
+		for b: Node3D in six:
+			near = near and a.position.distance_to(b.position) < Client3D.FACE_APART
+	_check(made == 6 and near and used.size() == Client3D.FACE_LAYERS.size() and six.all(agrees),
+			"%d carriers within %.0f m of each other (%d made here): all %d face layers in use, the rest sharing (%s)" % [
+			six.size(), Client3D.FACE_APART, made, used.size(), six.map(layer_of)])
+	for pet: Companion in pets:
+		if pet != null:
+			World.despawn(pet)
+	_rig._process(0.0)
+	# The carrier's own fill as main's: the switch off (client3d.face_own_only 0), every carrier on FACE_LAYER;
+	# its light's place, energy, range and lift the same, out of doors at night and under a roof the clock
+	# doesn't light (a crypt's dark).
+	var face := mine.get_node("FaceLight") as OmniLight3D
+	var reads := {}
+	for where: Array in [["out of doors, night", true], ["a crypt's (no clock)", false]]:
+		_rig._outdoor = bool(where[1])
+		for own: int in [1, 0]:
+			ArtKit.set_feel("client3d.face_own_only", own)
+			_rig._face_settle_at = 0
+			_rig._process(0.0)
+			reads["%s %d" % [where[0], own]] = [face.visible, snappedf(face.light_energy, 0.0001), snappedf(face.omni_range, 0.0001),
+					face.position.snappedf(0.0001), float(face.get_meta("lift", 1.0)), layer_of.call(mine), agrees.call(mine)]
+	ArtKit.set_feel("client3d.face_own_only", null)
+	_rig._face_settle_at = 0
+	_rig._process(0.0)
+	var same := true
+	for where: String in ["out of doors, night", "a crypt's (no clock)"]:
+		var on: Array = reads[where + " 1"]
+		var off: Array = reads[where + " 0"]
+		same = same and on.slice(0, 5) == off.slice(0, 5) and bool(on[0]) and int(off[5]) == Client3D.FACE_LAYER and bool(on[6]) and bool(off[6])
+	_check(same, "the carrier's own face light as main's, out of doors and in a crypt's dark ([shown, energy, range, place, lift, layer, own parts agree] %s)" % [reads])
+	DayNight.light = light_was
+	_rig._outdoor = outdoor_was
+	player.emit_light = lit_was
+	Client3D.night_look_2 = look_was
+	_rig._process(0.0)
 
 
 ## The cells within [param r] of [param at], nearest rows first.
@@ -14579,12 +14713,13 @@ func _test_goblins_differ() -> void:
 	_check(his_model != null and his_model.scene_file_path == str(Client3D.MODELS["imp"]["scene"]) and hoods.size() == 1
 			and (hoods[0] as MeshInstance3D).visible and not "hood=down" in str(his.get_meta("goblin_look")["words"]),
 			"a goblin resident is the goblin, its hood up (%s)" % [his_model.scene_file_path if his_model != null else "no model"])
-	# Who a face light falls on (451 amended (11)): every person you can talk to, by who they are, not by
-	# their body: the goblin townsperson as a human one; a body on a person's model as before (an orc), a goblin raider none.
+	# Who a face light falls on (451 amended (12)): its own carrier alone; no townsperson (a goblin, a human),
+	# no body on a person's model (an orc, a robber), no goblin raider carries a face layer. The look's switch
+	# (client3d.face_own_only 0) puts main's back: a townsperson on FACE_LAYER.
 	var faced := func(puppet: Node3D) -> Array:
 		var parts: Array = puppet.find_children("*", "MeshInstance3D", true, false).filter(
 				func(m: MeshInstance3D) -> bool: return m.get_parent() is Skeleton3D) if puppet != null else []
-		return [parts.filter(func(m: MeshInstance3D) -> bool: return m.layers & Client3D.FACE_LAYER).size(), parts.size()]
+		return [parts.filter(func(m: MeshInstance3D) -> bool: return m.layers & Client3D.FACE_LAYERS_ALL).size(), parts.size()]
 	var on_goblin: Array = faced.call(his)
 	var on_raider: Array = faced.call(a)
 	var on_orc: Array = faced.call(big)
@@ -14593,13 +14728,28 @@ func _test_goblins_differ() -> void:
 	var townsman: GridEntity = _main._spawn({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Resident_townface_view",
 		"tile": Vector2i(12, 2), "label": "Maud [carpenter]", "look": "seed=2 body=female"})
 	_rig._process(0.0)
-	var on_human: Array = faced.call(_rig._puppets.get(townsman.get_instance_id()) if townsman != null else null)
-	print("  PROBE FACE_LAYER skinned parts tagged/all: goblin townsperson %d/%d, human townsperson %d/%d, goblin raider %d/%d, orc raider %d/%d"
-			% [on_goblin[0], on_goblin[1], on_human[0], on_human[1], on_raider[0], on_raider[1], on_orc[0], on_orc[1]])
-	_check(on_goblin[1] > 0 and on_goblin[0] == on_goblin[1] and on_human[1] > 0 and on_human[0] == on_human[1]
-			and on_raider[1] > 0 and on_raider[0] == 0 and on_orc[1] > 0 and on_orc[0] == on_orc[1],
-			"a face light falls on every townsperson's own parts, a goblin's (%d/%d) as a human's (%d/%d); an orc's as before (%d/%d), no goblin raider's (%d/%d)"
-			% [on_goblin[0], on_goblin[1], on_human[0], on_human[1], on_orc[0], on_orc[1], on_raider[0], on_raider[1]])
+	var townsman_puppet: Node3D = _rig._puppets.get(townsman.get_instance_id()) if townsman != null else null
+	var on_human: Array = faced.call(townsman_puppet)
+	var robber := _spawn_imp(Vector2i(9, 6), "robber")
+	_rig._process(0.0)
+	var on_robber: Array = faced.call(_rig._puppets.get(robber.get_instance_id()) if robber != null else null)
+	print("  PROBE face layers, skinned parts tagged/all: goblin townsperson %d/%d, human townsperson %d/%d, goblin raider %d/%d, orc raider %d/%d, robber %d/%d"
+			% [on_goblin[0], on_goblin[1], on_human[0], on_human[1], on_raider[0], on_raider[1], on_orc[0], on_orc[1], on_robber[0], on_robber[1]])
+	_check([on_goblin, on_human, on_raider, on_orc, on_robber].all(func(r: Array) -> bool: return int(r[1]) > 0 and int(r[0]) == 0),
+			"no face layer on anyone who carries no face light: a goblin townsperson (%d/%d), a human one (%d/%d), an orc (%d/%d), a robber (%d/%d), a goblin raider (%d/%d)"
+			% [on_goblin[0], on_goblin[1], on_human[0], on_human[1], on_orc[0], on_orc[1], on_robber[0], on_robber[1], on_raider[0], on_raider[1]])
+	ArtKit.set_feel("client3d.face_own_only", 0)
+	_rig._process(0.0)
+	var main_human: Array = faced.call(townsman_puppet)
+	var main_orc: Array = faced.call(big)
+	ArtKit.set_feel("client3d.face_own_only", null)
+	_rig._process(0.0)
+	var back_human: Array = faced.call(townsman_puppet)
+	_check(int(main_human[1]) > 0 and main_human[0] == main_human[1] and main_orc[0] == main_orc[1] and int(back_human[0]) == 0,
+			"the look's switch off puts main's back (a human townsperson %d/%d, the orc %d/%d), on again none (%d/%d)"
+			% [main_human[0], main_human[1], main_orc[0], main_orc[1], back_human[0], back_human[1]])
+	if robber != null:
+		World.despawn(robber)
 	if townsman != null:
 		World.despawn(townsman)
 	_rig._process(0.0)

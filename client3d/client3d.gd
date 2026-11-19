@@ -975,6 +975,15 @@ const BODY_LAYER := 1 << 18
 ## People's own drawn parts alone (451 amended, the face light: _tag_body), for their FaceLight.
 ## Every other light's and camera's mask is all layers, so the bit adds nothing any other reaches.
 const FACE_LAYER := 1 << 17
+## A carrier's own face layer (451 amended (12)): each player's and companion's own drawn parts carry
+## one of these and its FaceLight lights that one alone, so a face light lights its own carrier's face
+## and no other (_settle_face_layers). FACE_LAYER first; bits 13 to 16 nothing else sets (no node,
+## light, camera, decal or probe in the scripts or scenes), and every other mask is all layers.
+const FACE_LAYERS: Array[int] = [FACE_LAYER, 1 << 13, 1 << 14, 1 << 15, 1 << 16]
+const FACE_LAYERS_ALL := FACE_LAYER | 1 << 13 | 1 << 14 | 1 << 15 | 1 << 16
+## Carriers drawn nearer each other than this (m) take different face layers: a face light's reach
+## (FACE_LIGHT_RANGE) from each and a step between.
+const FACE_APART := 3.0
 const BODY_FILL := Color(0.8, 0.83, 0.92)
 const BODY_FILL_ENERGY := 0.26
 ## How far below the camera's line the fill shines (degrees), so a body's
@@ -3352,6 +3361,11 @@ var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
 ## The night's fill on bodies (858).
 var _body_fill: DirectionalLight3D
+## 451 amended (12): carriers made in this view, counted (their face_order, their arrival here, nothing
+## of anyone's id); when their face layers are next settled (ms); whether client3d.face_own_only is on.
+var _face_order := 0
+var _face_settle_at := 0
+var _face_own := true
 var _outdoor := false
 ## The low-horizon camera is on now (decision 623): Net.camera_low and
 ## outdoors.
@@ -4086,14 +4100,126 @@ func _tag_body(node: Node) -> void:
 			return
 		if up.has_meta("entity_id"):
 			(node as VisualInstance3D).layers |= BODY_LAYER
-			# A person's (is_face_lit: player, companion, every townsperson; or any body on a person's model, a
-			# look) own drawn part: skinned on its skeleton (body, head, hair, a hat, clothes) or a worn piece on
-			# a socket; not a held thing, the hung lantern, a bedroll, a label (451 amended (10), (11)).
-			if (up.has_meta("face_lit") or up.has_meta("look")) and node is MeshInstance3D and (node.get_parent() is Skeleton3D or worn):
-				(node as VisualInstance3D).layers |= FACE_LAYER
+			# A carrier's own drawn part (a player's, a companion's, 451 amended (12)) on its own face layer
+			# (_face_bit): skinned on its skeleton (body, head, hair, a hat, clothes) or a worn piece on a
+			# socket; not a held thing, the hung lantern, a bedroll, a label (451 amended (10)).
+			var bit := _face_bit(up)
+			if bit != 0 and node is MeshInstance3D and (node.get_parent() is Skeleton3D or worn):
+				(node as VisualInstance3D).layers |= bit
 			return
 		worn = worn or up.name == &"Worn"
 		up = up.get_parent()
+
+
+## The face layer [param puppet]'s own parts carry (451 amended (12)): a carrier's (a player's, a
+## companion's) its own (_settle_face_layers); anyone else's none. With client3d.face_own_only off (the
+## look's switch back to main) a townsperson's and a body on a person's model (a look) FACE_LAYER, as
+## 451 amended (11) had it.
+func _face_bit(puppet: Node) -> int:
+	if puppet.has_meta("face_layer"):
+		return int(puppet.get_meta("face_layer"))
+	if not _face_own and (puppet.has_meta("face_main") or puppet.has_meta("look")):
+		return FACE_LAYER
+	return 0
+
+
+## Whether [param mesh] is [param puppet]'s own drawn part as _tag_body reads one: skinned on its
+## skeleton or a worn piece, under no other body.
+static func own_face_part(mesh: MeshInstance3D, puppet: Node) -> bool:
+	var worn := mesh.name == &"Worn"
+	var skinned := mesh.get_parent() is Skeleton3D
+	var up := mesh.get_parent()
+	while up != null and up != puppet:
+		if up.has_meta("entity_id"):
+			return false
+		worn = worn or up.name == &"Worn"
+		up = up.get_parent()
+	return up == puppet and (skinned or worn)
+
+
+## [param puppet]'s own drawn parts put on its face layer now (_face_bit), every other face bit taken
+## off; their drawing layer and BODY_LAYER kept, so every camera, viewport and light that drew them
+## still does.
+func _retag_face(puppet: Node3D) -> void:
+	var bit := _face_bit(puppet)
+	for node: Node in puppet.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if mesh.layers == 0 or not own_face_part(mesh, puppet):
+			continue
+		var want := (mesh.layers & ~FACE_LAYERS_ALL) | bit
+		if mesh.layers != want:
+			mesh.layers = want
+
+
+## [param puppet] (a carrier) onto face layer [param bit]: its parts and its FaceLight's mask.
+func _set_face_layer(puppet: Node3D, bit: int) -> void:
+	puppet.set_meta("face_layer", bit)
+	var face := puppet.get_node_or_null("FaceLight") as OmniLight3D
+	if face != null:
+		face.light_cull_mask = bit
+	_retag_face(puppet)
+
+
+## Each carrier's face layer (451 amended (12)), every FACE_RANGE_AGAIN: carriers drawn within
+## FACE_APART of each other take different ones of FACE_LAYERS, so no face light reaches another's
+## face. In order of arrival (face_order: this client's own count, nothing of anyone's id) each keeps
+## its layer unless an earlier one near it holds it, then takes the first free; a sixth within
+## FACE_APART of five keeps its own and shares one, lit as main lit them all (none goes without its
+## fill). Parts re-tagged and the light's mask set only on a change. client3d.face_own_only 0 (the
+## look's same-run switch, memory only) puts main's back: every carrier on FACE_LAYER, a
+## townsperson's and a look's parts too.
+func _settle_face_layers(now: int) -> void:
+	var own := ArtKit.feel("client3d.face_own_only", 1.0) >= 0.5
+	if own != _face_own:
+		_face_own = own
+		_face_settle_at = 0
+		for puppet: Node3D in _puppets.values():
+			if not puppet.has_meta("face_layer") and (puppet.has_meta("face_main") or puppet.has_meta("look")):
+				_retag_face(puppet)
+	if now < _face_settle_at:
+		return
+	_face_settle_at = now + roundi(FACE_RANGE_AGAIN * 1000.0)
+	var carriers: Array[Node3D] = []
+	for puppet: Node3D in _puppets.values():
+		if puppet.has_meta("face_order"):
+			carriers.append(puppet)
+	carriers.sort_custom(func(a: Node3D, b: Node3D) -> bool: return int(a.get_meta("face_order")) < int(b.get_meta("face_order")))
+	for i in carriers.size():
+		var puppet := carriers[i]
+		var was := int(puppet.get_meta("face_layer", FACE_LAYER))
+		var want := FACE_LAYER
+		if own:
+			var taken := 0
+			for j in i:
+				if carriers[j].position.distance_to(puppet.position) < FACE_APART:
+					taken |= int(carriers[j].get_meta("face_layer", FACE_LAYER))
+			want = was
+			if taken & was:
+				for bit: int in FACE_LAYERS:
+					if not taken & bit:
+						want = bit
+						break
+		if want != was:
+			_set_face_layer(puppet, want)
+
+
+## For a look's log (451 amended (12)): [param puppet]'s own drawn parts on any face layer ("on")
+## against all of them ("parts"), the face layers they carry ("layer", 0 none), its FaceLight's mask
+## ("mask", -1 none).
+static func face_parts(puppet: Node3D) -> Dictionary:
+	var on := 0
+	var parts := 0
+	var layer := 0
+	for node: Node in puppet.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if mesh.layers == 0 or not own_face_part(mesh, puppet):
+			continue
+		parts += 1
+		if mesh.layers & FACE_LAYERS_ALL:
+			on += 1
+			layer |= mesh.layers & FACE_LAYERS_ALL
+	var light := puppet.get_node_or_null("FaceLight") as OmniLight3D
+	return {"on": on, "parts": parts, "layer": layer, "mask": light.light_cull_mask if light != null else -1}
 
 
 ## The night's fill on bodies (858), outdoors while night_look_2: as strong
@@ -4207,9 +4333,10 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## line at the nose, a brim shading the whole face); at the eyes' height it clipped two thirds of a
 ## pale face to white and threw the body's shadow two heights long behind it. So a second light, the
 ## FaceLight: weak, shadowless, FACE_LIGHT_AHEAD along the body's drawn facing at FACE_LIGHT_OVER from
-## the head's top (the eyes' height, under a brim), on FACE_LAYER alone, which only a person's (is_face_lit, or a look) body,
-## head, hair and worn meshes carry (_tag_body): it lights faces (its carrier's, and another person's
-## within FACE_LIGHT_RANGE) and nothing else, no ground, no wall, no floor past a thin wall. Its
+## the head's top (the eyes' height, under a brim), on its carrier's face layer alone, which only that
+## carrier's own body, head, hair and worn meshes carry (_tag_body, FACE_LAYERS, _settle_face_layers):
+## it lights its carrier's face and nothing else (451 amended (12): no other person's face, which the
+## carrier's lantern already lights head-on), no ground, no wall, no floor past a thin wall. Its
 ## energy FACE_LIGHT_ENERGY times the carried lantern's dark at its carrier's cell (_lantern_dark_at:
 ## out of doors none by day in the open, full by night; in an inside lit by the clock less by as much of
 ## the day as reaches that floor, 451 amended (9); full underground or in a room without), shown while the Lantern is (covered with L, off); lying
@@ -24231,6 +24358,8 @@ func _sync_puppets() -> void:
 	for id in _puppets.keys():
 		if not seen.has(id):
 			_entity_went(id)
+	# After every body is made and placed, so a carrier made this frame is parted from one near it at once.
+	_settle_face_layers(now)
 
 
 ## A seam worked out (decision 769) is drawn as its rubble
@@ -29886,14 +30015,6 @@ static func person_words(entity: GridEntity) -> String:
 	return str((row as Dictionary).get("person", "")) if row is Dictionary else ""
 
 
-## Whether [param entity]'s own parts take the face light by who it is (451 amended (11)): a player, a
-## companion, every townsperson (a Resident, a goblin as a human). Any other body drawn on a person's model
-## (a look: a robber, a bandit, an orc) takes it as before, by its look (_tag_body); a goblin raider, a
-## beast, none (the coordinator's ruling: the take adds the goblin townsperson and takes it from nobody).
-static func is_face_lit(entity: GridEntity) -> bool:
-	return entity is Player or entity is Companion or entity is Resident
-
-
 ## [param entity]'s body (decision 388), &"" if it wears none.
 static func body_of(entity: GridEntity) -> StringName:
 	var body: Variant = entity.get("body")
@@ -29907,10 +30028,16 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	puppet.set_meta("body", body_of(entity))
 	puppet.set_meta("entity_name", String(entity.name))
 	puppet.set_meta("entity_id", entity.get_instance_id())
-	# A townsperson's own parts take the face light (451 amended (11)): by who they are, not by their body,
-	# so a goblin one (Snagfin, his kind's model, no look) as a human one; set before any part is added.
-	if is_face_lit(entity):
-		puppet.set_meta("face_lit", true)
+	# A carrier's own parts take a face layer of its own (451 amended (12)), set before any part is added:
+	# FACE_LAYER till _settle_face_layers (next frame) parts it from any carrier near. A townsperson only
+	# marked for the look's switch back to main (client3d.face_own_only 0, 451 amended (11)'s tagging).
+	if entity is Player or entity is Companion:
+		_face_order += 1
+		puppet.set_meta("face_order", _face_order)
+		puppet.set_meta("face_layer", FACE_LAYER)
+		_face_settle_at = 0
+	elif entity is Resident:
+		puppet.set_meta("face_main", true)
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
 	var model := model_for(entity)
 	if not model.is_empty():
@@ -30064,7 +30191,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		face.omni_range = FACE_LIGHT_RANGE
 		face.shadow_enabled = false
 		face.light_specular = FACE_LIGHT_SPECULAR
-		face.light_cull_mask = FACE_LAYER
+		face.light_cull_mask = int(puppet.get_meta("face_layer", FACE_LAYER))
 		face.visible = false
 		face.position.y = height + FACE_LIGHT_OVER
 		puppet.set_meta("lantern_top", height)
