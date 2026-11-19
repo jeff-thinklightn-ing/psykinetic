@@ -5849,6 +5849,23 @@ no longer force PSYKINETIC_TEST_PORT_OFFSET=200 on every perf-* checkout: each t
 checkout not yet rebased onto this keeps the old numbers (the byte sum, the old bases), so the clash fades only as
 trees rebase. Tests only; protocol unchanged; no class_name; no bullet.
 
+278 amended (12): first_steps_test runs as two scenes (the coordinator, 2026-11-18; label from
+tools/decision_number.sh). It ran about 229 s alone on saturn, over land.sh's 220 s slow-scene line, and met saturn's
+300 s cap inside a landing (ui's at 21:46), costing that landing its turn. The cut follows the timings (256 s on this
+PC, per row): run A replayed through World.step is 104 s of it and the rod step's four rows 35 s, so they are one
+half. As level_test's (10), the halves are two scripts extending a third. tests/first_steps_test_base.gd is not a
+scene. It holds the checks, the setup and end both share (_setup(state_path, overlay_dir), _finish) and the helpers
+both halves reach. Each half sets its own port, calls _setup() with scratch files of its own, its tests in today's
+order, then _finish(). first_steps_test (base port 18010, as before; 130 s here through tests/run.sh) holds the
+tables, the card and its Y, the chain, asked and unasked, a rising, a stray and a fight, travel, arrivals at each
+place, her log, journal and lore, here, ways, in use, off and the switch. first_steps_walk_test (base port 18011;
+151 s here) holds run A and the rod step (no rod, night, lapse, asked). A script made the split from the call graph:
+each test goes to the half that calls it, a helper one half alone reaches goes with it (_hear, _no_rod and
+_at_rod_step to the walk), and the rest go to the base. No row changed: the original's lines and the three files'
+lines, sorted, differ only in the headers, the _setup/_finish calls, the setup's two scratch arguments and the new
+port; the halves print 218 PASS lines between them (170 and 48), as the unsplit scene did. A new row goes in the half
+whose header names its subject, at the end of its list. Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
