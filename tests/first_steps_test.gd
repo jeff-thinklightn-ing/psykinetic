@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_stray_and_fight()
 	_test_travel()
 	_test_run_a()
+	_test_arrivals()
 	_test_log_lines()
 	_test_journal_mask()
 	_test_guide_lore()
@@ -311,7 +312,8 @@ func _test_tables() -> void:
 	print("\n== her decks and rules are the table's (companion_traits.json first_steps) ==")
 	var table := FirstSteps.table()
 	_check(table.get("on") == true, "the package's switch is on in the JSON (945 amended (3)) (%s)" % [table.get("on")])
-	var keys := ["offer.mughouse", "offer.pond", "offer.catch", "arrive.mughouse", "arrive.pond", "arrive.catch", "go.mughouse",
+	var keys := ["offer.mughouse", "offer.pond", "offer.catch", "arrive.mughouse", "arrive.pond", "arrive.catch", "arrive.healer",
+		"arrive.temple", "arrive.barrow", "go.mughouse",
 		"go.pond", "go.healer", "go.temple", "go.barrow", "sit", "bed", "hurt", "risen.temple_paid", "risen.temple", "risen.healer",
 		"choice.barrow", "choice.healer", "choice.mughouse", "choice.pond", "choice.temple", "asked", "asked_one", "no", "stray", "chain_end"]
 	var missing := keys.filter(func(key: String) -> bool: return FirstSteps.lines(key, "").is_empty())
@@ -714,13 +716,75 @@ func _play(seconds: float, until := Callable(), walk := false) -> bool:
 	return not until.is_valid()
 
 
-## Her walk's end as play has it: she on its cell, her player beside her, then the server's arrival.
-func _arrive(pet: Companion) -> void:
-	if pet.guide != null and pet.guide.goal.get("cell") is Vector2i:
-		var at: Vector2i = pet.guide.goal["cell"]
-		_put(pet, _main._nearest_free(at))
-		_put(_player(), _main._nearest_free(pet.tile + Vector2i(1, 0)))
-	_main._guide_done(pet, "arrived")
+## Her walk to [param kind] after a yes on [param path]'s offer, as play has it: the server steps (World.step,
+## her guide's own step and stop), her player on her heels (the cell she left), till the walk ends. The row
+## (the coordinator's, 945 amended (3)): it ends on arrival, her arrive.<kind> line said and the
+## "[firststeps] arrived" line logged, and the place reached today.
+func _led(path: String, kind: String) -> void:
+	var pet := _companion()
+	var player := _player()
+	var walk: Guide = pet.guide if pet != null else null
+	var going := walk != null and walk.going() and str(walk.goal.get("first", "")) == kind
+	_main.set("first_logged", "")  # (Main.first_logged; absent before 945 amended (3)'s arrival decks: the old-code check.)
+	var from := _said.size()
+	if going:
+		for i in 150 * World.TICK_RATE:
+			var was := pet.tile
+			World.step()
+			if pet.guide == null:
+				break
+			if pet.tile != was and player.tile != was:
+				_put(player, _main._nearest_free(was))
+	# A short walk ends inside her speech floor after her offer (Companion.FLOOR_TICKS): her line is held, said
+	# as it clears (917), as in play.
+	var heard := func() -> bool: return _said.slice(from).any(func(each: String) -> bool: return _in_deck(each, "arrive." + kind, pet))
+	if going and not heard.call():
+		_play(float(Companion.FLOOR_TICKS + Companion.HELD_GRACE_TICKS) / World.TICK_RATE + 1.0, heard)
+	var lines := _said.slice(from)
+	var said: bool = heard.call()
+	var logged := str(_main.get("first_logged")).begins_with("arrived ")
+	var seen := kind == "catch" or pet.first_steps.reached_today(kind, Townsfolk.day_of(World.steps))
+	var view := _in_view(walk.goal if walk != null else {}, player.tile, pet.tile)
+	_check(going and said and logged and seen and view.begins_with("in view"), "%s, %s: a yes ends in her arrive line and the [firststeps] arrived line, the place in their view (walk %s, stopped %s; said %s; logged \"%s\"; reached %s; at %s, goal %s; %s)" % [
+		path, kind, going, walk.stopped if walk != null else "none", lines, _main.get("first_logged"), seen, pet.tile,
+		walk.goal.get("cell") if walk != null else null, view])
+
+
+## Whether the place her walk [param goal] showed is in view of her player at [param at] (the coordinator, from
+## ui-design's runs: the hut at the screen's edge): at the camera's resting yaw (Client3D._camera_offset_at(0),
+## the camera south-east of the player, looking north-west) the place's building (its "seen", else the building
+## nearest its cell) lies up the screen from them, no farther to the side than ahead plus two cells, within 12
+## cells. The pond: they stand within FIRST_NEAR of her on its bank. The place's cell is its "seen" where she
+## stops off it (Main._first_sight), else her goal's own.
+func _in_view(goal: Dictionary, at: Vector2i, pet_at: Vector2i) -> String:
+	if goal.is_empty():
+		return "no walk"
+	if goal.get("bank", false) or str(goal.get("first", "")) == "pond":
+		return ("in view: on the bank beside her (%s)" if World.distance(at, pet_at) <= _main.FIRST_NEAR else "out of view: %s from her on the bank") % World.distance(at, pet_at)
+	var rect := _building_near(str(goal["area"]), goal.get("seen", goal["cell"]))  # Its own reading, not Main's.
+	if rect.size == Vector2i.ZERO:
+		return "no building near %s" % goal["cell"]
+	var middle := Vector2i(rect.get_center())
+	var off: Vector2i = middle - at
+	var ahead := -(off.x + off.y)  # Up the screen (north-west), in half-diagonal steps.
+	var aside := off.x - off.y
+	var ok := ahead > 0 and absi(aside) <= ahead + 4 and World.distance(at, middle) <= 12
+	return "%s: its building at %s, %d ahead and %d aside of them at %s" % ["in view" if ok else "out of view", middle, ahead, aside, at]
+
+
+## The building in [param area] nearest [param cell] within Level.PLACE_RADIUS; Rect2i() for none.
+func _building_near(area: String, cell: Vector2i) -> Rect2i:
+	var best := Rect2i()
+	var best_far := Level.PLACE_RADIUS + 1
+	for building: Dictionary in Level.load_level(area).get("buildings", []):
+		var laid: Variant = Level.building_rect(building)
+		if laid is Rect2i:
+			var rect: Rect2i = laid
+			var far := World.distance(cell, Vector2i(clampi(cell.x, rect.position.x, rect.end.x - 1), clampi(cell.y, rect.position.y, rect.end.y - 1)))
+			if far < best_far:
+				best_far = far
+				best = rect
+	return best
 
 
 ## A companion after a travel (a new body): her lines heard.
@@ -774,7 +838,7 @@ func _test_run_a() -> void:
 		return
 	_press_y(pet, heard)
 	pet._last_unasked_tick = -100000
-	_arrive(pet)
+	_led("chain", "mughouse")
 	_main.travel(Net.local_id, "umbrage_tavern")
 	_hear()
 	_play(7)
@@ -790,14 +854,14 @@ func _test_run_a() -> void:
 	var pond := _play(60, func() -> bool: return str(fresh.offer.get("kind", "")) == "pond")
 	if pond:
 		_press_y(_companion(), str(_said[-1]) if not _said.is_empty() else "")
-		_arrive(_companion())
+		_led("chain", "pond")
 	var slot := World.free_slot_for(player, "fish")
 	var fish := World.items.mint("fish", "built")
 	World.put_item(player, player, slot, fish)
 	if _play(30, func() -> bool: return str(fresh.offer.get("kind", "")) == "catch" or fresh.next_step() == ""):
 		if str(fresh.offer.get("kind", "")) == "catch":
 			_press_y(_companion(), str(_said[-1]) if not _said.is_empty() else "")
-			_arrive(_companion())
+			_led("chain", "catch")
 	World.consume(player, fish, "test")
 	var told := _play(120, func() -> bool: return fresh.end_told(), true)  # Walked back from the stall, as run A did.
 	_check(pond and told, "out again: the pond, the catch's taker, her end told (pond %s, told %s; %s)" % [pond, told, _said])
@@ -815,6 +879,76 @@ func _test_run_a() -> void:
 	_check(not "pond" in offers and not _said.any(func(each: String) -> bool: return _in_deck(each, "go.pond", _companion())),
 		"nor the pond she brought them to (offers %s)" % [offers])
 	_restore_run_a(keep, record, lists, lists_was)
+
+
+## Every place her first steps lead to, by each path that offers it (the coordinator's rows, 945 amended (3), after
+## run A on guide-look-6: her arrival at the hut said and logged nothing). The chain's three are run A's (_led).
+## Unasked: each place, the others seen (her card's days, as visits write them), her player walking known ground
+## till nothing is new, her offer on the server's own second, a Y, the walk. Asked: "Where to?" names the first
+## two places not where they stand (FirstSteps.PLACES' order): from the square the Mughouse (a yes) and the pond
+## (named); by the pond the Mughouse and the hut (named). The temple and the mound come third or later wherever
+## one stands in the wilds, so her asked answer never names them.
+func _test_arrivals() -> void:
+	print("\n== every place she leads to, by each path that offers it: her arrive line and its log ==")
+	var pet := _companion()
+	var player := _player()
+	var record: PlayerRecord = _main._record_of(pet) if pet != null else null
+	if pet == null or player == null or record == null:
+		_check(false, "(a player and their companion)")
+		return
+	var keep := pet.first_steps
+	var lists := [record.known_places, record.explored_places, record.known_areas]
+	var lists_was := lists.map(func(each: Array) -> Array: return each.duplicate())
+	for kind: String in FirstSteps.PLACES:
+		var key := str(_main._first_dest(kind, pet, player, record).get("key", ""))
+		for each: Array in lists:
+			each.erase(key)  # Not known to their record: hers to offer unasked.
+	for kind: String in FirstSteps.PLACES:
+		var fs := _fresh_card(record)
+		var day := Townsfolk.day_of(World.steps)
+		for other: String in FirstSteps.PLACES:
+			if other != kind:
+				fs.reached(other, day)
+		DayNight.set_hour(12.0)
+		_lull(_companion(), _player())
+		_said.clear()
+		var offered := _play(300, func() -> bool: return str(fs.offer.get("kind", "")) == kind, true)
+		var heard := str(_said[-1]) if not _said.is_empty() else ""
+		if not offered or not _in_deck(heard, "go." + kind, _companion()):
+			_check(false, "unasked, %s: her offer, nothing new over known ground (offer %s; %s; %s)" % [kind, fs.offer, _said, _why(_companion(), _player())])
+			continue
+		_press_y(_companion(), heard)
+		_led("unasked", kind)
+	for ask: Array in [["mughouse", "", Vector2i(196, 214)], ["pond", "pond", Vector2i(196, 214)], ["healer", "hut", Vector2i.ZERO]]:
+		var fs := _fresh_card(record)
+		var at: Vector2i = ask[2]
+		if at == Vector2i.ZERO:
+			at = _main._first_dest("pond", _companion(), _player(), record).get("cell", Vector2i(196, 214))  # Standing by the pond.
+		DayNight.set_hour(12.0)
+		_lull(_companion(), _player(), at)
+		_said.clear()
+		_says("Where to?")
+		var answer := str(_said[-1]) if not _said.is_empty() else ""
+		_says("Yes." if str(ask[1]).is_empty() else "The %s, then." % ask[1])
+		if _companion().guide == null:
+			_check(false, "asked, %s: her answer and the yes or the name taken (%s; offer %s; at %s)" % [ask[0], answer, fs.offer, _player().tile])
+			continue
+		_led("asked", str(ask[0]))
+	_restore_run_a(keep, record, lists, lists_was)
+
+
+## A card whose chain is done and its end told, hers and her player's record's (a fresh FirstSteps).
+func _fresh_card(record: PlayerRecord) -> FirstSteps:
+	var fresh := FirstSteps.new()
+	record.companion["first_steps"] = {"done": FirstSteps.CHAIN.duplicate(), "told": true}
+	fresh.card = record.companion["first_steps"]
+	_main._first_steps_live[record.player_id] = fresh
+	var pet := _companion()
+	pet.first_steps = fresh
+	pet.guide = null
+	_main._guides.erase(pet.keeper_id)
+	_main._guide_offers.erase(pet.keeper_id)
+	return fresh
 
 
 func _restore_run_a(keep: FirstSteps, record: PlayerRecord, lists: Array, lists_was: Array) -> void:

@@ -11358,9 +11358,53 @@ func _first_dest(kind: String, pet: Companion, player: Player, record: PlayerRec
 				to = {"key": "barrow", "kind": "area", "name": "the old mound", "area": player.zone, "cell": at}
 		"catch":
 			to = _first_taker(player)
+	if kind in ["healer", "temple", "barrow"] and not to.is_empty():
+		to = _first_sight(to)
 	if not to.is_empty():
 		to["first"] = kind
 	return to
+
+
+## Cells beyond a place's building, along the camera's line, where she stops to show it (945 amended (3)).
+const FIRST_SIGHT := 3
+
+
+## Where she stops to show [param to] (945 amended (3); the coordinator, from ui-design's runs on guide-look-6: her
+## walk to the hut stopped 4 to 6 cells off its place cell, north-east of the turf house, the hut at the screen's
+## edge). The place's building (the nearest to its cell within Level.PLACE_RADIUS) is put straight up the screen at
+## the camera's resting yaw (Client3D._camera_offset_at(0): the camera south-east of the player, looking north-west):
+## her stop is FIRST_SIGHT cells past its south-east, the nearest free cell there, "arrive" 1 (the Mughouse door's
+## rule), "seen" the building's middle. No building near: as it was.
+func _first_sight(to: Dictionary) -> Dictionary:
+	var rect := _first_building(str(to["area"]), to["cell"])
+	if rect.size == Vector2i.ZERO:
+		return to
+	var middle := Vector2i(rect.get_center())
+	var reach := int(maxi(rect.size.x, rect.size.y) / 2.0) + FIRST_SIGHT
+	var stop := middle + Vector2i(reach, reach)
+	if zone_name_here() == str(to["area"]):
+		stop = _nearest_free(stop)
+	to = to.duplicate()
+	to["cell"] = stop
+	to["arrive"] = 1
+	to["seen"] = middle
+	return to
+
+
+## The building in [param area] nearest [param cell], within Level.PLACE_RADIUS of it; Rect2i() for none.
+func _first_building(area: String, cell: Vector2i) -> Rect2i:
+	var best := Rect2i()
+	var best_far := Level.PLACE_RADIUS + 1
+	for building: Dictionary in Level.load_level(area).get("buildings", []):
+		var laid: Variant = Level.building_rect(building)
+		if not laid is Rect2i:
+			continue
+		var rect: Rect2i = laid
+		var edge := Vector2i(clampi(cell.x, rect.position.x, rect.end.x - 1), clampi(cell.y, rect.position.y, rect.end.y - 1))
+		if World.distance(cell, edge) < best_far:
+			best_far = World.distance(cell, edge)
+			best = rect
+	return best
 
 
 ## Whether her pointer may name healer's hut or temple [param id] (945 amended (3), the
@@ -11464,8 +11508,15 @@ func _first_say(pet: Companion, key: String, why_now: String, place: String, cel
 		line = line % fill
 	if not pet._say(line, true, false, weight):
 		return false
-	print("[firststeps] %s %s %s t%d" % [why_now, place, str(cell), World.tick])
+	_first_log("%s %s %s t%d" % [why_now, place, str(cell), World.tick])
 	return true
+
+
+## The journal's "[firststeps]" line (945: place key, cell, tick and kind only), the last kept for the tests.
+var first_logged := ""
+func _first_log(text: String) -> void:
+	first_logged = text
+	print("[firststeps] " + text)
 
 
 ## Her offer went 90 s with no answer (945): a lapse. A chain step's passes
@@ -11583,15 +11634,17 @@ func _first_walk_done(pet: Companion, walk: Guide, why: String) -> bool:
 	var at: Vector2i = walk.goal["cell"]
 	match why:
 		"arrived":
+			# Every place her first steps lead to has its arrival deck (945 amended (3)): the hut's, the temple's
+			# and the mound's fell to her free voice, which may say nothing (run A on guide-look-6, the hut).
 			var key := "arrive." + kind
-			if FirstSteps.lines(key, "").is_empty():
-				return false  # No arrival deck (the healer's, the temple's, the mound's): as any walk's end, her voice told.
 			pet.guide = null
 			_guides.erase(pet.keeper_id)
 			party_log.add("%s has brought %s to %s." % [Companion._name_of(pet), _display_name(player) if is_instance_valid(player) else "",
 				walk.goal["name"]])
-			_first_say(pet, key, "arrived", str(walk.goal.get("key", kind)), at, Companion.Weight.NEEDED, str(walk.goal.get("taker", "")))
-			if kind in FIRST_KINDS.values() and is_instance_valid(player) and player.zone == pet.zone \
+			var place := str(walk.goal.get("key", kind))
+			if not _first_say(pet, key, "arrived", place, at, Companion.Weight.NEEDED, str(walk.goal.get("taker", ""))):
+				_first_log("arrived_unsaid %s %s t%d" % [place, str(at), World.tick])  # Held (a fight, her quiet): logged, the step passed.
+			if kind in FirstSteps.PLACES and is_instance_valid(player) and player.zone == pet.zone \
 					and World.distance(player.tile, pet.tile) <= FIRST_HEARD:
 				fs.reached(kind, Townsfolk.day_of(World.steps))  # Brought there with her: seen (945 amended (3)), the Mughouse's door too.
 			if fs.next_step() == kind:

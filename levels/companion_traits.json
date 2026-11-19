@@ -220,6 +220,18 @@
 				"Here we are. The fish go to %s.",
 				"That's where the catch goes: %s."
 			],
+			"arrive.healer": [
+				"This is the medicine man's hut. He makes remedies, if we ever need one.",
+				"Here's the medicine man's hut. We'll know where to come for a remedy."
+			],
+			"arrive.temple": [
+				"Here's the temple. It's the priest here who brings the fallen back.",
+				"So this is the temple. Good to have seen it."
+			],
+			"arrive.barrow": [
+				"That's the old mound, with the spears planted round it.",
+				"There's the old burial mound, and its stone-framed door."
+			],
 			"go.mughouse": [
 				"We've not seen the Mughouse yet. There's a hearth there, and ale. Shall we?",
 				"Shall we find the Mughouse? I'd like to know where there's a fire and a room."
