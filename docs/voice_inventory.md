@@ -3425,8 +3425,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | We're at the medicine man's hut. Those in his care who fall are brought back here. | `first_steps.decks.risen.healer[1]` |
 |  | the Mughouse, for a fire and an ale | `first_steps.decks.choice.mughouse` |
 |  | the pond, to fish a while | `first_steps.decks.choice.pond` |
-|  | the medicine man's hut, so we know where he is | `first_steps.decks.choice.healer` |
-|  | the temple, so we know where the fallen are brought back | `first_steps.decks.choice.temple` |
+|  | the medicine man's hut, for his remedies | `first_steps.decks.choice.healer` |
+|  | the temple, where the priest brings the fallen back | `first_steps.decks.choice.temple` |
 |  | the old mound outside town, for a look at its door | `first_steps.decks.choice.barrow` |
 |  | %s. Or %s, if you'd rather. | `first_steps.decks.asked[0]` |
 |  | I'd say %s. Or %s. | `first_steps.decks.asked[1]` |

@@ -156,6 +156,21 @@ static func offer_said(text: String) -> bool:
 	return _offer_pattern.search(text.strip_edges()) != null
 
 
+## Whether [param text] is a line of her "no" deck, any temperament's (945 amended (3)): her offer withdrawn
+## after her player's no, so the client takes its Y line down.
+static func no_said(text: String) -> bool:
+	var decks: Variant = table().get("decks", {})
+	var deck: Variant = (decks as Dictionary).get("no") if decks is Dictionary else null
+	var all: Array = []
+	if deck is Dictionary:
+		for t: String in deck:
+			all.append_array(deck[t] if deck[t] is Array else [deck[t]])
+	else:
+		all = lines("no", "")
+	var said := text.strip_edges().to_lower()
+	return all.any(func(each: Variant) -> bool: return str(each).strip_edges().to_lower() == said)
+
+
 static func _escaped(text: String) -> String:
 	var out := ""
 	for c in text:

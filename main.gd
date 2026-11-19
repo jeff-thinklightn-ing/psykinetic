@@ -11300,19 +11300,23 @@ func _first_where(player: Player) -> String:
 
 ## Her places to offer, in her order (FirstSteps.PLACES), as walk goals: the
 ## ones there is a way to, not where her player stands, and for an unasked
-## offer ([param unasked]) none reached on three days or offered twice in
-## vain. The barrow's door only after her chain and for a player never in
+## offer ([param unasked]) none she has reached with them or their record
+## knows (its deck says "not seen yet": voice, from the look on be074edce)
+## or offered twice in vain. The barrow's door only after her chain and for a player never in
 ## it.
 func _first_choices(pet: Companion, player: Player, record: PlayerRecord, unasked: bool) -> Array[Dictionary]:
 	var fs := pet.first_steps
 	var out: Array[Dictionary] = []
 	for kind: String in FirstSteps.PLACES:
-		if unasked and (fs.days_at(kind).size() >= int(FirstSteps.rule("known_days", 3)) or not _first_may(fs, kind, player)):
+		if unasked and (not fs.days_at(kind).is_empty() or not _first_may(fs, kind, player)):
 			continue
 		if kind == "barrow" and (fs.chain_running() or "barrow" in record.known_areas):
 			continue
 		var to := _first_dest(kind, pet, player, record)
 		if to.is_empty() or player.zone == to["area"] and World.distance(player.tile, to["cell"]) <= FIRST_NEAR:
+			continue
+		var key := str(to.get("key", ""))
+		if unasked and (key in record.known_places or key in record.explored_places or key in record.known_areas):
 			continue
 		if kind == "mughouse" and _first_inside(player.zone):
 			continue
@@ -19798,12 +19802,15 @@ static func standing_words(title: String) -> String:
 
 
 ## The HUD's words for the offer Y would answer now: a resident's standing one (the resident's first), else her own offer to lead
-## while it stands (551 amended (5); voice's words, the word to say and what a yes does), else "".
+## while it stands (551 amended (5); voice's words, the word to say and what a yes does), else "". Hers names the key
+## first, as the hint line does ("Y  say ..."): a newcomer has no other way to learn Y says it (945 amended (3), the
+## coordinator, from the look on be074edce).
+const FOLLOW_WORDS := '%s  say "yes" to follow %s'
 func offer_words() -> String:
 	if not standing_title.is_empty():
 		return standing_words(standing_title)
 	if lead_offer_stands():
-		return 'say "yes" to follow %s' % Companion._name_of(_own_companion())
+		return FOLLOW_WORDS % [Keys.name_of("yes"), Companion._name_of(_own_companion())]
 	return ""
 
 
@@ -20430,6 +20437,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		if entity != null and _is_own_companion(entity) and (RegEx.create_from_string(Companion.LEAD_OFFER).search(str(data.get("text", ""))) != null
 				or FirstSteps.offer_said(str(data.get("text", "")))):
 			_lead_offer_msec = Time.get_ticks_msec()  # Her offer to lead (929), or a first-steps offer of her deck's (945): Y answers it for Guide.OFFER_S.
+		elif entity != null and _is_own_companion(entity) and FirstSteps.no_said(str(data.get("text", ""))):
+			_lead_offer_msec = -1  # Her no line (945 amended (3)): the offer is gone on the server, its line goes here.
 		if entity != null and barter_panel != null and barter_panel.is_open() and barter_panel.person == entity:
 			barter_panel.add_said(speaker, str(data.get("text", "")), str(data.get("aside", "")))  # 802: in their window too.
 		if entity != null and barter_panel != null:
@@ -22290,7 +22299,8 @@ func _record_of(pet: Companion) -> PlayerRecord:
 
 
 ## Her bond's slow changes (decision 444), once a world tick: a day
-## travelling together counts once a day, a deed of warmth (decision 621:
+## travelling together counts once a day, from the day after she first
+## travels with them, a deed of warmth (decision 621:
 ## it stops at close). Apart from her player it stands: no decay (Jeff).
 func _tend_bonds() -> void:
 	var day := int(World.steps / maxi(DayNight.day_steps, 1))
@@ -22303,9 +22313,12 @@ func _tend_bonds() -> void:
 			continue
 		_settle_needs(record, day)
 		_tend_want(record, day)
-		if int(record.companion.get("bond_day", -1)) == day:
+		var since := int(record.companion.get("bond_day", -1))
+		if since == day:
 			continue
 		record.companion["bond_day"] = day
+		if since < 0:
+			continue  # Her first day with them is not yet "days" (the coordinator, from the look on be074edce: a fresh card read so).
 		_bond(record, "day", "kept you company for days")
 
 

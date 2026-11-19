@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_chain()
 	_test_asked()
 	_test_unasked()
+	_test_unasked_unseen()
 	_test_rising()
 	_test_stray_and_fight()
 	_test_travel()
@@ -201,8 +202,26 @@ func _test_y_arms() -> void:
 	var hud: String = _main.offer_words()
 	_main._lead_offer_msec = -1
 	_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": str(FirstSteps.lines("arrive.mughouse", "")[0])})
-	_check(armed and hud == 'say "yes" to follow %s' % Companion._name_of(pet) and not _main.lead_offer_stands(),
-		"her Mughouse offer heard by her client: Y armed and the HUD's line up; her arrive line: not (%s; %s)" % [armed, hud])
+	_check(armed and hud == "Y  say \"yes\" to follow %s" % Companion._name_of(pet) and not _main.lead_offer_stands(),
+		"her Mughouse offer heard by her client: Y armed and the HUD's line up, naming the key; her arrive line: not (%s; %s)" % [armed, hud])
+	# The line goes when the offer no longer stands (the coordinator, from the look on be074edce): at her no line, each
+	# temperament's, and at the lapse (the server's lapse_s, the client's Guide.OFFER_S the same).
+	var nos: Array[String] = []
+	var no_deck: Dictionary = (FirstSteps.table().get("decks", {}) as Dictionary).get("no", {})
+	for t: String in no_deck:
+		for each: Variant in no_deck[t]:
+			nos.append(str(each))
+	var kept: Array[String] = []
+	for no: String in nos:
+		_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": offer_line})
+		_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": no})
+		if _main.lead_offer_stands() or not _main.offer_words().is_empty():
+			kept.append(no)
+	_check(nos.size() > 5 and kept.is_empty(), "her no line, any of %d: Y's line goes (kept up by %s)" % [nos.size(), kept])
+	_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": Companion._name_of(pet), "text": offer_line})
+	_main._lead_offer_msec = Time.get_ticks_msec() - int(FirstSteps.rule("lapse_s", 90) * 1000.0) - 500
+	_check(is_equal_approx(FirstSteps.rule("lapse_s", 90), Guide.OFFER_S) and _main.offer_words().is_empty(),
+		"her offer lapsed (lapse_s, %s s): Y's line goes" % FirstSteps.rule("lapse_s", 90))
 	_main._lead_offer_msec = -1
 
 
@@ -539,6 +558,68 @@ func _test_unasked() -> void:
 	_main._guides.erase(pet.keeper_id)
 	fs.offer = {}
 	_main._guide_offers.erase(pet.keeper_id)
+
+
+## 945 amended (3) (voice, from the look on be074edce: "We've not seen the Mughouse yet" after she had led
+## him into it): an unasked offer names only a place she has not reached with her player and their record
+## does not know; asked, she names it still.
+func _test_unasked_unseen() -> void:
+	print("
+== an unasked offer names no place reached or known; asked, it is named ==")
+	var pet := _companion()
+	var player := _player()
+	var fs := pet.first_steps
+	var record: PlayerRecord = _main._record_of(pet)
+	_lull(pet, player)
+	fs.clear_noes()
+	fs.no_where.clear()
+	var days_was: Variant = fs.card.get("days")
+	var known_was := record.known_places.duplicate()
+	var explored_was := record.explored_places.duplicate()
+	var areas_was := record.known_areas.duplicate()
+	fs.card.erase("days")
+	var kinds := func(unasked: bool) -> Array:
+		return _main._first_choices(pet, player, record, unasked).map(func(to: Dictionary) -> String: return str(to["first"]))
+	var pond: Dictionary = _main._first_dest("pond", pet, player, record)
+	record.known_places.erase(str(pond.get("key", "")))
+	record.explored_places.erase(str(pond.get("key", "")))
+	_check("mughouse" in kinds.call(true) and "pond" in kinds.call(true),
+		"neither reached nor known: both offered unasked (%s)" % [kinds.call(true)])
+	fs.reached("mughouse", Townsfolk.day_of(World.steps))
+	_check(not "mughouse" in kinds.call(true) and "mughouse" in kinds.call(false),
+		"the Mughouse reached once: not offered unasked, named asked (%s, %s)" % [kinds.call(true), kinds.call(false)])
+	record.known_places.append(str(pond.get("key", "")))
+	_check(not pond.is_empty() and not "pond" in kinds.call(true) and "pond" in kinds.call(false),
+		"the pond in their record's known places: not offered unasked, named asked (%s, %s)" % [pond.get("key"), kinds.call(true)])
+	fs.offer = {}
+	_main._guide_offers.erase(pet.keeper_id)
+	fs.last_unasked_tick = -100000
+	fs.quiet_until = -100000
+	fs.unasked_ticks.clear()
+	fs.lapses = 0
+	fs.last_new_tick = World.tick - FirstSteps.ticks("nothing_new_s", 240) - 10
+	fs.cells_since_new = 100
+	fs.known = _known(player)
+	fs.zone = player.zone
+	_said.clear()
+	_tick()
+	var kind := str(fs.offer.get("kind", ""))
+	_check(not kind in ["mughouse", "pond"] and not _said.any(func(each: String) -> bool:
+			return _in_deck(each, "go.mughouse", pet) or _in_deck(each, "go.pond", pet)),
+		"nothing new for 4 minutes: her offer is of neither (%s: %s)" % [kind, _said])
+	fs.offer = {}
+	_main._guide_offers.erase(pet.keeper_id)
+	pet.guide = null
+	_main._guides.erase(pet.keeper_id)
+	if days_was == null:
+		fs.card.erase("days")
+	else:
+		fs.card["days"] = days_was
+	record.known_places.assign(known_was)
+	record.explored_places.assign(explored_was)
+	record.known_areas.assign(areas_was)
+	fs.clear_noes()
+	fs.no_where.clear()
 
 
 func _known(player: Player) -> int:

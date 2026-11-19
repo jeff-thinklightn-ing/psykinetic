@@ -99,7 +99,6 @@
 			"hurt_below": 0.5,
 			"dusk_hour": 19,
 			"dawn_hour": 5,
-			"known_days": 3,
 			"quiet_s": 30
 		},
 		"guide": {
@@ -285,8 +284,8 @@
 			],
 			"choice.mughouse": "the Mughouse, for a fire and an ale",
 			"choice.pond": "the pond, to fish a while",
-			"choice.healer": "the medicine man's hut, so we know where he is",
-			"choice.temple": "the temple, so we know where the fallen are brought back",
+			"choice.healer": "the medicine man's hut, for his remedies",
+			"choice.temple": "the temple, where the priest brings the fallen back",
 			"choice.barrow": "the old mound outside town, for a look at its door",
 			"asked": [
 				"%s. Or %s, if you'd rather.",

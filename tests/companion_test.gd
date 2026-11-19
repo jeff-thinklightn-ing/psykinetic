@@ -1684,6 +1684,11 @@ func _test_bond() -> void:
 	var next_day := func() -> void: World.steps += DayNight.day_steps
 	_check(Standing.words(record.companion, id, Standing.COMPANION) == "fond" and ("You are fond of %s." % record.name) in pet.voice_prompt("test"),
 		"from the first she is fond of her player, and her voice is told so")
+	_main._tend_bonds()
+	_check(score.call() == 0 and float(record.companion.get("bond_carry", 0.0)) == 0.0 and Main.mood_why_of(record.companion, id, "you").is_empty()
+			and int(record.companion.get("bond_day", -1)) == int(World.steps / maxi(DayNight.day_steps, 1)),
+		"her first day with them: no day together counted, and no reason on her card (%s)" % Main.mood_why_of(record.companion, id, "you"))
+	next_day.call()
 	# Warmth: half a step a deed, once a day each, up to close.
 	_main._bond_bandaged(owner, pet, &"started")
 	_check(score.call() == 0 and is_equal_approx(float(record.companion["bond_carry"]), 0.5)
@@ -5248,7 +5253,8 @@ func _test_guide_refuses() -> void:
 	_main._lead_offer_msec = -1
 	_check(_main.offer_words().is_empty(), "no offer of hers: no line")
 	offer_stands.call()
-	_check(_main.offer_words() == 'say "yes" to follow %s' % her, "her offer stands: the HUD's line names the word and her (%s)" % _main.offer_words())
+	_check(_main.offer_words() == Main.FOLLOW_WORDS % [Keys.name_of("yes"), her] and _main.offer_words().begins_with("Y  "),
+		"her offer stands: the HUD's line names the key, the word and her (%s)" % _main.offer_words())
 	_main.standing_title = "Bring Bram home"
 	_check(_main.offer_words() == Main.standing_words("Bring Bram home"), "a resident's offer beside it: the resident's line, hers waits")
 	var chat_was: int = _main._chat_sent_at
