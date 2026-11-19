@@ -5755,6 +5755,30 @@ func _test_bubbles_kept_on_screen() -> void:
 	rect = bubbles.rect_of(1)
 	_check(inside.encloses(rect) and bubbles.tail_of(1) == SpeechBubbles.Tail.UP and is_equal_approx(rect.position.y, inside.position.y),
 			"a head off the top: the bubble at the top of the screen, its tail up (%s)" % rect)
+	# C: the head on the screen but its plate hidden (behind another person: placed_rect empty), no room over it: beside the head, the tail
+	# sideways, not up at the screen's edge (ui-design's P7_hint_185_208_z04: Rhea behind Tourbot, the tail 840 px from her).
+	var hidden_head := Vector2(screen.size.x * 0.5, 90.0)
+	bubbles.anchor_of = func(_key: int) -> Variant: return hidden_head
+	bubbles.plate_of = func(_key: int) -> Rect2: return Rect2()
+	bubbles.keep_off = func() -> Array: return []
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	var hidden_sideways := bubbles.tail_of(1) == SpeechBubbles.Tail.LEFT or bubbles.tail_of(1) == SpeechBubbles.Tail.RIGHT
+	_check(hidden_sideways and inside.encloses(rect), "a head on the screen, its plate hidden, no room over it: beside it, tail sideways, on the screen (%s, tail %d)" % [rect, bubbles.tail_of(1)])
+	var hidden_face := Rect2(hidden_head + Vector2(-0.5 * tile, 0.35 * tile), SpeechBubbles.FACE_SIZE * tile)
+	_check(not rect.intersects(hidden_face), "and off her face (%s)" % hidden_face)
+	# D: a block beside the head steps a bubble past its speaker: the tail is still on her (a down tail under her, or sideways at her plate).
+	var down_head := Vector2(screen.size.x * 0.5, screen.size.y * 0.5)
+	var down_plate := Rect2(down_head + Vector2(-0.55 * tile, 0.0), Vector2(1.1 * tile, 0.35 * tile))
+	bubbles.anchor_of = func(_key: int) -> Variant: return down_head
+	bubbles.plate_of = func(_key: int) -> Rect2: return down_plate
+	var wide := Rect2(Vector2(down_head.x - 0.2 * tile, 0.0), Vector2(0.4 * tile, down_head.y - 4.0))
+	bubbles.keep_off = func() -> Array: return [wide]
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	var under := bubbles.tail_of(1) == SpeechBubbles.Tail.DOWN
+	_check(not rect.intersects(wide) and inside.encloses(rect) and (not under or (down_head.x >= rect.position.x and down_head.x <= rect.end.x)),
+			"a block over her head stepped the bubble off, its tail still on her (%s, tail %d)" % [rect, bubbles.tail_of(1)])
 	# D: a HUD block where the bubble would stand: it steps off by the shortest way that stays on the screen and off the plate.
 	bubbles.anchor_of = func(_key: int) -> Variant: return head
 	bubbles.plate_of = func(_key: int) -> Rect2: return plate

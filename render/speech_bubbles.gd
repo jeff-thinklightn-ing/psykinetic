@@ -210,15 +210,17 @@ func _layout() -> void:
 				moved = true
 		var aim := at
 		if rect.position.y < inside.position.y:
-			if drawn[key]:
-				var beside := _beside(bubble, scale_now, own_name, face, inside, blocks)
-				rect = beside[0]
-				aim = beside[1]
-			else:
+			if not drawn[key] and at.y < inside.position.y:
 				bubble.point(Tail.UP)
 				bubble.fit(scale_now)
 				rect = Rect2(Vector2(at.x - bubble.size.x * 0.5, inside.position.y), bubble.size)
+			else:
+				# The plate drawn, or the head on the screen with its plate hidden (behind another person: the anchor's own): beside it, the tail sideways.
+				var beside := _beside(bubble, scale_now, own_name, face, inside, blocks)
+				rect = beside[0]
+				aim = beside[1]
 		rect = _held(rect, inside)
+		var stepped_off := false
 		for block: Rect2 in blocks:
 			if not block.has_area() or not rect.intersects(block.grow(GAP)):
 				continue
@@ -235,6 +237,12 @@ func _layout() -> void:
 				return a.position.distance_to(here.position) < b.position.distance_to(here.position))
 			if not steps.is_empty():
 				rect = steps[0]
+				stepped_off = true
+		if stepped_off and bubble.tail == Tail.DOWN and (at.x < rect.position.x or at.x > rect.end.x):
+			# A step that left the speaker outside the bubble's width: beside its plate instead, the tail still on the speaker.
+			var beside := _beside(bubble, scale_now, own_name, face, inside, blocks)
+			rect = beside[0]
+			aim = beside[1]
 		taken.append(rect)
 		bubble.position = rect.position
 		var pad := CORNER * 2.0 * scale_now
