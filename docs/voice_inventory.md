@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3155)
+## Lines in the code (3158)
 
 ### companions (Pip, Wren, Nix) (721)
 
@@ -1419,7 +1419,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (650)
+### other (sim) (653)
 
 | | Line | Where |
 |---|---|---|
@@ -1606,7 +1606,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | to the healer's hut %s | `sim/economy.gd` hut_supplies() |
 |  | a mend's supplies from %s | `sim/economy.gd` hut_supplies() |
 |  | paid %s's debt to %s | `sim/economy.gd` pay_loan() |
-|  | %s paid %d of %s's debt to the town | `sim/economy.gd` pay_loan() |
+|  | a player paid %d of %s's debt to the town | `sim/economy.gd` pay_loan() |
 |  | %s has paid the town's coffer back | `sim/economy.gd` pay_loan() |
 |  | a commission from %s | `sim/economy.gd` pay_commission() |
 |  | paid %s %d gold for a commission | `sim/economy.gd` pay_commission() |
@@ -1827,8 +1827,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | the field is sown | `sim/towns.gd` _crop() |
 |  | a storm flattened half the crop | `sim/towns.gd` _crop() |
 |  | the harvest is in: %d food | `sim/towns.gd` _crop() |
+|  | the store could not take the harvest: %d food left in the field | `sim/towns.gd` _crop() |
 |  | roots dug in winter | `sim/towns.gd` _crop() |
 |  | roots dug: %d food | `sim/towns.gd` _crop() |
+|  | the store could not take the roots: %d food left in the ground | `sim/towns.gd` _crop() |
 |  | the crop rotted in the field | `sim/towns.gd` _crop_turn() |
 |  | %s the farmer comes to work the field | `sim/towns.gd` _farmer_walks_in() |
 |  | a drove of their own | `sim/towns.gd` _herders_turn() |
@@ -2045,6 +2047,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | the rim (teetering) | `sim/world.gd` _free_slide() |
 |  | a fall of %d | `sim/world.gd` _free_slide() |
 |  | (by %s, %s) | `sim/world.gd` lay_downed() |
+|  | (?i)(?<![0-9a-f-])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-f-]) | `sim/world.gd` _staying_tags() |
 |  | (?<![\\w])(%s)(?![\\w]) | `sim/world.gd` mask_pattern() |
 |  | world_map.json: the start zone %s is not a level | `sim/world_map.gd` problems() |
 |  | no player start | `sim/world_map.gd` problems() |
@@ -2280,7 +2283,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | zone %s is not open (zones: %s); it reads its level when it opens | `main.gd` _reload_command() |
 |  | zone %s has no level on disk any more; left as it is | `main.gd` _reload_command() |
 |  | %s reloaded from %s, %d players there kept | `main.gd` _reload_command() |
-|  | %s gave %d gold toward the %s | `main.gd` _boot() |
+|  | a player gave %d gold toward the %s | `main.gd` _boot() |
 |  | move <player> <x> <y> [zone], or move <player> <building code> [zone]: the player by name as "players" lists them | `main.gd` _move_command() |
 |  | move: no player %s online | `main.gd` _move_command() |
 |  | move: %d players online are called %s; not moved | `main.gd` _move_command() |
