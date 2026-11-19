@@ -10949,6 +10949,8 @@ func _observe_roads() -> void:
 ## A rising each player had (_on_returned), for her line at their side
 ## within FirstSteps "risen_s": player id -> {kind, paid, tick}.
 var _first_steps_rise: Dictionary[String, Dictionary] = {}
+## Her second's tick last ran at this World.steps, the world's own clock (945 amended (3)): World.tick is
+## each zone's, and a zone entered starts on its own (the Mughouse at 0 behind the wilds' 557).
 var _first_steps_at := -100000
 ## Whether any companion was given her guide's places (945 amended (2)), to clear them once off.
 var _first_guided := false
@@ -10978,9 +10980,9 @@ func _first_steps_tick() -> void:
 				if is_instance_valid(_companions[id]):
 					(_companions[id] as Companion).guide_places = []  # Off: her talk as before (945 amended (2)).
 		return
-	if World.tick - _first_steps_at < World.TICK_RATE:
+	if World.steps - _first_steps_at < World.TICK_RATE:
 		return
-	_first_steps_at = World.tick
+	_first_steps_at = World.steps
 	for id: String in _companions:
 		var pet: Companion = _companions[id]
 		var record: PlayerRecord = _records.get(id)
@@ -11589,6 +11591,9 @@ func _first_walk_done(pet: Companion, walk: Guide, why: String) -> bool:
 			party_log.add("%s has brought %s to %s." % [Companion._name_of(pet), _display_name(player) if is_instance_valid(player) else "",
 				walk.goal["name"]])
 			_first_say(pet, key, "arrived", str(walk.goal.get("key", kind)), at, Companion.Weight.NEEDED, str(walk.goal.get("taker", "")))
+			if kind in FIRST_KINDS.values() and is_instance_valid(player) and player.zone == pet.zone \
+					and World.distance(player.tile, pet.tile) <= FIRST_HEARD:
+				fs.reached(kind, Townsfolk.day_of(World.steps))  # Brought there with her: seen (945 amended (3)), the Mughouse's door too.
 			if fs.next_step() == kind:
 				fs.pass_step(kind)
 				fs.next_chain_tick = World.tick + FirstSteps.ticks("next_offer_s", 30)

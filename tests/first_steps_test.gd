@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_rising()
 	_test_stray_and_fight()
 	_test_travel()
+	_test_run_a()
 	_test_log_lines()
 	_test_journal_mask()
 	_test_guide_lore()
@@ -696,6 +697,138 @@ func _test_travel() -> void:
 	if out != null:
 		out.said.connect(func(line: String) -> void: _said.append(line))
 	fs.quiet_until = -100000
+
+
+## The server stepped [param seconds] as play steps it (World.step; Main's own tick on the zone's every tenth,
+## its Main._first_steps_at never reset), till [param until] holds; with [param walk], her player stepped back
+## and forth two cells each second on ground they know. True when until held (or there is none).
+func _play(seconds: float, until := Callable(), walk := false) -> bool:
+	for i in roundi(seconds * World.TICK_RATE):
+		World.step()
+		if walk and i % World.TICK_RATE == 0:
+			var player := _player()
+			if player != null:
+				_put(player, _main._nearest_free(Vector2i(196 + 2 * (int(i / float(World.TICK_RATE)) % 2), 214)))
+		if until.is_valid() and until.call():
+			return true
+	return not until.is_valid()
+
+
+## Her walk's end as play has it: she on its cell, her player beside her, then the server's arrival.
+func _arrive(pet: Companion) -> void:
+	if pet.guide != null and pet.guide.goal.get("cell") is Vector2i:
+		var at: Vector2i = pet.guide.goal["cell"]
+		_put(pet, _main._nearest_free(at))
+		_put(_player(), _main._nearest_free(pet.tile + Vector2i(1, 0)))
+	_main._guide_done(pet, "arrived")
+
+
+## A companion after a travel (a new body): her lines heard.
+func _hear() -> void:
+	var pet := _companion()
+	if pet != null:
+		pet.said.connect(func(line: String) -> void: _said.append(line))
+
+
+## Run A as ui-design's look played it (guidea6, the coordinator's row): a new record's card, her chain
+## through the server's own ticks: the Mughouse offered and taken, its door, in and out by the link, the
+## pond, the catch's taker, her end told, then nothing new for 240 s over 60 cells. No offer after the visit
+## names the Mughouse as unseen. In play the wilds' clock ran ahead of the Mughouse's (World.tick is each
+## zone's own), and her second's tick, held on the zone's clock, never ran inside.
+func _test_run_a() -> void:
+	print("\n== run A through the server's ticks: the Mughouse visited, never offered as unseen after ==")
+	var pet := _companion()
+	var player := _player()
+	var record: PlayerRecord = _main._record_of(pet) if pet != null else null
+	if pet == null or player == null or record == null:
+		_check(false, "(a player and their companion)")
+		return
+	var keep := pet.first_steps
+	var lists := [record.known_places, record.explored_places, record.known_areas]
+	var lists_was := lists.map(func(each: Array) -> Array: return each.duplicate())
+	for kind: String in ["mughouse", "pond"]:
+		var key := str(_main._first_dest(kind, pet, player, record).get("key", ""))
+		for each: Array in lists:
+			each.erase(key)  # A newcomer's: neither known nor found.
+	keep.offer = {}
+	_main._guide_offers.erase(pet.keeper_id)
+	# The wilds' clock ahead of the Mughouse's, as in the look (in at t557 there, out at its t67).
+	var tavern: Variant = World.zones.get("umbrage_tavern")
+	var tavern_tick: int = (tavern as Zone).tick if tavern is Zone else 0
+	if World.tick < tavern_tick + 300:
+		_play(float(tavern_tick + 300 - World.tick) / World.TICK_RATE)
+	var fresh := FirstSteps.new()
+	record.companion["first_steps"] = {"done": []}
+	fresh.card = record.companion["first_steps"]
+	_main._first_steps_live[record.player_id] = fresh
+	pet.first_steps = fresh
+	pet.first_words = false
+	_lull(pet, player)
+	fresh.fought = -100000
+	_said.clear()
+	var offered := _play(30, func() -> bool: return str(fresh.offer.get("kind", "")) == "mughouse")
+	var heard := str(_said[-1]) if not _said.is_empty() else ""
+	_check(offered and _in_deck(heard, "offer.mughouse", pet), "her chain's Mughouse offer, on the server's own second (%s; %s)" % [_said, _why(pet, player)])
+	if not offered:
+		_restore_run_a(keep, record, lists, lists_was)
+		return
+	_press_y(pet, heard)
+	pet._last_unasked_tick = -100000
+	_arrive(pet)
+	_main.travel(Net.local_id, "umbrage_tavern")
+	_hear()
+	_play(7)
+	var day := Townsfolk.day_of(World.steps)
+	_check(fresh.reached_today("mughouse", day) and fresh.was_inside,
+		"inside, on its own clock, her second's tick runs: the Mughouse reached today, \"came back out\" to come (days %s, in %s, its tick %d, hers at %d)" % [
+			fresh.card.get("days", {}), World.zone.name, World.tick, _main._first_steps_at])
+	_main.travel(Net.local_id, "wilds")
+	_hear()
+	pet = _companion()
+	player = _player()
+	_said.clear()
+	var pond := _play(60, func() -> bool: return str(fresh.offer.get("kind", "")) == "pond")
+	if pond:
+		_press_y(_companion(), str(_said[-1]) if not _said.is_empty() else "")
+		_arrive(_companion())
+	var slot := World.free_slot_for(player, "fish")
+	var fish := World.items.mint("fish", "built")
+	World.put_item(player, player, slot, fish)
+	if _play(30, func() -> bool: return str(fresh.offer.get("kind", "")) == "catch" or fresh.next_step() == ""):
+		if str(fresh.offer.get("kind", "")) == "catch":
+			_press_y(_companion(), str(_said[-1]) if not _said.is_empty() else "")
+			_arrive(_companion())
+	World.consume(player, fish, "test")
+	var told := _play(120, func() -> bool: return fresh.end_told(), true)  # Walked back from the stall, as run A did.
+	_check(pond and told, "out again: the pond, the catch's taker, her end told (pond %s, told %s; %s)" % [pond, told, _said])
+	_said.clear()
+	var offers: Array[String] = []
+	_play(300, func() -> bool:
+		if not fresh.offer.is_empty() and not str(fresh.offer.get("kind", "")) in offers:
+			offers.append(str(fresh.offer.get("kind", "")))
+		return false
+	, true)
+	var unseen := _said.filter(func(each: String) -> bool:
+		return _in_deck(each, "go.mughouse", _companion()) or _in_deck(each, "offer.mughouse", _companion()))
+	_check(unseen.is_empty() and not "mughouse" in offers,
+		"300 s with nothing new over hundreds of cells: no offer names the Mughouse as unseen (offers %s; %s)" % [offers, _said])
+	_check(not "pond" in offers and not _said.any(func(each: String) -> bool: return _in_deck(each, "go.pond", _companion())),
+		"nor the pond she brought them to (offers %s)" % [offers])
+	_restore_run_a(keep, record, lists, lists_was)
+
+
+func _restore_run_a(keep: FirstSteps, record: PlayerRecord, lists: Array, lists_was: Array) -> void:
+	var pet := _companion()
+	for i in lists.size():
+		(lists[i] as Array).assign(lists_was[i])
+	record.companion["first_steps"] = keep.card
+	_main._first_steps_live[record.player_id] = keep
+	if pet != null:
+		pet.first_steps = keep
+		pet.guide = null
+		_main._guides.erase(pet.keeper_id)
+		_main._guide_offers.erase(pet.keeper_id)
+	keep.offer = {}
 
 
 func _test_log_lines() -> void:
