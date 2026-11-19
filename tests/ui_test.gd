@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_talk_no_panel()
 	_test_sim_reads()
 	_test_minimap_turn()
+	_test_bubbles_keep_off_the_map()
 	_test_revive_reads()
 	_test_screenshot_key()
 	_test_aim()
@@ -757,6 +758,23 @@ func _test_sim_reads() -> void:
 		_main._refresh_world_map()
 	else:
 		print("  (no companion in this world: her line's checks skipped)")
+
+
+## 865 amended (10), D: a bubble keeps off the corner map as it is drawn (ui-design's look on fa784f2fd: the Minimap control's own rect is empty,
+## its panel is drawn in _draw, so a bubble at the top right was laid on the map) and off the world map's button under it.
+func _test_bubbles_keep_off_the_map() -> void:
+	print("== a speech bubble keeps off the corner map and its button (865 amended (10)) ==")
+	var map: Minimap = _main.minimap
+	_check(map.texture != null and map.is_visible_in_tree(), "(the corner map is drawn)")
+	var drawn: Rect2 = (map.view(Vector2(map.cells) / 2.0)["dest"] as Rect2).grow(3.0 * map.ui_scale())
+	var blocks: Array = _main._bubble_keep_off()
+	var covers_map := false
+	var covers_button := false
+	for block: Rect2 in blocks:
+		covers_map = covers_map or block.encloses(drawn)
+		covers_button = covers_button or (map.world_button != null and block.encloses(map.world_button.get_global_rect()))
+	_check(drawn.has_area() and covers_map, "the map's frame as drawn %s is among the blocks %s" % [drawn, blocks])
+	_check(covers_button, "and the world map's button")
 
 
 func _test_minimap_turn() -> void:

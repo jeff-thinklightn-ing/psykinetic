@@ -19778,7 +19778,7 @@ func _bubble_plate(key: int) -> Rect2:
 ## the minimap, the hint lines.
 func _bubble_keep_off() -> Array:
 	var out: Array = []
-	for block: Variant in [compass, compass.get("_place") if compass != null else null, minimap, _context_hint, _talk_hint]:
+	for block: Variant in [compass, compass.get("_place") if compass != null else null, _context_hint, _talk_hint]:
 		if block is Control and (block as Control).is_visible_in_tree():
 			var box := (block as Control).get_global_rect()
 			if block is Label:  # a label's own text, not its box (the compass's place name is a 1000 px box, right-aligned)
@@ -19794,6 +19794,12 @@ func _bubble_keep_off() -> Array:
 					x = box.get_center().x - ink.x * 0.5
 				box = Rect2(x, box.get_center().y - ink.y * 0.5, minf(ink.x, box.size.x), ink.y)
 			out.append(box)
+	# The corner map draws its panel in its own _draw, so the control's rect is empty: the frame as drawn (the dest of view() grown by 3 px of
+	# its ui scale; the corner's dest does not depend on the centre), and the world map's button under it.
+	if minimap != null and minimap.is_visible_in_tree() and minimap.texture != null:
+		out.append((minimap.view(Vector2(minimap.cells) / 2.0)["dest"] as Rect2).grow(3.0 * minimap.ui_scale()))
+		if minimap.world_button != null and minimap.world_button.is_visible_in_tree():
+			out.append(minimap.world_button.get_global_rect())
 	return out
 
 
