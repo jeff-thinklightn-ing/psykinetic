@@ -95,7 +95,7 @@ echo "== a companion or a player id handed to a printer (284 amended (2)'s lefto
 # A take adds a printer of main.gd's own and a caller handing it <arg>.
 relay() { printf '\n\nfunc _relay_row(by: String, what := "") -> void:\n\tprint("[row] %%s: %%s" %% [%s, what])\n\n\nfunc _relay_caller() -> void:\n\t_relay_row(%s, "x")\n' "${2:-by}" "$1" >>"$work/main.gd"; }
 add main.gd $'\tWorld.stockpile.deposit("umbrage", "gold", 2, "folk:%s" % id, "a sale")'
-PN; check $(fails_with $? "companion_arg lines, over") "her folk id handed to stockpile.deposit (its print shows by raw) is over main.gd's companion_arg line"
+PN; check $? "her folk id handed to stockpile.deposit passes: its print shows by through log_name (econprint, 284 amended (3))"
 reset
 relay '"companion:%s" % pet_id'
 PN; check $(fails_with $? "companion_arg lines, over") "her id handed to a printer of main.gd's own: over its companion_arg line"
@@ -134,15 +134,13 @@ python - "$work/sim/stockpile.gd" <<'EOF'
 import sys
 p = sys.argv[1]
 s = open(p, encoding="utf-8", newline="").read()
-a = '[by if by != "" else "someone", amount,'
-b = 'what, place, from if from != "" else "nowhere said", now()])'
-assert s.count(a) == 1 and s.count(b) == 1
-s = s.replace(a, '[Companion.tag(by) if by != "" else "someone", amount,')
-s = s.replace(b, 'what, place, Companion.tag(from) if from != "" else "nowhere said", now()])')
+a = '[log_name(by) if by != "" else "someone", amount,'
+assert s.count(a) == 1
+s = s.replace(a, '[by if by != "" else "someone", amount,')
 open(p, "w", encoding="utf-8", newline="").write(s)
 EOF
-PN; check $(fails_with $? "sim/stockpile.gd: 0 relay_print lines, under its line of 1") "stockpile.deposit's print through tags: under stockpile.gd's relay_print line, lower it in the same commit"
-grep -q "sim/economy.gd: [0-9]* companion_arg lines, under its line" "$tmp/out.txt"; check $? "and economy.gd's companion_arg count falls with it (the handed sites into deposit)"
+PN; check $(fails_with $? "sim/stockpile.gd: 1 relay_print lines, over its line of 0") "stockpile.deposit's print showing by raw again (econprint's mend undone) fails: no relay_print line is left"
+grep -q "sim/economy.gd: 3 id_arg lines, over its line of 0" "$tmp/out.txt"; check $? "and economy.gd's three calls handing a player id into it (sale:, debt:) fail with it: the print's World.masked covers her, never an id"
 cp "$tmp/stockpile.gd.good" "$work/sim/stockpile.gd"
 reset
 

@@ -4822,7 +4822,9 @@ _start_return twice, to sim/production.gd:701; main.gd's add_xp note, to sim/tow
 today's counts (main.gd companion_arg 1, id_arg 3; sim/economy.gd companion_arg 14, id_arg 3, relay_print 2;
 sim/production.gd relay_print 2; sim/stockpile.gd relay_print 1; sim/towns.gd relay_print 1), economy's
 econprint take mends them, and a file's id_arg line goes when it reaches 0, so from then an id handed to a
-printer fails outright as the direct rule. Some companion_arg sites may only ever see a resident; the tool
+printer fails outright as the direct rule. Economy's econprint (284 amended (3)) landed first and brought
+all three kinds to 0 in every file (deposit's print shows by through Stockpile.log_name, a tag), so the take
+lands with no companion_arg, id_arg or relay_print line: one such print, in any file, fails outright. Some companion_arg sites may only ever see a resident; the tool
 cannot tell, and the count only falls. World.masked (the coordinator, 11-19, after perf read it): it puts
 each companion of the printing World as her tag and leaves a player's id raw, so it covers her name and never
 an id: the id walk reads a print with masked's insides kept and takes no masked(...) out as a lookup, and its
@@ -4830,10 +4832,11 @@ arguments hand an id on only outside a lookup call (an id inside _players.get(_p
 Masked knows only the companions of the World that prints; the walk is static and cannot tell whether a
 companion_arg site prints for a companion outside that zone, so it credits masked there as everywhere, and
 such a site is tagged at the call (the coordinator's word to economy). The check runs in about 2.5 s (it was
-0.3). tests/print_names_test.sh: 14 new rows (her id to stockpile.deposit and to a printer of main.gd's own, over; the printer itself over its
+0.3). tests/print_names_test.sh: 14 new rows (her id to a printer of main.gd's own, over; the printer itself over its
 relay_print line; a card's name, over; inside Companion.tag, passes; a printer that only tests the parameter,
-passes; a whole id, over; an id only looked up, passes; the peer table's id, over; deposit's print through
-tags brings stockpile.gd's relay_print and economy.gd's companion_arg under their lines; a player id through
+passes; a whole id, over; an id only looked up, passes; the peer table's id, over; her id to deposit, whose
+print tags it, passes; deposit's print with by raw again fails stockpile.gd's relay_print and economy.gd's three
+id_arg calls at 0; a player id through
 a printer's World.masked, over; her id so, passes; an id handed inside World.masked(...), over). PASS. Tools and
 tests only; protocol unchanged; no class_name; no bullet.
 
