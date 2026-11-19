@@ -1726,6 +1726,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if click.button_index == MOUSE_BUTTON_LEFT and opens_on_click(target):
 		_open_pack(player, target)
 		return
+	# 935 amended (12): a person drawn over a way in (the low camera puts one 2 to 5 cells before a door over its picture) with the pointer on
+	# that way in's own picture: the press goes in, as it would with nobody there.
+	if click.button_index == MOUSE_BUTTON_LEFT and on_sprite and target != player:
+		var way_in := _way_in_over(target)
+		if way_in != NONE:
+			if Net.test_click_log:
+				print("[click] over a way in: goal %s" % way_in)
+			_move_click(player, way_in)
+			return
 	var targetable := target != null and target != player and World.can_target(player, target)
 	# Left on a friend (a resident, a companion, another player) or a
 	# peaceable monster that talks, both schemes: talk, never an attack
@@ -1767,6 +1776,56 @@ func _plain_left(player: Player, target: GridEntity, tile: Vector2i, targetable:
 		_move_click(player, go_in_goal(level, tile))  # 935 amended (4): a click on a way into a building with an inside goes in.
 
 
+## Whether [param link] (a level link of a level's "links") is one a click may go in by: not closed, hidden, sealed or one-way.
+static func link_usable(link: Dictionary) -> bool:
+	return not bool(link.get("closed", false)) and not bool(link.get("hidden", false)) and str(link.get("sealed", "")).is_empty() 		and not bool(link.get("one_way", false))
+
+
+## Where a press on a person who talks goes instead of a talk (935 amended (12); the coordinator after guidea6: Hale's Resident, 4 cells before
+## the Mughouse's door and drawn over it, took the click as a talk and the door was never pressed). [param door] is the door edge the
+## pointer's ray passes (Client3D.door_on_ray, bodies looked through; null for none), [param ground] the cell the pointer meets on the
+## ground, [param person] the cell the person stands on. The press goes in only when the pointer is on a way in's own picture: a door's
+## opening, or a usable level link's own ground. The goal is what the same press would do with nobody there (go_in_goal of the ground cell,
+## else of the door's own cells, else the ground cell). A person within 1 cell of the way in (its door cells, the goal) is still talked to,
+## and a press on wall, roof or floor behind a person is no way in. NONE for a talk.
+static func way_in_over_person(from_level: Dictionary, door: Variant, ground: Vector2i, person: Vector2i) -> Vector2i:
+	var near: Array[Vector2i] = []
+	var goal := NONE
+	if door is Vector3i:
+		near.assign(Terrain.edge_cells(door))
+		goal = go_in_goal(from_level, ground) if ground != NONE else NONE
+		if goal == ground:
+			for cell: Vector2i in near:
+				var through := go_in_goal(from_level, cell)
+				if through != cell:
+					goal = through
+					break
+		if goal == ground:
+			# No inside to go in to (a walk-in building's door, a shut way in): the door's own cell nearer the ground the pointer meets.
+			goal = near[0]
+			if near.size() > 1 and Vector2(near[1]).distance_squared_to(Vector2(ground)) < Vector2(near[0]).distance_squared_to(Vector2(ground)):
+				goal = near[1]
+	elif ground != NONE:
+		for link: Dictionary in from_level.get("links", []):
+			if link_usable(link) and Vector2i(link["tile"]) == ground:
+				near = [ground]
+				goal = ground
+	if goal == NONE:
+		return NONE
+	near.append(goal)
+	for cell: Vector2i in near:
+		if maxi(absi(person.x - cell.x), absi(person.y - cell.y)) <= 1:
+			return NONE
+	return goal
+
+
+## [method way_in_over_person] for the press now under the pointer on [param person], NONE for a talk (and in a headless run: no ray).
+func _way_in_over(person: GridEntity) -> Vector2i:
+	if person == null or _client3d == null or DisplayServer.get_name() == "headless" or not talks_on_click(person):
+		return NONE
+	return way_in_over_person(level, _client3d.door_edge_under_mouse(), _mouse_tile(), person.tile)
+
+
 ## A plain click's goal (935 amended (4)): for a building with an inside (a level_link behind its door), a click on one of its door
 ## edges' cells, the front one outside or the one inside the door, is a click to go in: the goal is that building's link, so "lane, click
 ## the door, he is in the tavern": a route ends on the cell clicked and never passes over a link, and a click on the door's own face
@@ -1780,7 +1839,7 @@ static func go_in_goal(from_level: Dictionary, tile: Vector2i) -> Vector2i:
 		if code.is_empty():
 			code = str(building.get("slot", ""))
 		var mine: Array = links.filter(func(link: Dictionary) -> bool:
-			return str(link.get("building", "")) == code and not bool(link.get("closed", false)) and not bool(link.get("hidden", false)) 				and str(link.get("sealed", "")).is_empty() and not bool(link.get("one_way", false)))
+			return str(link.get("building", "")) == code and link_usable(link))
 		if mine.is_empty():
 			continue
 		var at_door := false
@@ -1821,8 +1880,11 @@ func _click_with_bow(player: Player) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)
+	var way_in := _way_in_over(target) if on_sprite and target != player else NONE  # 935 amended (12): as the plain click.
 	if opens_on_click(target):
 		_open_pack(player, target)  # 779: as the plain click without a bow.
+	elif way_in != NONE:
+		_move_click(player, way_in)
 	elif target != null and target != player and talks_on_click(target):
 		_talk_to(player, target)
 	elif Net.controls == "wasd" and not on_sprite:

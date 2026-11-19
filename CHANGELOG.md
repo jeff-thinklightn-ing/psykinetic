@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A click on a door takes you in even when someone stands in the way of it, and a click on someone right at the door talks to them (935 amended (12)).
 - Each new line in the talk box comes into view in full as it arrives, however long it is (427 amended (2)).
 - Press Y to answer an offer while a place's name is up on the screen, and your yes is given as soon as the name clears (660 amended (15)).
 - If you come out of the Mughouse with no fishing rod, your companion offers to take you to Rolf's stall for one before the pond, and after dark tells you that his stall opens in the morning (945 amended (4)).

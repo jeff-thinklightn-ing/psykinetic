@@ -6447,6 +6447,35 @@ func entity_under_mouse() -> GridEntity:
 	return entity_on_ray(_mouse_ray())
 
 
+## The door edge whose opening the cursor's ray passes (935 amended (12)), with bodies looked through: a person standing before a door
+## does not hide it. [param ray] as _mouse_ray gives (a test's from the camera through a point); null when it passes none. The opening is the
+## door's own pick volume (its edge's width, the ground to the frame's height), so a press on a plain wall, a roof or the ground
+## behind a body is no door; and a ray that lands on the ground before the door never reaches it.
+func door_on_ray(ray: Array[Vector3]) -> Variant:
+	if _camera == null:
+		return null
+	var query := PhysicsRayQueryParameters3D.create(ray[0], ray[0] + ray[1] * CAMERA_DISTANCE * 3.0)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = []
+	for i in PICK_DEPTH:
+		query.exclude = exclude
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			break
+		var area: Area3D = hit["collider"]
+		if area.has_meta("door"):
+			return area.get_meta("door")
+		exclude.append(hit["rid"])
+	return null
+
+
+## [method door_on_ray] for the cursor's own ray (a press's position while one is being read).
+func door_edge_under_mouse() -> Variant:
+	return door_on_ray(_mouse_ray())
+
+
 ## Where cell [param cell]'s ground point is on the screen, in viewport coordinates (the space a press's position and the pointer are read in); NaN when it
 ## is behind the lens or off the visible rect. A press there picks the cell back (tests/tour/bot.gd's click sends it).
 func screen_point_of(cell: Vector2i) -> Vector2:

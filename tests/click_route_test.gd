@@ -53,6 +53,7 @@ func _ready() -> void:
 		_test_rack_click()
 		_test_go_in()
 		_test_footprint_click()
+		_test_way_in_over_person()
 		_test_door_talk()
 		_test_stand_cell_routes()
 		_test_no_route()
@@ -259,6 +260,57 @@ func _test_footprint_click() -> void:
 	var shut_goal: Vector2i = _main._click_ground_cell(Vector2(174, 206))
 	_main.level = kept
 	_check(shut_goal != Vector2i(174, 206) and not links.has(shut_goal), "the inn's way in shut: a click on its roof is the snap's cell %s, as before" % shut_goal)
+
+
+## 935 amended (12): a press on a person drawn over a way in goes in when the pointer is on the way in's own picture (guidea6: a resident
+## at (182,211), 4 cells before the Mughouse's door, took the press as a talk). Main.way_in_over_person says where, from the door edge the ray
+## passes (null for none), the ground cell under the pointer and the person's cell; the view's own rows (view_test) say what a ray passes.
+func _test_way_in_over_person() -> void:
+	print("\n== a press on a person before a way in goes in on the way in's own picture only (935 amended (12)) ==")
+	var wilds: Dictionary = _main.level
+	var inn := _building_at(wilds, Vector2i(174, 208))
+	var doors: Array = Level.entrances(inn) if not inn.is_empty() else []
+	_check(not doors.is_empty() and doors[0] is Vector3i, "the Mughouse's door edges: %s" % [doors])
+	if doors.is_empty() or not doors[0] is Vector3i:
+		return
+	var door: Vector3i = doors[0]
+	var cells: Array[Vector2i] = Terrain.edge_cells(door)
+	var links: Array[Vector2i] = []
+	for link: Dictionary in wilds.get("links", []):
+		if str(link.get("to_map", "")) == "umbrage_tavern":
+			links.append(link["tile"])
+	var inside := Vector2i(177, 209)
+	# The look's own stand: the resident 4 cells off, the pointer on the door's opening above him (the ray's ground behind the door).
+	var gone_in: Vector2i = Main.way_in_over_person(wilds, door, inside, Vector2i(182, 211))
+	_check(links.has(gone_in), "the look's own stand: a person 4 cells off, the ray through the door's opening: the press goes in (%s)" % gone_in)
+	_check(links.has(Main.way_in_over_person(wilds, door, inside, Vector2i(182, 206))), "a person 4 cells off on the other side: in")
+	# One cell off the door's cells or its link is a talk, from every side of them.
+	var near_hits := 0
+	var tried := 0
+	for off: Vector2i in [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(0, 0)]:
+		for base: Vector2i in [cells[0], cells[1], links[0]]:
+			tried += 1
+			if Main.way_in_over_person(wilds, door, inside, base + off) == Main.NONE:
+				near_hits += 1
+	_check(near_hits == tried, "a person within 1 cell of the door's cells or a link is talked to (%d of %d)" % [near_hits, tried])
+	# The pointer on a person's own cell (the ray lands on the ground before the door: no door passed): a talk.
+	_check(Main.way_in_over_person(wilds, null, Vector2i(182, 208), Vector2i(182, 208)) == Main.NONE, "the pointer at the person's own cell: no door passed, a talk")
+	# A person 3 cells before the plain wall, the pointer on his chest with the footprint's ground behind it: a talk (the wider rule's fault).
+	var wall_ground := Vector2i(174, 209)
+	_check(Main.go_in_goal(wilds, wall_ground) != wall_ground, "the footprint's ground behind him would be a click to go in (go_in_goal %s)" % Main.go_in_goal(wilds, wall_ground))
+	_check(Main.way_in_over_person(wilds, null, wall_ground, Vector2i(174, 215)) == Main.NONE, "a person 3 cells before the plain wall, the pointer on his chest: a talk")
+	# A link cell's own ground under the pointer: in; the person within 1 of it: a talk.
+	var link_cell: Vector2i = links[0]
+	_check(Main.way_in_over_person(wilds, null, link_cell, Vector2i(link_cell.x + 4, link_cell.y + 2)) == link_cell, "the pointer on the link cell's own ground, a person 4 cells off: in")
+	_check(Main.way_in_over_person(wilds, null, link_cell, Vector2i(link_cell.x + 1, link_cell.y + 1)) == Main.NONE, "and one beside it: a talk")
+	# A way in that is shut: a link cell is no way in at all; a door's opening still walks to the door's own cell.
+	var shut_level: Dictionary = wilds.duplicate(true)
+	for link: Dictionary in shut_level["links"]:
+		if str(link.get("to_map", "")) == "umbrage_tavern":
+			link["closed"] = true
+	_check(Main.way_in_over_person(shut_level, null, link_cell, Vector2i(link_cell.x + 4, link_cell.y + 2)) == Main.NONE, "a shut link's ground: a talk")
+	var shut_goal: Vector2i = Main.way_in_over_person(shut_level, door, inside, Vector2i(182, 211))
+	_check(shut_goal in cells, "a shut inn's door opening: the walk is to the door's own cell (%s)" % shut_goal)
 
 
 ## The building of [param from_level] whose footprint holds [param cell] (an empty one: none).

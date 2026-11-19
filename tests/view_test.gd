@@ -198,6 +198,7 @@ func _ready() -> void:
 		_test_roofs()
 		_test_wall_heights()
 		await _test_double_doors()
+		await _test_door_on_ray()
 		_test_field()
 		_test_folds()
 		_test_kinds()
@@ -7427,6 +7428,36 @@ func _kinds_level(stamps: Array, slope := 0.0) -> Dictionary:
 		for cell in cells:
 			field[cell.y * size.x + cell.x] = pad
 	return Level.parse(map.to_image(), null, config, Relief.image(field, size))
+
+
+## A press's ray finds the door whose opening it passes (935 amended (12): Client3D.door_on_ray), and no wall, roof or ground: the opening is
+## the door's own pick volume, one edge wide and the frame's height, and a ray that lands on the ground before it never reaches it.
+func _test_door_on_ray() -> void:
+	print("
+== a ray finds a door's own opening and nothing else of its building (935 amended (12)) ==")
+	_rig.rebuild(_kit_level()["terrain"], Vector2i(11, 5))
+	var hut := Level.outline(Rect2i(10, 2, 3, 3)).filter(func(key: Vector3i) -> bool: return _rig._doorways.has(key))
+	if hut.size() != 1:
+		_check(false, "the hut has one door edge to ray at (%s)" % [hut])
+		return
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var key: Vector3i = hut[0]
+	var doorway: Node3D = _rig._doorways[key]
+	var ground := Vector3(doorway.global_position.x, doorway.global_position.y, doorway.global_position.z)
+	var out_of := ground - _rig.to_global(Vector3(11.0, 0.0, 3.0))
+	out_of.y = 0.0
+	var outward := Vector3(signf(out_of.x), 0.0, 0.0) if absf(out_of.x) > absf(out_of.z) else Vector3(0.0, 0.0, signf(out_of.z))
+	var along := Vector3(0.0, 0.0, 1.0) if absf(outward.x) > 0.5 else Vector3(1.0, 0.0, 0.0)
+	var low_camera := func(target: Vector3) -> Array[Vector3]:
+		var origin := ground + outward * 8.0 + Vector3.UP * 3.0  # The low camera's lie: a few metres up, looking across the ground.
+		return [origin, (target - origin).normalized()]
+	_check(_rig.door_on_ray(low_camera.call(ground + Vector3.UP * 1.2)) == key, "a ray through the door's opening finds its edge %s" % [key])
+	_check(_rig.door_on_ray(low_camera.call(ground + Vector3.UP * 1.2 + along * 1.4)) == null, "a ray through the plain wall beside it finds none")
+	_check(_rig.door_on_ray(low_camera.call(ground + Vector3.UP * 5.0)) == null, "a ray over the frame finds none")
+	_check(_rig.door_on_ray(low_camera.call(ground + outward * 3.0)) == null, "a ray that lands on the ground 3 cells before the door finds none (a person there, pointed at his feet)")
+	var inside_hut: Variant = _rig.door_on_ray(low_camera.call(ground - outward * 1.5 + Vector3.UP * 1.2))
+	_check(inside_hut == key, "a ray through the opening to the floor inside still finds it (the ground behind the door is the way in's own)")
 
 
 func _test_double_doors() -> void:
