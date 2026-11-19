@@ -1813,18 +1813,29 @@ func _crop(town: String) -> void:
 				crop_now["worked"] = int(crop_now["worked"]) + since
 				if int(crop_now["worked"]) >= int(rule.get("harvest_steps", 3000)):
 					var food := roundi(float(rule.get("harvest", 150)) * season_scale() * level * float(crop_now["growth"]))
-					production.deliver_to(town, production.worker_at("%s:field" % town), "food", food, "harvest", "the harvest")
-					crop_now["stage"] = "harvested"
-					crop_now["worked"] = 0
-					_note(town, "the harvest is in: %d food" % food)
-					record["harvests"] = int(record.get("harvests", 0)) + 1
+					# Only what the store took is in (449 amended (2), the box's 120 roots of 11-15: a refused
+					# delivery was printed as stored): refused, the crop stays in the field for the next turn.
+					if production.deliver_to(town, production.worker_at("%s:field" % town), "food", food, "harvest", "the harvest"):
+						crop_now["stage"] = "harvested"
+						crop_now["worked"] = 0
+						crop_now.erase("refused")
+						_note(town, "the harvest is in: %d food" % food)
+						record["harvests"] = int(record.get("harvests", 0)) + 1
+					elif not bool(crop_now.get("refused", false)):
+						crop_now["refused"] = true
+						_note(town, "the store could not take the harvest: %d food left in the field" % food)
 		"winter":
 			if not bool(crop_now["roots"]) and farming:
 				var roots := roundi(float(rule.get("roots", 20)) * season_scale()) * level
-				production.deliver_to(town, production.worker_at("%s:field" % town), "food", roots, "roots", "roots dug in winter")
-				crop_now["roots"] = true
-				_note(town, "roots dug: %d food" % roots)
-				record["harvests"] = int(record.get("harvests", 0)) + 1  # A crop too (652 amended): the first may be the roots.
+				# 449 amended (2): dug only once the store took them; refused, they wait in the ground for the next turn.
+				if production.deliver_to(town, production.worker_at("%s:field" % town), "food", roots, "roots", "roots dug in winter"):
+					crop_now["roots"] = true
+					crop_now.erase("refused")
+					_note(town, "roots dug: %d food" % roots)
+					record["harvests"] = int(record.get("harvests", 0)) + 1  # A crop too (652 amended): the first may be the roots.
+				elif not bool(crop_now.get("refused", false)):
+					crop_now["refused"] = true
+					_note(town, "the store could not take the roots: %d food left in the ground" % roots)
 
 
 ## When [param town]'s field's look changed, building_changed for it: Main

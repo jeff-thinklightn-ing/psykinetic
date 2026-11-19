@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_years()
 	_test_field_work()
 	_test_missed()
+	_test_refused()
 	_test_late_sow()
 	_test_farmer_comes()
 	_test_free_name()
@@ -220,6 +221,42 @@ func _test_missed() -> void:
 	_year(towns, 2)
 	_check(towns.crop(TOWN)["stage"] == "rotted" and towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the crop rotted in the field"),
 		"not brought in by winter: it rots")
+
+
+## 449 amended (2) (the box's 120 roots of 11-15, "roots dug" in the town log with nothing banked): a
+## harvest or roots the store refuses (Production.deliver false, as Economy.deliver at the owed cap
+## was) are not counted in: the town log says so once, the crop stays in the field (the roots in the
+## ground), and the next turn tries again; taken, they are in as before.
+func _test_refused() -> void:
+	print("\n== a harvest the store refuses ==")
+	_rain = 0.11
+	_storm = false
+	var towns := _towns()
+	var gate := {"refuse": true}
+	var store := towns.production.stockpile
+	towns.production.deliver = func(town: String, worker_id: String, what: String, count: int, why: String) -> bool:
+		return false if gate["refuse"] else store.deposit(town, what, count, worker_id, why, worker_id)
+	var said := func(prefix: String) -> int:
+		return towns.log_of(TOWN).filter(func(line: Dictionary) -> bool: return str(line["what"]).begins_with(prefix)).size()
+	var before := store.count(TOWN, "food")
+	_year(towns, 19)  # Into autumn's sixth day (14 to 20; winter at 21): the work done, the store refusing.
+	_check(said.call("the harvest is in") == 0 and towns.crop(TOWN)["stage"] == "sown" and store.count(TOWN, "food") == before,
+		"refused: not in, the crop still in the field, nothing banked (%s, food %d)" % [towns.crop(TOWN)["stage"], store.count(TOWN, "food") - before])
+	_check(said.call("the store could not take the harvest") == 1, "the refusal said once in the town log, not every turn (%d)" % said.call("the store could not take the harvest"))
+	gate["refuse"] = false
+	_year(towns, 1)  # To day 20, still autumn: the roots not yet due.
+	_check(said.call("the harvest is in") == 1 and towns.crop(TOWN)["stage"] == "harvested" and store.count(TOWN, "food") > before,
+		"taken on a later turn: in, and banked (%d food)" % (store.count(TOWN, "food") - before))
+	var harvested := store.count(TOWN, "food")
+	gate["refuse"] = true
+	_year(towns, 3)  # Into winter (day 21): the roots refused.
+	_check(said.call("roots dug") == 0 and not bool(towns.crop(TOWN)["roots"]) and store.count(TOWN, "food") == harvested,
+		"roots refused: not dug, nothing banked")
+	_check(said.call("the store could not take the roots") == 1, "the roots' refusal said once (%d)" % said.call("the store could not take the roots"))
+	gate["refuse"] = false
+	_year(towns, 1)
+	_check(said.call("roots dug") == 1 and bool(towns.crop(TOWN)["roots"]) and store.count(TOWN, "food") == harvested + int(_rules["crop"]["roots"]),
+		"roots taken on a later turn: dug and banked (%d food)" % (store.count(TOWN, "food") - harvested))
 
 
 ## 449 amended (1) (Jeff 11-13, pick 2 A): a field may be sown in summer while unsown, and the later

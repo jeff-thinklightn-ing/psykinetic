@@ -14947,6 +14947,16 @@ until next spring. farm_test _test_late_sow (base growth: sown in spring a whole
 4 and 6 of 7, sown that day, (7 - k) / 7 of it; home in autumn, nothing sown), _test_field_work (summer counts while
 unsown), _test_missed (away all spring and summer: only the roots). Server only; protocol and save format unchanged;
 no new class_name. Bullet (voice's words).
+449 amended (2): a harvest or roots the store refuses is kept and said, never printed as stored (the
+box's 120 roots of 11-15, "roots dug" in the town log with nothing banked; the coordinator, 11-17;
+label from tools/decision_number.sh). Towns._crop counts the harvest in, and the roots dug, only when
+Production.deliver_to took them: refused (Economy.deliver at the owed cap), the crop stays "sown" in
+the field, the roots in the ground, the town log says so once ("the store could not take the harvest:
+N food left in the field", "... the roots: N food left in the ground", the crop's "refused" flag), and
+the next turn tries again; taken, they are in as before and the flag is cleared. farm_test
+_test_refused. Server only; protocol unchanged (the flag is in the saved crop, read with a default);
+no new class_name; no bullet.
+
 ## 446. The "world" message: what each player's world map knows
 
 ui's world map (its step 5; 445 reads this) draws areas, ways and places
