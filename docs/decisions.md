@@ -4803,6 +4803,32 @@ tests/land_checks_test.sh fakes print_names.py beside the other checks' tools (9
 failed for lack of one) with a row for each of land.sh and land.ps1: PASS; the other tests that copy
 land.sh (fonts_imported, land_beat, land_retry, land_tested, land_name, push_guard, remote_slot,
 run_digest, run_parse) PASS.
+284 amended (4) (perf, 2026-11-17; the coordinator's ruling after release's read of the box by class, the
+"[stockpile] folk:companion:<x> banked 2 gold ... (from <x> bought food from the store for 2 gold)" lines, 35 of
+them 10-19 to 11-15; label from tools/decision_number.sh): print_names follows a value handed to a function that
+prints it raw. The direct rules read only a print's own code; sim/economy.gd handed her "folk:%s" % id and
+who["name"] to stockpile.deposit, whose print shows its by and from raw. tools/print_names.py now reads every
+top-level func of the server's files: a parameter it prints raw (bare in a print's code, outside a tag call
+or World.masked(...), not only tested as in `by != ""`, not read through a member as id.left(8)), or hands
+bare to such a parameter of another, to a fixed point. A call is matched to its function by its receiver's
+file (stockpile.deposit to sim/stockpile.gd), a bare call to its own file's, else every server function of
+that name. Counted per file and budgeted as the rest: companion_arg, a call handing her id formatted raw
+("folk:%s" % ..., "companion:%s" % ...) or a folk record's name (who["name"], who.get("name")) into a
+printed parameter; id_arg, a call handing a whole player id there (the direct rule's names, after any call
+that only looks it up, str() and _peer_ids.get excepted); relay_print, the print that shows such a parameter
+raw. The first read also found a whole player id reaching the journal at six calls (main.gd's
+_start_return twice, to sim/production.gd:701; main.gd's add_xp note, to sim/towns.gd:4201; economy.gd's
+"sale:%s" twice and pay_loan's "debt:%s", to sim/stockpile.gd:234). The coordinator's ruling: budgeted at
+today's counts (main.gd companion_arg 1, id_arg 3; sim/economy.gd companion_arg 14, id_arg 3, relay_print 2;
+sim/production.gd relay_print 2; sim/stockpile.gd relay_print 1; sim/towns.gd relay_print 1), economy's
+econprint take mends them, and a file's id_arg line goes when it reaches 0, so from then an id handed to a
+printer fails outright as the direct rule. Some companion_arg sites may only ever see a resident; the tool
+cannot tell, and the count only falls. The check runs in about 2.5 s (it was 0.3). tests/print_names_test.sh:
+11 new rows (her id to stockpile.deposit and to a printer of main.gd's own, over; the printer itself over its
+relay_print line; a card's name, over; inside Companion.tag, passes; a printer that only tests the parameter,
+passes; a whole id, over; an id only looked up, passes; the peer table's id, over; deposit's print through
+tags brings stockpile.gd's relay_print and economy.gd's companion_arg under their lines). PASS. Tools and
+tests only; protocol unchanged; no class_name; no bullet.
 
 284 amended (3): a player's id off every server print (TASK 9, the coordinator's call of 2026-11-19
 and its correction the same day, on the 11-17 ruling; label from tools/decision_number.sh). Each print

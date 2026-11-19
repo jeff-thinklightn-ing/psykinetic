@@ -91,6 +91,51 @@ add main.gd $'\tprint("[fight] %s" % World.last_log)'
 PN; check $(fails_with $? "World._log prints its message only through masked") "a second printer of the message (last_log) fails"
 reset
 
+echo "== a companion or a player id handed to a printer (284 amended (2)'s leftover) =="
+# A take adds a printer of main.gd's own and a caller handing it <arg>.
+relay() { printf '\n\nfunc _relay_row(by: String, what := "") -> void:\n\tprint("[row] %%s: %%s" %% [%s, what])\n\n\nfunc _relay_caller() -> void:\n\t_relay_row(%s, "x")\n' "${2:-by}" "$1" >>"$work/main.gd"; }
+add main.gd $'\tWorld.stockpile.deposit("umbrage", "gold", 2, "folk:%s" % id, "a sale")'
+PN; check $(fails_with $? "companion_arg lines, over") "her folk id handed to stockpile.deposit (its print shows by raw) is over main.gd's companion_arg line"
+reset
+relay '"companion:%s" % pet_id'
+PN; check $(fails_with $? "companion_arg lines, over") "her id handed to a printer of main.gd's own: over its companion_arg line"
+grep -q "main.gd: 1 relay_print lines, over its line of 0" "$tmp/out.txt"; check $? "and the printer that shows it raw is over main.gd's relay_print line"
+reset
+relay 'str(who["name"])'
+PN; check $(fails_with $? "companion_arg lines, over") "a card's name (who[\"name\"]) handed the same way: over"
+reset
+relay 'Companion.tag(pet_id)'
+PN; check $? "her id inside Companion.tag passes"
+reset
+relay '"companion:%s" % pet_id' '"#" if by != "" else "someone"'
+PN; check $? "a printer that only tests the parameter (by != \"\") does not show it: passes"
+reset
+relay '"sale:%s" % player_id'
+PN; check $(fails_with $? "id_arg lines, over") "a whole player id handed to a printer is over main.gd's id_arg line"
+reset
+relay 'str(_players.get(_peer_of(player_id)))'
+PN; check $? "a player id only looked up inside a call (no id handed on) passes"
+reset
+relay 'str(_peer_ids.get(peer, ""))'
+PN; check $(fails_with $? "id_arg lines, over") "the peer-to-id table's id handed on is over"
+reset
+cp "$work/sim/stockpile.gd" "$tmp/stockpile.gd.good"
+python - "$work/sim/stockpile.gd" <<'EOF'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8", newline="").read()
+a = '[by if by != "" else "someone", amount,'
+b = 'what, place, from if from != "" else "nowhere said", now()])'
+assert s.count(a) == 1 and s.count(b) == 1
+s = s.replace(a, '[Companion.tag(by) if by != "" else "someone", amount,')
+s = s.replace(b, 'what, place, World.masked(from) if from != "" else "nowhere said", now()])')
+open(p, "w", encoding="utf-8", newline="").write(s)
+EOF
+PN; check $(fails_with $? "sim/stockpile.gd: 0 relay_print lines, under its line of 1") "stockpile.deposit's print through tags: under stockpile.gd's relay_print line, lower it in the same commit"
+grep -q "sim/economy.gd: [0-9]* companion_arg lines, under its line" "$tmp/out.txt"; check $? "and economy.gd's companion_arg count falls with it (the handed sites into deposit)"
+cp "$tmp/stockpile.gd.good" "$work/sim/stockpile.gd"
+reset
+
 echo "== the budget only falls =="
 add main.gd $'\tprint("[zone] %s came" % record.name)'
 PN; check $(fails_with $? "over its line") "a new line naming a player is over main.gd's line"

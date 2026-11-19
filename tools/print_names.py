@@ -31,6 +31,17 @@ them for Jeff and release) are counted per file in tools/print_names_budget.txt,
   player_node     a Player node's name, "Player<index>", the record's kept index: player.name,
                   (x as Player).name
 
+A companion handed to a printer (284 amended (2)'s leftover, release's box read, 11-17): a call
+that passes her id formatted raw ("folk:%s" % id, "companion:%s" % ...) or a card's name
+(x["name"], x.get("name")) into a parameter its function prints raw, itself or through the
+functions it hands that parameter to (by name, across the server's files), is counted per file:
+
+  companion_arg   the call that hands her over (sim/economy.gd: stockpile.deposit and _sale)
+  relay_print     the print that prints such a parameter raw (sim/stockpile.gd: deposit's line)
+
+A parameter is printed raw when it stands bare in a print's code outside a tag; functions are
+matched by name alone, so two of one name count as one. Both kinds are budgeted as the rest.
+
   python -B tools/print_names.py           check: exit 0, or 1 naming each line or count
   python -B tools/print_names.py --list    every line read as a hit, by rule, then the check
   python -B tools/print_names.py --counts  the budget as it stands, one line per file
@@ -71,10 +82,20 @@ RULES = [
 	("player_id", re.compile(r"\b(?:player_id|keeper_id|owner_id)\b|\b_peer_ids\s*(?:\[|\.get\()")),
 ]
 SELF_NAME = re.compile(r"(?<![\w.])name\b(?!\s*=)")  # Her own node name, in sim/companion.gd.
+# A companion handed to a printer (284 amended (2)'s leftover): her id formatted raw, or a card's name.
+HANDED = re.compile(r'"(?:folk|companion):%[sd]"\s*%|\bwho\s*(?:\[\s*|\.get\(\s*)"name"')
+MASKED = re.compile(r"(?<![\w])(?:World\.)?masked\(")
+# A call that only looks the id up (_players.get(_peer_of(id))): any call but str(), taken out for the id rule.
+LOOKUP = re.compile(r"(?<![\w.])(?!str\(|_peer_ids\.get\()(?:\w+\.)*\w+\(")
+FUNC = re.compile(r"^(?:static\s+)?func\s+(\w+)\(", re.M)
+ANY_CALL = re.compile(r"(?<![\w.])((?:\w+\.)*)(\w+)\(")  # A call: its receiver (if any) and name.
 BUDGETED = [
 	("player_name", re.compile(r"\brecord\.name\b|\bplayer_name\w*\b|\b_display_name\(")),
 	("id_letters", re.compile(r"\.left\(\s*\d+\s*\)")),
 	("player_node", re.compile(r"\bplayer\.name\b|\(\s*\w+\s+as\s+Player\s*\)\.name\b")),
+	("companion_arg", None),  # Counted by handed(), not by a pattern.
+	("id_arg", None),
+	("relay_print", None),
 ]
 
 
@@ -145,10 +166,10 @@ def calls(text, call=CALL):
 	return out
 
 
-def _untagged(code):
+def _untagged(code, tagged=None):
 	"""The call's code with each tag call (and all inside it) taken out."""
 	while True:
-		m = TAGGED.search(code)
+		m = (tagged or TAGGED).search(code)
 		if not m:
 			return code
 		depth, i = 1, m.end()
@@ -163,6 +184,144 @@ def _blanked(code):
 	"""Strings emptied, so a word inside a line's text is never read as code; a "name" key kept."""
 	return re.sub(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'',
 		lambda m: m.group(0) if m.group(0) == '"name"' else '""', code)
+
+
+def functions(text):
+	"""[(name, [parameter names], body, first line of the body)] of each top-level func."""
+	out = []
+	for m in FUNC.finditer(text):
+		depth, i = 1, m.end()
+		while i < len(text) and depth > 0:
+			depth += text[i] in "([{"
+			depth -= text[i] in ")]}"
+			i += 1
+		params = [re.match(r"\s*(\w*)", each).group(1) for each in split_args(text[m.end():i - 1])]
+		start = text.find("\n", i) + 1
+		end = re.compile(r"^[^\s#]", re.M).search(text, start)
+		out.append((m.group(1), [each for each in params if each], text[start:end.start() if end else len(text)],
+			text.count("\n", 0, start) + 1))
+	return out
+
+
+def split_args(code):
+	"""A call's arguments, split at its top-level commas (strings and brackets kept whole)."""
+	out, depth, i, last = [], 0, 0, 0
+	while i < len(code):
+		c = code[i]
+		if c in "\"'":
+			i = _string_end(code, i)
+			continue
+		depth += c in "([{"
+		depth -= c in ")]}"
+		if c == "," and depth == 0:
+			out.append(code[last:i])
+			last = i + 1
+		i += 1
+	out.append(code[last:])
+	return [each.strip() for each in out]
+
+
+def _bare(word, code):
+	"""Whether [word] stands as a bare name in [code] (strings blanked): not a member, not a call, and
+	not read through one of its own (id.left(8), entity.name: the other rules read those)."""
+	return re.search(r"(?<![\w.])%s\b(?!\s*[(.\[])" % re.escape(word), code) is not None
+
+
+def _shown(word, code):
+	"""Whether [word] is printed raw in a print's [code]: bare, and not only tested (`by != ""`, `if by`)."""
+	tested = r"\b(?:if|not|elif)\s+%s\b|%s\s*(?:[!=]=|[<>]=?)" % ((re.escape(word),) * 2)
+	return _bare(word, re.sub(tested, "#", code))
+
+
+def handed():
+	"""(the calls that hand a companion to a printer, the prints that print her), each [(file, line,
+	code)]: 284 amended (2)'s leftover, followed parameter by parameter through the functions."""
+	funcs = {}  # (file, name): (params, first line, [(callee keys, line, args)], [(line, code, blanked code)] of its prints)
+	bodies = []
+	files = server_files()
+	by_base = {}
+	for f in files:
+		by_base.setdefault(os.path.splitext(os.path.basename(f))[0].lower(), []).append(f)
+	for f in files:
+		text = open(os.path.join(ROOT, f), encoding="utf-8").read()
+		for name, params, body, line in functions(text):
+			bodies.append((f, name, params, body, line))
+	names = {}
+	for f, name, _, _, _ in bodies:
+		names.setdefault(name, []).append(f)
+
+	def callees(f, receiver, name):
+		# A bare call is the file's own function; "stockpile.deposit" the one in stockpile.gd where a
+		# file of the receiver's name has it; else every server function of that name.
+		where = names.get(name, [])
+		if not receiver:
+			return [(f, name)] if f in where else []
+		mine = [each for each in by_base.get(receiver.lstrip("_").lower(), []) if each in where]
+		return [(each, name) for each in (mine or where)]
+
+	for f, name, params, body, line in bodies:
+		found = [m for m in ANY_CALL.finditer(body) if _in_code(body, m.start())]
+		made = [(callees(f, m.group(1).rstrip(".").split(".")[-1] if m.group(1) else "", m.group(2)), l, split_args(c))
+			for m, (l, c, _) in zip(found, calls(body, ANY_CALL))]
+		# World.masked puts each companion of the zone as her tag (279 amended (4)): a name inside it is not hers.
+		shown = [(l, c, _blanked(_untagged(_untagged(c), MASKED))) for l, c, s in calls(body) if not s.startswith("[test]")]
+		funcs[(f, name)] = (params, line, made, shown)
+
+	def handed_bare(made, param, slots_of):
+		# The (callee, slot) pairs [param] is handed to bare, among the slots [slots_of] gives each callee.
+		for keys, _, args in made:
+			for key in keys:
+				for slot in slots_of.get(key, ()):
+					if slot < len(args) and _bare(param, _blanked(_untagged(args[slot]))):
+						yield key, slot
+
+	# The slots each function prints raw: itself, or by handing them on to such a slot (a fixed point).
+	printed = {}
+	for key, (params, _, _, shown) in funcs.items():
+		for _, _, code in shown:
+			printed.setdefault(key, set()).update(i for i, p in enumerate(params) if _shown(p, code))
+	changed = True
+	while changed:
+		changed = False
+		for key, (params, _, made, _) in funcs.items():
+			for i, p in enumerate(params):
+				if i not in printed.get(key, ()) and any(handed_bare(made, p, printed)):
+					printed.setdefault(key, set()).add(i)
+					changed = True
+	# The calls that hand her into a printed slot; then onward, from those slots alone.
+	# A whole player id handed the same way is counted apart (id_arg): 279 amended (3)'s rule, met
+	# through a printer (Economy.pay_loan's "debt:<id>", 11-17).
+	whole_id = dict(RULES)["player_id"]
+	reach, gave, ids = {}, [], []
+	for (f, _), (params, line, made, _) in funcs.items():
+		for keys, l, args in made:
+			hit = {}
+			for key in keys:
+				for found, form in ((gave, lambda arg: HANDED.search(_untagged(arg))),
+						(ids, lambda arg: whole_id.search(_blanked(_untagged(_untagged(arg), LOOKUP))))):
+					got = [slot for slot in printed.get(key, ()) if slot < len(args) and form(args[slot])]
+					if got:
+						hit[id(found)] = found
+						reach.setdefault(key, set()).update(got)
+			for found in hit.values():
+				found.append((f, line + l - 1, "%s(%s)" % (keys[0][1], ", ".join(args))))
+	changed = True
+	while changed:
+		changed = False
+		for key, (params, _, made, _) in funcs.items():
+			for i in list(reach.get(key, ())):
+				if i >= len(params):
+					continue
+				for callee, slot in list(handed_bare(made, params[i], printed)):
+					if slot not in reach.setdefault(callee, set()):
+						reach[callee].add(slot)
+						changed = True
+	relays = []
+	for (f, name), (params, line, _, shown) in funcs.items():
+		for l, c, code in shown:
+			if any(i < len(params) and _shown(params[i], code) for i in reach.get((f, name), ())):
+				relays.append((f, line + l - 1, c))
+	return sorted(gave), sorted(ids), sorted(relays)
 
 
 def scan():
@@ -184,6 +343,8 @@ def scan():
 			if f == "sim/companion.gd" and not masked and SELF_NAME.search(blank):
 				hits.append((f, line, "entity", code))
 			for rule, pattern in BUDGETED:
+				if pattern is None:
+					continue
 				if masked and rule == "player_node":
 					continue  # A Player's node among World._log's entity names: Jeff's pick, as the rest.
 				if pattern.search(blank):
@@ -193,6 +354,12 @@ def scan():
 		if not masked_print_ok(f, text):
 			hits.append((f, 0, "log_print", "World._log prints its message only through masked(message), once; "
 				"no other print reads last_log or recent_logs"))
+	gave, ids, relays = handed()
+	for rule, found in (("companion_arg", gave), ("id_arg", ids), ("relay_print", relays)):
+		for f, line, code in found:
+			counts.setdefault(f, {}).setdefault(rule, 0)
+			counts[f][rule] += 1
+			hits.append((f, line, rule, code))
 	return hits, counts
 
 
