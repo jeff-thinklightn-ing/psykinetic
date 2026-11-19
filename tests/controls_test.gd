@@ -1323,11 +1323,13 @@ func _test_bubble_click_goes_through() -> void:
 	speaker.name = "Wynn"
 	_check(World.spawn(speaker, Vector2i(12, 4)), "(a resident speaks at 12,4)")
 	var key := speaker.get_instance_id()
-	bubbles.anchor_of = func(k: int) -> Variant: return bubbles.get_local_mouse_position() + Vector2(0.0, 12.0) if k == key else null
+	# The speaker is mid-screen: a bubble is held on the screen now (865 amended (10)), so one at a headless mouse's (0, 0) corner is not under it.
+	var middle := bubbles.get_viewport_rect().size * 0.5
+	bubbles.anchor_of = func(k: int) -> Variant: return middle if k == key else null
 	bubbles.show_line(key, "Fine weather for it.")
 	bubbles._layout()
-	_check(bubbles.key_under_mouse() == key and bubbles.mouse_filter == Control.MOUSE_FILTER_IGNORE,
-			"(the bubble is under the mouse, and takes no mouse)")
+	_check(bubbles.key_at(bubbles.rect_of(key).get_center()) == key and bubbles.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+			"(a point of the bubble is under it, and it takes no mouse)")
 	_main._pick_grid = Vector2(9.2, 6.1)
 	_left(false)
 	_check(_walking_to(Vector2i(9, 6)) and not _main._bar.visible and _main._talk_wanted == null,

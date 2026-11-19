@@ -19384,6 +19384,8 @@ func _build_talk() -> void:
 	bubbles.name = "Bubbles"
 	bubbles.anchor_of = _bubble_anchor
 	bubbles.tile_px = _bubble_tile_px
+	bubbles.plate_of = _bubble_plate
+	bubbles.keep_off = _bubble_keep_off
 	$HUD.add_child(bubbles)
 	$HUD.move_child(bubbles, 0)
 	gains = Gains.new()
@@ -19765,6 +19767,34 @@ func _bubble_anchor(key: int) -> Variant:
 	if entity == null or not entity.is_inside_tree() or not entity.visible:
 		return null
 	return entity.get_global_transform_with_canvas() * Vector2(0.0, -BUBBLE_OVER_2D)
+
+
+## Speaker [param key]'s name row as the plates drew it this frame, empty for none (865 amended (10)).
+func _bubble_plate(key: int) -> Rect2:
+	return name_plates.placed_rect(key) if name_plates != null else Rect2()
+
+
+## The HUD blocks a bubble keeps off, as drawn (865 amended (10), D): the compass and its place name,
+## the minimap, the hint lines.
+func _bubble_keep_off() -> Array:
+	var out: Array = []
+	for block: Variant in [compass, compass.get("_place") if compass != null else null, minimap, _context_hint, _talk_hint]:
+		if block is Control and (block as Control).is_visible_in_tree():
+			var box := (block as Control).get_global_rect()
+			if block is Label:  # a label's own text, not its box (the compass's place name is a 1000 px box, right-aligned)
+				var label := block as Label
+				if label.text.is_empty():
+					continue
+				var ink := label.get_theme_font("font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+					label.get_theme_font_size("font_size"))
+				var x := box.position.x
+				if label.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT:
+					x = box.end.x - ink.x
+				elif label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER:
+					x = box.get_center().x - ink.x * 0.5
+				box = Rect2(x, box.get_center().y - ink.y * 0.5, minf(ink.x, box.size.x), ink.y)
+			out.append(box)
+	return out
 
 
 func _bubble_tile_px() -> float:

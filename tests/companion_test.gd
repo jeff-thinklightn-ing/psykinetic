@@ -5690,10 +5690,80 @@ func _test_bubbles() -> void:
 	_check(two.size.x <= SpeechBubbles.MAX_WIDTH_TILES * 64.0 + 1.0 and two.size.y > one.size.y,
 			"a long line wraps within 3 tiles (%s)" % two.size)
 	_check(is_equal_approx(SpeechBubbles.hold_seconds("x".repeat(80)), 6.0), "held 4 s and 1 s per 40 characters")
-	bubbles.tile_px = func() -> float: return 128.0
+	# 865 amended (10), A: set at the zoom until zoom 1.0 (the screen CAMERA_SIZE tiles tall), the same size nearer.
+	var cap := bubbles.get_viewport_rect().size.y / Client3D.CAMERA_SIZE
+	bubbles.tile_px = func() -> float: return cap * 0.25
 	bubbles._layout()
-	var ratio := bubbles.rect_of(1).size.x / one.size.x
+	var far := bubbles.rect_of(1).size.x
+	bubbles.tile_px = func() -> float: return cap * 0.5
+	bubbles._layout()
+	var ratio := bubbles.rect_of(1).size.x / far
 	_check(ratio > 1.8 and ratio < 2.2, "and set at the zoom: twice the px per tile, about twice as wide (%.2f)" % ratio)
+	bubbles.tile_px = func() -> float: return cap
+	bubbles._layout()
+	var at_one := bubbles.rect_of(1).size
+	bubbles.tile_px = func() -> float: return cap * 3.0
+	bubbles._layout()
+	_check(bubbles.rect_of(1).size.is_equal_approx(at_one), "from zoom 1.0 in, one size as the name plates are (%s at 1.0, %s at 3.0)" % [at_one, bubbles.rect_of(1).size])
+	bubbles.queue_free()
+	_test_bubbles_kept_on_screen()
+
+
+## 865 amended (10): the tail's tip over the speaker's own plate (B), the bubble held on the screen beside the plate and off
+## the speaker's face (C), and off the HUD's blocks (D). The plates and blocks are given, as Main gives them.
+func _test_bubbles_kept_on_screen() -> void:
+	print("
+== a speech bubble: tip over the plate, held on the screen, off the HUD's blocks (865 amended (10)) ==")
+	var bubbles := SpeechBubbles.new()
+	add_child(bubbles)
+	var screen := bubbles.get_viewport_rect()
+	var tile := screen.size.y / Client3D.CAMERA_SIZE
+	var inside := screen.grow(-SpeechBubbles.EDGE)
+	var gap := SpeechBubbles.GAP
+	bubbles.tile_px = func() -> float: return tile
+	var head := Vector2(screen.size.x * 0.5, screen.size.y * 0.5)
+	# B: the plate drawn higher than the anchor says (a speaker that moved: the plate's row is the newer one).
+	var plate := Rect2(head + Vector2(-0.55 * tile, -10.0), Vector2(1.1 * tile, 0.35 * tile))
+	bubbles.anchor_of = func(_key: int) -> Variant: return head
+	bubbles.plate_of = func(_key: int) -> Rect2: return plate
+	bubbles.show_line(1, "Stay close to me.")
+	bubbles._layout()
+	var rect := bubbles.rect_of(1)
+	_check(rect.end.y <= plate.position.y - gap + 0.01 and rect.end.y > plate.position.y - gap - 1.0,
+			"the tail's tip a gap (%.0f) over the plate it is given: tip %.1f, plate top %.1f" % [gap, rect.end.y, plate.position.y])
+	_check(not rect.intersects(plate), "nothing of the bubble on the plate")
+	_check(bubbles.tail_of(1) == SpeechBubbles.Tail.DOWN, "the tail points down at a head under it")
+	bubbles.plate_of = func(_key: int) -> Rect2: return Rect2()
+	bubbles._layout()
+	_check(bubbles.rect_of(1).end.y <= head.y - gap + 0.01, "with no plate drawn, the tip is over the head (%.1f of %.1f)" % [bubbles.rect_of(1).end.y, head.y])
+	# C: a speaker near the top: the bubble beside the plate, tail sideways, on the screen, off the plate and the face.
+	var top_head := Vector2(screen.size.x * 0.3, 30.0)
+	var top_plate := Rect2(top_head + Vector2(-0.25 * tile, 0.0), Vector2(0.5 * tile, 0.35 * tile))
+	var face := Rect2(Vector2(top_plate.get_center().x - SpeechBubbles.FACE_SIZE.x * tile * 0.5, top_plate.end.y), SpeechBubbles.FACE_SIZE * tile)
+	bubbles.anchor_of = func(_key: int) -> Variant: return top_head
+	bubbles.plate_of = func(_key: int) -> Rect2: return top_plate
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	var sideways := bubbles.tail_of(1) == SpeechBubbles.Tail.LEFT or bubbles.tail_of(1) == SpeechBubbles.Tail.RIGHT
+	_check(inside.encloses(rect), "a speaker near the top: the bubble is held on the screen (%s of %s)" % [rect, inside])
+	_check(sideways and not rect.intersects(top_plate) and not rect.intersects(face), "beside the plate, its tail sideways, off the plate and the speaker's face (%s)" % rect)
+	_check(rect.position.x >= face.end.x - 0.01 and bubbles.tail_of(1) == SpeechBubbles.Tail.LEFT, "on the side toward the screen's middle, the tail pointing back at the speaker")
+	# C: the head off the top (no plate): at the top of the screen, the tail up toward the head.
+	bubbles.anchor_of = func(_key: int) -> Variant: return Vector2(screen.size.x * 0.5, -20.0)
+	bubbles.plate_of = func(_key: int) -> Rect2: return Rect2()
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	_check(inside.encloses(rect) and bubbles.tail_of(1) == SpeechBubbles.Tail.UP and is_equal_approx(rect.position.y, inside.position.y),
+			"a head off the top: the bubble at the top of the screen, its tail up (%s)" % rect)
+	# D: a HUD block where the bubble would stand: it steps off by the shortest way that stays on the screen and off the plate.
+	bubbles.anchor_of = func(_key: int) -> Variant: return head
+	bubbles.plate_of = func(_key: int) -> Rect2: return plate
+	var block := Rect2(head + Vector2(-150.0, -150.0), Vector2(300.0, 140.0))
+	bubbles.keep_off = func() -> Array: return [block]
+	bubbles._layout()
+	rect = bubbles.rect_of(1)
+	_check(not rect.intersects(block) and inside.encloses(rect) and not rect.intersects(plate),
+			"over a HUD block: off it, on the screen, off the plate (%s, block %s)" % [rect, block])
 	bubbles.queue_free()
 
 

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A speech bubble stays on the screen and clear of the speaker's face, the compass, the map and the hint lines; its tail stops just above the speaker's name, it sits beside the name when they're near the top of the screen, and it keeps one size as you zoom in close (865 amended (10)).
 - A click on a door takes you in even when someone stands in the way of it, and a click on someone right at the door talks to them (935 amended (12)).
 - Each new line in the talk box comes into view in full as it arrives, however long it is (427 amended (2)).
 - Press Y to answer an offer while a place's name is up on the screen, and your yes is given as soon as the name clears (660 amended (15)).
