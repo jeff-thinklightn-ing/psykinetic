@@ -16657,6 +16657,7 @@ func _test_two_hands() -> void:
 		if body != null:
 			body.set_meta("roused_at", Time.get_ticks_msec())
 	rouse.call()
+	var roused_ms := AnimRig.now_msec()
 	_rig._process(0.0)
 	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
 	var sockets: Dictionary = puppet.get_meta("sockets")
@@ -16669,6 +16670,11 @@ func _test_two_hands() -> void:
 		for at: float in [-1.0, 0.0, 0.55]:
 			if at >= 0.0:
 				rig.upper_at("Axe_Overhead", at)
+			if at < 0.0:
+				# Read once the stance's crossfade is done, on the rigs' own clock (CLIP_BLEND past the rouse): three
+				# frames after it read the pose mid-blend, its figure following the frames' length (0.12 m alone, 0.05
+				# under a full run: perf's flakes.md, v0.1.240's cut).
+				await _until_msec(roused_ms + int(ArtKit.feel("client3d.clip_blend", Client3D.CLIP_BLEND) * 1000.0))
 			for i in 3:
 				await get_tree().process_frame
 			var left := sockets["hand_l"] as Node3D
