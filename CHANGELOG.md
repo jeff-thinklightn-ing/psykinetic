@@ -7,11 +7,6 @@ notes (decision 324).
 
 ## Unreleased
 
-- A speech bubble stays on the screen and clear of the speaker's face, the compass, the map and the hint lines; its tail stops just above the speaker's name, it sits beside the name when they're near the top of the screen, and it keeps one size as you zoom in close (865 amended (10)).
-- A click on a door takes you in even when someone stands in the way of it, and a click on someone right at the door talks to them (935 amended (12)).
-- Each new line in the talk box comes into view in full as it arrives, however long it is (427 amended (2)).
-- Press Y to answer an offer while a place's name is up on the screen, and your yes is given as soon as the name clears (660 amended (15)).
-- If you come out of the Mughouse with no fishing rod, your companion offers to take you to Rolf's stall for one before the pond, and after dark tells you that his stall opens in the morning (945 amended (4)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
@@ -22,6 +17,14 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, keep their count when you die, log out or travel, and a bundle you pick up with your bow out joins those in your hand (619 amended (4), 619 amended (5)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.236
+
+- A speech bubble stays on the screen and clear of the speaker's face, the compass, the map and the hint lines; its tail stops just above the speaker's name, it sits beside the name when they're near the top of the screen, and it keeps one size as you zoom in close (865 amended (10)).
+- A click on a door takes you in even when someone stands in the way of it, and a click on someone right at the door talks to them (935 amended (12)).
+- Each new line in the talk box comes into view in full as it arrives, however long it is (427 amended (2)).
+- Press Y to answer an offer while a place's name is up on the screen, and your yes is given as soon as the name clears (660 amended (15)).
+- If you come out of the Mughouse with no fishing rod, your companion offers to take you to Rolf's stall for one before the pond, and after dark tells you that his stall opens in the morning (945 amended (4)).
 
 ## v0.1.235
 
