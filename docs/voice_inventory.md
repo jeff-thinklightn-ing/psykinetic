@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3153)
+## Lines in the code (3155)
 
 ### companions (Pip, Wren, Nix) (721)
 
@@ -2232,7 +2232,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (844)
+### server and windows (846)
 
 | | Line | Where |
 |---|---|---|
@@ -2388,7 +2388,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Except to %s: you would like to go fishing with them there, and you can take them there yourself. | `main.gd` _roads_words() |
 |  | the old mound | `main.gd` _first_dest() |
 |  | %s at the stall | `main.gd` _first_taker() |
+|  | %s %s %s t%d | `main.gd` _first_say() |
 | U | %s has brought %s to %s. | `main.gd` _first_walk_done() |
+|  | arrived_unsaid %s %s t%d | `main.gd` _first_walk_done() |
 |  | (?i)\\b(to\|towards?)\\b | `main.gd` _guide_said() |
 |  | %s asks you to lead them somewhere you have not been with them: you do not know the way there. | `main.gd` _guide_said() |
 |  | %s asks you to lead them to %s, and you are there already. | `main.gd` _guide_said() |
@@ -3292,7 +3294,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (1119)
+## Lines in the data (1125)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3330,7 +3332,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (268)
+### levels/companion_traits.json (274)
 
 | | Line | Key |
 |---|---|---|
@@ -3395,6 +3397,12 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Not a bad day's work! Shall we take it to %s? | `first_steps.decks.offer.catch.cheerful under pressure[0]` |
 |  | Here we are. The fish go to %s. | `first_steps.decks.arrive.catch[0]` |
 |  | That's where the catch goes: %s. | `first_steps.decks.arrive.catch[1]` |
+|  | This is the medicine man's hut. He makes remedies, if we ever need one. | `first_steps.decks.arrive.healer[0]` |
+|  | Here's the medicine man's hut. We'll know where to come for a remedy. | `first_steps.decks.arrive.healer[1]` |
+|  | Here's the temple. It's the priest here who brings the fallen back. | `first_steps.decks.arrive.temple[0]` |
+|  | So this is the temple. Good to have seen it. | `first_steps.decks.arrive.temple[1]` |
+|  | That's the old mound, with the spears planted round it. | `first_steps.decks.arrive.barrow[0]` |
+|  | There's the old burial mound, all grassed over. | `first_steps.decks.arrive.barrow[1]` |
 |  | We've not seen the Mughouse yet. There's a hearth there, and ale. Shall we? | `first_steps.decks.go.mughouse[0]` |
 |  | Shall we find the Mughouse? I'd like to know where there's a fire and a room. | `first_steps.decks.go.mughouse[1]` |
 |  | Shall we try the pond? It's a short walk south-east of the square. | `first_steps.decks.go.pond[0]` |
