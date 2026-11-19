@@ -4086,10 +4086,10 @@ func _tag_body(node: Node) -> void:
 			return
 		if up.has_meta("entity_id"):
 			(node as VisualInstance3D).layers |= BODY_LAYER
-			# A person's (a look: player, companion, townsperson) own drawn part: skinned on its skeleton
-			# (body, head, hair, a hat, clothes) or a worn piece on a socket; not a held thing, the hung
-			# lantern, a bedroll, a label or a creature (451 amended, the face light).
-			if up.has_meta("look") and node is MeshInstance3D and (node.get_parent() is Skeleton3D or worn):
+			# A person's (is_face_lit: player, companion, every townsperson; or any body on a person's model, a
+			# look) own drawn part: skinned on its skeleton (body, head, hair, a hat, clothes) or a worn piece on
+			# a socket; not a held thing, the hung lantern, a bedroll, a label (451 amended (10), (11)).
+			if (up.has_meta("face_lit") or up.has_meta("look")) and node is MeshInstance3D and (node.get_parent() is Skeleton3D or worn):
 				(node as VisualInstance3D).layers |= FACE_LAYER
 			return
 		worn = worn or up.name == &"Worn"
@@ -4207,7 +4207,7 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## line at the nose, a brim shading the whole face); at the eyes' height it clipped two thirds of a
 ## pale face to white and threw the body's shadow two heights long behind it. So a second light, the
 ## FaceLight: weak, shadowless, FACE_LIGHT_AHEAD along the body's drawn facing at FACE_LIGHT_OVER from
-## the head's top (the eyes' height, under a brim), on FACE_LAYER alone, which only people's body,
+## the head's top (the eyes' height, under a brim), on FACE_LAYER alone, which only a person's (is_face_lit, or a look) body,
 ## head, hair and worn meshes carry (_tag_body): it lights faces (its carrier's, and another person's
 ## within FACE_LIGHT_RANGE) and nothing else, no ground, no wall, no floor past a thin wall. Its
 ## energy FACE_LIGHT_ENERGY times the carried lantern's dark at its carrier's cell (_lantern_dark_at:
@@ -29886,6 +29886,14 @@ static func person_words(entity: GridEntity) -> String:
 	return str((row as Dictionary).get("person", "")) if row is Dictionary else ""
 
 
+## Whether [param entity]'s own parts take the face light by who it is (451 amended (11)): a player, a
+## companion, every townsperson (a Resident, a goblin as a human). Any other body drawn on a person's model
+## (a look: a robber, a bandit, an orc) takes it as before, by its look (_tag_body); a goblin raider, a
+## beast, none (the coordinator's ruling: the take adds the goblin townsperson and takes it from nobody).
+static func is_face_lit(entity: GridEntity) -> bool:
+	return entity is Player or entity is Companion or entity is Resident
+
+
 ## [param entity]'s body (decision 388), &"" if it wears none.
 static func body_of(entity: GridEntity) -> StringName:
 	var body: Variant = entity.get("body")
@@ -29899,6 +29907,10 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	puppet.set_meta("body", body_of(entity))
 	puppet.set_meta("entity_name", String(entity.name))
 	puppet.set_meta("entity_id", entity.get_instance_id())
+	# A townsperson's own parts take the face light (451 amended (11)): by who they are, not by their body,
+	# so a goblin one (Snagfin, his kind's model, no look) as a human one; set before any part is added.
+	if is_face_lit(entity):
+		puppet.set_meta("face_lit", true)
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
 	var model := model_for(entity)
 	if not model.is_empty():

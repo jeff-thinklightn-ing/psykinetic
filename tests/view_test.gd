@@ -3460,7 +3460,7 @@ func _test_face_light() -> void:
 		var person := false
 		while up != null:
 			if up.has_meta("entity_id"):
-				person = up.has_meta("look")
+				person = up.has_meta("face_lit") or up.has_meta("look")
 				break
 			worn = worn or up.name == &"Worn"
 			up = up.get_parent()
@@ -14579,7 +14579,29 @@ func _test_goblins_differ() -> void:
 	_check(his_model != null and his_model.scene_file_path == str(Client3D.MODELS["imp"]["scene"]) and hoods.size() == 1
 			and (hoods[0] as MeshInstance3D).visible and not "hood=down" in str(his.get_meta("goblin_look")["words"]),
 			"a goblin resident is the goblin, its hood up (%s)" % [his_model.scene_file_path if his_model != null else "no model"])
+	# Who a face light falls on (451 amended (11)): every person you can talk to, by who they are, not by
+	# their body: the goblin townsperson as a human one; a body on a person's model as before (an orc), a goblin raider none.
+	var faced := func(puppet: Node3D) -> Array:
+		var parts: Array = puppet.find_children("*", "MeshInstance3D", true, false).filter(
+				func(m: MeshInstance3D) -> bool: return m.get_parent() is Skeleton3D) if puppet != null else []
+		return [parts.filter(func(m: MeshInstance3D) -> bool: return m.layers & Client3D.FACE_LAYER).size(), parts.size()]
+	var on_goblin: Array = faced.call(his)
+	var on_raider: Array = faced.call(a)
+	var on_orc: Array = faced.call(big)
 	World.despawn(merchant)
+	_rig._process(0.0)
+	var townsman: GridEntity = _main._spawn({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Resident_townface_view",
+		"tile": Vector2i(12, 2), "label": "Maud [carpenter]", "look": "seed=2 body=female"})
+	_rig._process(0.0)
+	var on_human: Array = faced.call(_rig._puppets.get(townsman.get_instance_id()) if townsman != null else null)
+	print("  PROBE FACE_LAYER skinned parts tagged/all: goblin townsperson %d/%d, human townsperson %d/%d, goblin raider %d/%d, orc raider %d/%d"
+			% [on_goblin[0], on_goblin[1], on_human[0], on_human[1], on_raider[0], on_raider[1], on_orc[0], on_orc[1]])
+	_check(on_goblin[1] > 0 and on_goblin[0] == on_goblin[1] and on_human[1] > 0 and on_human[0] == on_human[1]
+			and on_raider[1] > 0 and on_raider[0] == 0 and on_orc[1] > 0 and on_orc[0] == on_orc[1],
+			"a face light falls on every townsperson's own parts, a goblin's (%d/%d) as a human's (%d/%d); an orc's as before (%d/%d), no goblin raider's (%d/%d)"
+			% [on_goblin[0], on_goblin[1], on_human[0], on_human[1], on_orc[0], on_orc[1], on_raider[0], on_raider[1]])
+	if townsman != null:
+		World.despawn(townsman)
 	_rig._process(0.0)
 	var animators: Array[AnimRig] = [a.get_meta("rig"), b.get_meta("rig")]
 	_check(absf(animators[0].position() - animators[1].position()) > 0.01,
