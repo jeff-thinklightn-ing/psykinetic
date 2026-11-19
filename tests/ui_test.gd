@@ -73,6 +73,8 @@ func _ready() -> void:
 	await _test_open_window_rects()
 	await _test_person_give()
 	_test_taker_hint()
+	await _test_talk_follows_last_line()
+	await _test_talk_follows_growth()
 	_test_held_yes()  # Last: its "yes" is a line said in the room, which the imps hear.
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -487,6 +489,82 @@ func _test_talk_panel() -> void:
 	_main._close_chat()
 	await get_tree().process_frame
 	_check(not talk.visible, "closed: it goes")
+
+
+## TASK 7 item 3 (the at-a-loss offer missing from the chat log; ui-design's probe, C:/dev/review/ui-design/looks/heldy_6f217ca82/godot.log): the line just
+## added is in view within a few frames, whatever the log's height was before it (under the box's cap, or over it) and whether the panel had faded away
+## the frame before. The scroll was set once, on the next frame, before the new row's height reached the bar's max, and never again: the newest row sat
+## below the view (row 9: scroll 0, max 578, page 520; row 10: scroll 58 at max 621).
+func _test_talk_follows_last_line() -> void:
+	print("== the talk panel keeps its newest line in view (TASK 7 item 3) ==")
+	var talk: TalkPanel = _main.talk
+	var long_line := "There's a medicine man out in the wilds who makes remedies, and he has a hut a way off; shall we find it, so we know where it is, just say so?"
+	# [rows before the new line, whether the panel has faded away a frame before it]: under the cap and crossing it, over it already.
+	for case: Array in [[4, true], [7, false], [14, true], [14, false]]:
+		talk.lines.clear()
+		for child in talk._list.get_children():
+			talk._list.remove_child(child)
+			child.queue_free()
+		talk.pinned = false
+		for n in int(case[0]):
+			talk.add_line("Rhea", "Line %d of a long talk, long enough to wrap over two rows of the panel when it is set in its box, so the log is tall." % n)
+		for _f in 6:
+			await get_tree().process_frame
+		if case[1]:
+			talk._shown_until = 0.0
+			await get_tree().process_frame
+			await get_tree().process_frame
+		var before: float = talk._list.get_combined_minimum_size().y
+		talk.add_line("Rhea", long_line)
+		var bar: VScrollBar = talk._scroll.get_v_scroll_bar()
+		var seen_at := -1
+		var trail := ""
+		for f in 10:
+			await get_tree().process_frame
+			var in_view := float(talk._scroll.scroll_vertical) + bar.page >= bar.max_value - 1.0
+			trail += " [%d: %d/%.0f/%.0f %s]" % [f + 1, talk._scroll.scroll_vertical, bar.max_value, bar.page, in_view]
+			if in_view and seen_at < 0:
+				seen_at = f + 1
+		_check(seen_at >= 1 and seen_at <= 3, "%d rows (%.0f high, the cap %.0f), panel faded a frame before: %s; the new line in view within 3 frames (first: %d)%s" % [case[0], before, TalkPanel.LIST_HEIGHT, case[1], seen_at, trail])
+	talk._shown_until = 0.0
+
+
+## The mechanism of the same fault, deterministically (the height reaching the bar's max after the scroll was set): a log that grows after the
+## view was put at its end keeps the end in view; one the player scrolled up stays where it is.
+func _test_talk_follows_growth() -> void:
+	print("== a growing talk log keeps its end in view, and leaves a scrolled-up view be (TASK 7 item 3) ==")
+	var talk: TalkPanel = _main.talk
+	talk.lines.clear()
+	for child in talk._list.get_children():
+		talk._list.remove_child(child)
+		child.queue_free()
+	talk.pinned = true
+	for n in 12:
+		talk.add_line("Rhea", "Line %d of a long talk, long enough to wrap over two rows of the panel when it is set in its box, so the log is tall." % n)
+	for _f in 6:
+		await get_tree().process_frame
+	var bar: VScrollBar = talk._scroll.get_v_scroll_bar()
+	_check(float(talk._scroll.scroll_vertical) + bar.page >= bar.max_value - 1.0, "the view starts at the end of the log (%d, page %.0f, max %.0f)" % [talk._scroll.scroll_vertical, bar.page, bar.max_value])
+	# A row whose height arrives after the scroll (added to the list as it is, with no scroll asked).
+	var late := Control.new()
+	late.custom_minimum_size = Vector2(10, 101)
+	talk._list.add_child(late)
+	for _f in 3:
+		await get_tree().process_frame
+	_check(float(talk._scroll.scroll_vertical) + bar.page >= bar.max_value - 1.0 and bar.max_value > bar.page, "a row that grows the log by 101 after the scroll: the end is in view (%d, page %.0f, max %.0f)" % [talk._scroll.scroll_vertical, bar.page, bar.max_value])
+	talk._scroll.scroll_vertical = 0
+	var late2 := Control.new()
+	late2.custom_minimum_size = Vector2(10, 101)
+	talk._list.add_child(late2)
+	for _f in 3:
+		await get_tree().process_frame
+	_check(talk._scroll.scroll_vertical == 0, "a view the player scrolled up stays where it is when the log grows (%d)" % talk._scroll.scroll_vertical)
+	talk.add_line("Rhea", "A new line, which takes the view to the end again.")
+	for _f in 3:
+		await get_tree().process_frame
+	_check(float(talk._scroll.scroll_vertical) + bar.page >= bar.max_value - 1.0, "and a new line takes it to the end again (%d, page %.0f, max %.0f)" % [talk._scroll.scroll_vertical, bar.page, bar.max_value])
+	talk.pinned = false
+	talk._shown_until = 0.0
 
 
 func _test_context_and_place() -> void:

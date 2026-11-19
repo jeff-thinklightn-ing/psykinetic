@@ -57,6 +57,8 @@ var _shown_until := 0.0
 ## () -> Gains.lines (Main); none: no Gains button.
 var gains_of: Callable
 ## Whether the Gains list shows in place of the talk.
+## Whether the view sits at the end of the log (or was put there): the end then follows the log's growth (_follow_growth).
+var _at_end := true
 var showing_gains := false
 var _gains_button: Button
 var _gains_list: VBoxContainer
@@ -88,6 +90,8 @@ func _init() -> void:
 	# The scroll box is the list's own: no inset box inside the panel.
 	_scroll.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	column.add_child(_scroll)
+	_scroll.get_v_scroll_bar().changed.connect(_follow_growth)
+	_scroll.get_v_scroll_bar().value_changed.connect(_note_scrolled)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -286,4 +290,19 @@ func _scroll_to_end() -> void:
 
 func _scroll_now() -> void:
 	if is_instance_valid(_scroll):
+		_at_end = true
 		_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
+
+
+## The bar's range changed (a new row's height reaching its max a frame or two after the row was added, or the box reaching its cap: ui-design's
+## probe, heldy_6f217ca82, row 9 and 10): a view at the end goes on to the new end, where the one scroll on the frame after the line had set it
+## to the end the bar knew then and left the newest row below the view. A view the player has scrolled up stays where it is.
+func _follow_growth() -> void:
+	if _at_end and is_instance_valid(_scroll):
+		_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
+
+
+## The view moved (this panel's own scroll to the end, or the player's wheel or bar): whether it is at the end.
+func _note_scrolled(value: float) -> void:
+	var bar := _scroll.get_v_scroll_bar()
+	_at_end = value + bar.page >= bar.max_value - 1.0
