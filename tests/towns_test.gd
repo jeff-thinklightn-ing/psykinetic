@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_hut_day_words()
 	_test_rack()
 	_test_newcomer_want()
+	_test_staying_print()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -653,3 +654,32 @@ func _run_to(step: int) -> void:
 		_at(_now + 600)
 	if _now < step:
 		_at(step)
+
+
+## 284 amended (3) (TASK 9, 2026-11-19): a companion who comes to stay is named in the town's log (kept as
+## written) and printed by her player's tag, with the World's zone not hers (World.masked reads the
+## staying companions from Production's workers, not the zone); her player's id in no printed line.
+## Fails on main before it: her name was printed as is.
+class _Printed extends Logger:
+	var lines: Array[String] = []
+
+	func _log_message(message: String, _error: bool) -> void:
+		lines.append(message)
+
+
+func _test_staying_print() -> void:
+	print("\n== a staying companion's line: her player's tag, never her name or her player's id ==")
+	_fresh()
+	var pid := "0f1e2d3c-4b5a-4968-8776-655443322110"  # A made-up id, Net.new_uuid's form.
+	var printed := _Printed.new()
+	var was: Production = World.production
+	World.production = _work
+	OS.add_logger(printed)
+	_towns.note_companion_in(TOWN, "Wren", "cook", pid)
+	OS.remove_logger(printed)
+	World.production = was
+	var said := "\n".join(printed.lines)
+	_check(_towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "Wren comes to stay, and works as a cook"),
+		"the town's log keeps her name")
+	_check("%s comes to stay, and works as a cook" % Companion.tag(pid) in said and not "Wren" in said and not pid.left(8) in said,
+		"printed by her player's tag:\n%s" % said)

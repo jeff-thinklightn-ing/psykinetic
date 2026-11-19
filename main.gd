@@ -5762,7 +5762,7 @@ func _boot() -> void:
 		World.trade.caravan_lost.connect(World.economy.caravan_lost)
 	World.production.settle_fund = World.economy.settle_fund
 	World.economy.contributed.connect(func(town: String, player_id: String, kind: String, gold: int, xp: int) -> void:
-		World.towns.add_xp(town, xp, "%s gave %d gold toward the %s" % [player_id, gold, kind])
+		World.towns.add_xp(town, xp, "a player gave %d gold toward the %s" % [gold, kind])  # Stored (the town log): no id, no tag (284 amended (3)).
 		World.towns.credit_build(town, kind, player_id, "gold", gold))  # 804 amended: "built with your gold".
 	# The fallen come back at a temple or a healer's hut (decision 396).
 	World.production.returned = _on_returned
@@ -8387,7 +8387,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	if respawn and at != World.NO_CELL:
 		tile = _nearest_free(at)  # Brought back at a temple or a hut (decision 396).
 	if not World.is_free(tile):
-		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
+		print("[net] no free tile for %s (%s)" % [player_name, Companion.tag(id)])
 		return
 	# Monsters kept as records near where they come in are back first
 	# (decision 352): those near enough to count for spawn safety now, the
@@ -8453,7 +8453,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	_living_came(player)
 	_fell_at.erase(peer)
 	print("[net] %s (%s) joined as %s at %s%s" % [
-		player_name, id.left(8), player.name, tile, " (back)" if back else ""])
+		player_name, Companion.tag(id), player.name, tile, " (back)" if back else ""])
 	party_log.add("%s joined." % player_name)
 	if shifted:
 		# Back at a newer generation: told; a first visit is not.
@@ -17241,7 +17241,7 @@ func _gather_herbs() -> void:
 		while _herbs_today(id, today) < a_day:
 			if not _take_herbs(id, str(who.get("name", id)), area, hut["cell"], today):
 				break
-			print("[townsfolk] %s gathered herbs around the hut" % who.get("name", id))
+			print(World.masked("[townsfolk] %s gathered herbs around the hut" % who.get("name", id)))
 
 
 ## How many herbs [param id] has gathered on [param today].
@@ -22994,7 +22994,7 @@ func _leave(peer: int, player: Player, id: String) -> void:
 			World.despawn(pet)
 			_travelling = false
 			_companions.erase(id)
-	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
+	print("[net] %s (%s) left" % [record.name if record != null else "?", Companion.tag(id)])
 	party_log.add("%s left." % (record.name if record != null else "someone"))
 
 

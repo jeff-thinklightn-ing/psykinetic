@@ -231,9 +231,31 @@ func deposit(place: String, what: String, amount := 1, by := "", from := "", by_
 	store["resources"][what] = int(store["resources"].get(what, 0)) + amount
 	_record(store, what, amount, by, from)
 	deposited.emit(place, by, by_id, what, amount)
-	print("[stockpile] %s banked %d %s at %s (from %s), step %d" % [by if by != "" else "someone", amount,
-		what, place, from if from != "" else "nowhere said", now()])
+	print(World.masked("[stockpile] %s banked %d %s at %s (from %s), step %d" % [log_name(by) if by != "" else "someone", amount,
+		what, place, from if from != "" else "nowhere said", now()]))
 	return true
+
+
+## A ledger's [param by] as a server log line (284 amended (3)): after "debt:",
+## "sale:" or "player:" the rest is always a player's id (any shape the server
+## takes, net.gd's up to 64 letters), save the "sale:trader" of a sale to the
+## trader; a whole id of Net.new_uuid's form elsewhere, alone or after its kind
+## (a purse's "companion:<id>", "given:<id>"); each as Companion.tag of it as
+## held, the per-boot "#n" that player's companion is logged by (a count in
+## memory, nothing of the id in it). Any other by as it is; the ledger keeps by
+## as given.
+static func log_name(by: String) -> String:
+	var at := by.find(":")
+	var rest := by.substr(at + 1)
+	if (at > 0 and by.substr(0, at) in _ID_KINDS and not rest.is_empty() and not rest in _NOT_IDS) or World.is_player_id(rest):
+		return by.substr(0, at + 1) + Companion.tag(rest)
+	return by
+
+
+## The by kinds whose rest is always a player's id (Stockpile.log_name), and
+## the rests after them that are not ("sale:trader", Economy's sale to the trader).
+const _ID_KINDS: Array[String] = ["debt", "sale", "player"]
+const _NOT_IDS: Array[String] = ["trader"]
 
 
 ## Banks the gear [param uid] (in the book, not already here) at
@@ -251,8 +273,8 @@ func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vec
 		book.note(uid, event, "%s by %s" % [place, by if by != "" else "someone"], zone, tile)
 	_record(store, book.id_of(uid), 1, by, from, uid)
 	deposited.emit(place, by, by_id, book.id_of(uid), 1)
-	print("[stockpile] %s banked %s (#%d) at %s (from %s), step %d" % [by if by != "" else "someone",
-		Items.name_of(book.id_of(uid)), uid, place, from if from != "" else "nowhere said", now()])
+	print(World.masked("[stockpile] %s banked %s (#%d) at %s (from %s), step %d" % [log_name(by) if by != "" else "someone",
+		Items.name_of(book.id_of(uid)), uid, place, from if from != "" else "nowhere said", now()]))
 	return true
 
 

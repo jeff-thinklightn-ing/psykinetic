@@ -54,7 +54,7 @@ Assert ($room.entities.Count -eq 10) "snapshot holds the 10 level entities (saw 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 $second = Run-Host 'second' @('--test-exit-after=2')
 Assert (@($second | Select-String '\[state\] loaded 10 entities and 1 player records').Count -eq 1) 'second run loads 10 entities and 1 player record from the snapshot'
-Assert (@($second | Select-String '\[net\] Player \(dev-host\) joined as Player1 at \(8, 2\) \(back\)').Count -eq 1) 'the host comes back where it left off, as Player1'
+Assert (@($second | Select-String '\[net\] Player \(#[0-9]+\) joined as Player1 at \(8, 2\) \(back\)').Count -eq 1) 'the host comes back where it left off, as Player1'
 Assert (@($second | Select-String 'tiles: .*Crate1=\(7, 2\)').Count -eq 1) 'second run has Crate1 where the first left it'
 Assert (@($second | Select-String 'slots: Chest1=\[bandaging_kit\] Player1=\[\]$').Count -eq 1) 'the chest holds the bandaging kit, the host nothing'
 

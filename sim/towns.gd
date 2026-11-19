@@ -1937,7 +1937,7 @@ func _herders_turn() -> void:
 			production.add_worker(who, name, [trade], id, str(place.get("area", "")))
 			stock.deposit(id, "sheep", int(rule.get("start", 4)), name, "a drove of their own")
 			herd["next"] = at + int(float(rule.get("every", 3)) * day)
-			print("[towns] %s the %s keeps %s, %d sheep" % [name, trade, id, stock.count(id, "sheep")])
+			print(World.masked("[towns] %s the %s keeps %s, %d sheep" % [name, trade, id, stock.count(id, "sheep")]))
 			folds_changed.emit(id)
 			continue
 		if bool(production.worker(who).get("away", false)):
@@ -1973,7 +1973,7 @@ func _herders_turn() -> void:
 		herd["buyer"] = buyer  # Where they are while away (npc's body stands at its store).
 		herd["back"] = at + int(rule.get("walk_steps", 3000))
 		production.set_away(who, true)
-		print("[towns] %s drives %d sheep to %s, sells %d" % [production.worker(who)["name"], count, buyer, sold])
+		print(World.masked("[towns] %s drives %d sheep to %s, sells %d" % [production.worker(who)["name"], count, buyer, sold]))
 		folds_changed.emit(id)
 
 
@@ -2534,8 +2534,8 @@ func _wander_turn(town: String) -> void:
 	_town(town)["sought"][leaving]["why"] = "bench"
 	# For the box's journal only, never the town's log (release's ask, 11-14: a line that names why): the worker's
 	# name as every [towns] line has it, no player's.
-	print("[towns] %s: %s the %s left for %s (owed %d), step %d" % [town, worker["name"], trade.replace("_", " "),
-		_town(town)["sought"][leaving]["why"], int(worker.get("owed", 0)), now()])
+	print(World.masked("[towns] %s: %s the %s left for %s (owed %d), step %d" % [town, worker["name"], trade.replace("_", " "),
+		_town(town)["sought"][leaving]["why"], int(worker.get("owed", 0)), now()]))
 	_seat(town)
 	wandered.emit(town, leaving)
 
@@ -2677,13 +2677,13 @@ func sought_home(id: String) -> bool:
 func _own_way_in(town: String, id: String, entry: Dictionary) -> bool:
 	if _gone_for_hunger(entry) and str(entry.get("freed_by", "")).is_empty():
 		# 918: home at the town's next turn, nobody needing to fetch them. The box's journal only (release's ask).
-		print("[towns] %s: %s comes home, gone for %s, step %d" % [town, entry["name"],
-			"hunger" if str(entry.get("why", "")) == "hunger" else "a reason no save kept (left before 918)", now()])
+		print(World.masked("[towns] %s: %s comes home, gone for %s, step %d" % [town, entry["name"],
+			"hunger" if str(entry.get("why", "")) == "hunger" else "a reason no save kept (left before 918)", now()]))
 	elif bool(entry.get("wandered", false)) and str(entry.get("why", "")) == "wages" and str(entry.get("freed_by", "")).is_empty():
 		# 918 amended (1), the coordinator: owed is no reason to leave now, so one gone for it comes home at the town's
 		# next turn, his debt still owed and paid first. The box's journal only: the trade and the town.
-		print("[towns] %s: %s the %s comes home, gone for wages (owed %d), step %d" % [town, entry["name"], str(entry["trade"]).replace("_", " "),
-			int(production.worker(id).get("owed", 0)), now()])
+		print(World.masked("[towns] %s: %s the %s comes home, gone for wages (owed %d), step %d" % [town, entry["name"], str(entry["trade"]).replace("_", " "),
+			int(production.worker(id).get("owed", 0)), now()]))
 	elif str(entry["trade"]) != WALKS_IN:
 		var days := float(rules.get("gatherers_days", 0))
 		if days <= 0.0 or not str(entry.get("freed_by", "")).is_empty() or not rules.get("gatherers", {}).has(str(entry["trade"])):
@@ -2884,7 +2884,7 @@ func _taught_catch(town: String, who: String, worker: Dictionary, _site: Diction
 	if got > 0:
 		production.deliver_to(town, who, "fish", got, "fisherman:%s" % who, "%s's catch" % worker["name"])
 	else:
-		print("[towns] %s: %s home from the water with nothing, step %d" % [town, worker["name"], now()])
+		print(World.masked("[towns] %s: %s home from the water with nothing, step %d" % [town, worker["name"], now()]))
 
 
 ## Whether resident [param who] holds a bench of their trade (916: npc's
@@ -3871,7 +3871,7 @@ func _hut_mend(id: String, entry: Dictionary, keeper: String, rule: Dictionary) 
 		return
 	var trade := str(production.worker(keeper).get("trades", ["medicine_man"])[0])
 	entry["job"] = production.order_build(id, HUT_REPAIR + id, trade, needs, int(mend.get("steps", 1500)))
-	print("[towns] %s sets about mending the healer's hut %s (%s), step %d" % [production.worker(keeper).get("name", keeper), id, entry["state"], now()])
+	print(World.masked("[towns] %s sets about mending the healer's hut %s (%s), step %d" % [production.worker(keeper).get("name", keeper), id, entry["state"], now()]))
 	_rack_thanks(id, entry)
 
 
@@ -4198,7 +4198,7 @@ func _note(town: String, what: String) -> void:
 	record["log"].append({"step": now(), "what": what})
 	if record["log"].size() > LOG_SIZE:
 		record["log"].pop_front()
-	print("[towns] %s: %s, step %d" % [town, what, now()])
+	print(World.masked("[towns] %s: %s, step %d" % [town, what, now()]))
 
 
 ## Threat in town (decision 762): the kind a threat over [param town] is

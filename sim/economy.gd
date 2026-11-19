@@ -271,8 +271,8 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 	if lines.size() > LOG_SIZE:
 		lines.pop_front()
 	_log[player_id] = lines
-	print("[economy] a player %s %s %d gold (%s): %d now, step %d" % [Companion.tag(player_id), "got" if now_gold >= had else "spent",
-		absi(now_gold - had), why if why != "" else "no reason said", now_gold, now()])
+	print(World.masked("[economy] a player %s %s %d gold (%s): %d now, step %d" % [Companion.tag(player_id), "got" if now_gold >= had else "spent",
+		absi(now_gold - had), why if why != "" else "no reason said", now_gold, now()]))
 	purse_changed.emit(player_id, now_gold)
 	return now_gold
 
@@ -1592,8 +1592,8 @@ func _floor_turn() -> void:
 		var owed := int(who.get("owed", 0))
 		_owe_or_pay(town, id, short, "the town's wage floor", str(trades[trade]))
 		var now_owed := int(production.worker(id).get("owed", 0)) - owed
-		print("[economy] %s the %s earned %d: the wage floor's %d more, %d paid and %d owed, step %d" % [who["name"], trade, earned, short,
-			short - now_owed, now_owed, now()])
+		print(World.masked("[economy] %s the %s earned %d: the wage floor's %d more, %d paid and %d owed, step %d" % [who["name"], trade, earned, short,
+			short - now_owed, now_owed, now()]))
 
 
 # --- The temple's offering and the gold below (decision 546) -------------------------
@@ -1924,7 +1924,7 @@ func _acolyte_turn(days: int) -> void:
 		if keep > 0:
 			_alms[town] = alms(town) - keep
 			production.pay(id, keep, "an acolyte's keep from the alms")
-			print("[economy] %s the %s is kept %d gold from %s's alms, %d left, step %d" % [who["name"], trade, keep, town, alms(town), now()])
+			print(World.masked("[economy] %s the %s is kept %d gold from %s's alms, %d left, step %d" % [who["name"], trade, keep, town, alms(town), now()]))
 		var rest := mini(due - keep, maxi(int(rules.get("store", {}).get("owed_cap", 30)) - int(who.get("owed", 0)), 0))
 		if rest > 0:
 			_owe_or_pay(town, id, rest, "an acolyte's keep from the treasury")
@@ -2935,8 +2935,8 @@ func _luxury_order(town: String, market: String, eta: int) -> Dictionary:
 		if int(them["purse"]) >= asks:
 			production.spend(buyer, cost, "a %s commissioned from %s" % [Items.name_of(id), market])
 			stockpile.deposit(town, "gold", cost, "commission:%s" % buyer, "%s commissioned a %s from %s" % [them["name"], Items.name_of(id), market])
-			print("[economy] %s commissions a %s from %s through %s, paying %d up front, step %d" % [them["name"], Items.name_of(id), market,
-				production.worker(merchant).get("name", TREASURY), cost, now()])
+			print(World.masked("[economy] %s commissions a %s from %s through %s, paying %d up front, step %d" % [them["name"], Items.name_of(id), market,
+				production.worker(merchant).get("name", TREASURY), cost, now()]))
 			return {"id": id, "cost": cost, "merchant": merchant, "name": str(production.worker(merchant).get("name", TREASURY)), "for": buyer}
 	if stockpile.count(town, "gold") - cost < int(rules.get("gold_floor", 0)):
 		return {}
@@ -2959,8 +2959,8 @@ func _stock_import(town: String, id: String, count: int, caravan: Dictionary) ->
 		var uid := stockpile.book.mint(id, "imported", "from %s" % caravan["market"])
 		stockpile.stock_shop(town, uid, "caravan from %s" % caravan["market"], merchant)
 		_landed[uid] = cost
-		print("[economy] %s puts a %s on the shelf at %s (landed %d, asks %d), step %d" % [production.worker(merchant).get("name", TREASURY),
-			Items.name_of(id), town, cost, item_price(town, uid), now()])
+		print(World.masked("[economy] %s puts a %s on the shelf at %s (landed %d, asks %d), step %d" % [production.worker(merchant).get("name", TREASURY),
+			Items.name_of(id), town, cost, item_price(town, uid), now()]))
 
 
 ## A commissioned [param id] home: its buyer [param buyer] pays the rest of
@@ -2991,8 +2991,8 @@ func _deliver_commission(town: String, id: String, cost: int, buyer: String, mer
 		production.pay(merchant, rest - cut, "a %s for %s" % [Items.name_of(id), them["name"]])
 		seller = str(production.worker(merchant)["name"])
 	_owned(uid, buyer, id, asks, seller, merchant)
-	print("[economy] %s's commissioned %s is home: %d more to %s, %d of it tax to %s's treasury, step %d" % [them["name"], Items.name_of(id),
-		rest, seller, stockpile.count(town, "gold") - before if seller != TREASURY else rest, town, now()])
+	print(World.masked("[economy] %s's commissioned %s is home: %d more to %s, %d of it tax to %s's treasury, step %d" % [them["name"], Items.name_of(id),
+		rest, seller, stockpile.count(town, "gold") - before if seller != TREASURY else rest, town, now()]))
 
 
 ## What [param town]'s shop asks for [param uid]: its price, and an import
@@ -3052,8 +3052,8 @@ func _indulge(id: String, cat: Dictionary) -> void:
 	var seller := _sale(town, maker, what, best_cost, "folk:%s" % id, "sold a %s to %s" % [thing, who["name"]], best_base, int(_landed.get(best, -1)))
 	_landed.erase(best)
 	_owned(best, id, what, best_cost, seller, maker)
-	print("[economy] %s buys a %s from %s for %d gold, %d of it tax to %s's treasury, step %d" % [who["name"], thing, seller, best_cost,
-		stockpile.count(town, "gold") - before if seller != TREASURY else 0, town, now()])
+	print(World.masked("[economy] %s buys a %s from %s for %d gold, %d of it tax to %s's treasury, step %d" % [who["name"], thing, seller, best_cost,
+		stockpile.count(town, "gold") - before if seller != TREASURY else 0, town, now()]))
 
 
 ## Luxury [param uid] ([param what]) is now resident [param id]'s, bought
@@ -3129,7 +3129,7 @@ func _apprentice_turn(id: String, town: String) -> void:
 ## An apprentice taken or let go: the town's ledger and the log.
 func _say(town: String, id: String, what: String) -> void:
 	stockpile.note(town, "gold", 0, "apprentice:%s" % id, what)
-	print("[economy] %s, step %d" % [what, now()])
+	print(World.masked("[economy] %s, step %d" % [what, now()]))
 
 
 ## Maker [param id] pays [param town]'s store for a job's materials
@@ -3203,7 +3203,7 @@ func pay_loan(player_id: String, worker_id: String, gold_offered: int) -> int:
 		return 0
 	var town := str(who["town"])
 	add_gold(player_id, -paid, "paid %s's debt to %s" % [who["name"], town])
-	stockpile.deposit(town, "gold", paid, "debt:%s" % player_id, "%s paid %d of %s's debt to the town" % [player_id, paid, who["name"]])
+	stockpile.deposit(town, "gold", paid, "debt:%s" % player_id, "a player paid %d of %s's debt to the town" % [paid, who["name"]])  # Stored: no id, no tag; by prints "debt:#n" (284 amended (3)).
 	var left := maxf(owed - paid, 0.0)
 	production.set_loan(worker_id, left, bool(who["working_off"]) and left > 0.0)
 	if left <= 0.0:

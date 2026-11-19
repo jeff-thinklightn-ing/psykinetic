@@ -4804,6 +4804,41 @@ failed for lack of one) with a row for each of land.sh and land.ps1: PASS; the o
 land.sh (fonts_imported, land_beat, land_retry, land_tested, land_name, push_guard, remote_slot,
 run_digest, run_parse) PASS.
 
+284 amended (3): a player's id off every server print (TASK 9, the coordinator's call of 2026-11-19
+and its correction the same day, on the 11-17 ruling; label from tools/decision_number.sh). Each print
+that carried a player's whole id or its first eight letters prints Companion.tag of the id in its
+place, the per-boot "#n" that player's companion is already logged by: Companion._tags, a count in
+memory (the next number for an id not seen this boot), never saved or sent, nothing of the id in it;
+one id, one tag, so a player and their companion read as one pair. The tag is keyed on the id as the
+server holds it, never lower-cased, at every site (a direct call, Stockpile.log_name, World.mask_ids):
+one key, one tag. No printed id is dropped. Masked where the value is also a key, at the printer:
+Stockpile.log_name(by) (after "debt:", "sale:" or "player:" the rest whatever its shape, by the code
+always a player's id, the server taking any id up to 64 letters, save Economy's "sale:trader"; a whole
+id of the uuid shape alone or after another kind, a purse's "companion:", "given:"; each as the kind
+and the tag) at the stockpile's deposit and bank prints and Production.open_work's owner;
+Production.log_name(worker_id) (a companion staying in a town as her player's tag, from her origin
+"companion:<id>", else a number of her own; a resident by name) at production's spend, pay,
+open_return and given-up prints; at the call site where it is only prose: main.gd's [net] joined
+(both) and left lines and net.gd's authenticated one ("Name (#n)" for the id's letters). Two stored
+texts change: add_xp's reason in main.gd (kept in the town log) and Economy.pay_loan's from words
+(kept in the ledger) lose the id with nothing in its place ("a player gave %d gold toward the %s", "a
+player paid %d of %s's debt to the town"), since a per-boot tag in a save would name another player,
+or nobody, after a restart; the debt's by still prints as "debt:#n". Neither text is sent to a client.
+Every other stored or replicated value keeps what it kept. Stored words that a printer also
+prints (the ledger's from, add_gold's why, _say's note, the town log's _note) go through World.masked
+at the printer, which now starts from the companions staying in towns (read from Production's workers,
+in this zone or not, again when Production.workers_rev moves) before the zone's own, and ends with
+World.mask_ids, any whole id left as its tag: masked alone is safe there because its table no longer
+depends on the zone. An id not of the uuid shape inside stored prose is not caught by mask_ids.
+tools/print_names_budget.txt: main.gd's and net/net.gd's id_letters lines fall
+to 0 (removed). The shell tests' greps for an id's letters (net_test.sh 17, state_test.sh and .ps1,
+server/stage.sh's wait) read "(#n)"; net_test phase 2: the impostor joins under Casey's tag, and no
+line of the server's carries either player's letters. economy_test _test_print_names and towns_test
+_test_staying_print (a fake id, a Logger reading the prints, the World's zone holding no companion)
+fail on main before it; economy_test's rows also give a short made-up id its tag after "debt:",
+"sale:" and "player:", and an id in capitals one tag at a direct site, in a by and through mask_ids. A player's shown name and "Player<index>" wait on Jeff's page. Server only
+(and the test and stage greps); protocol unchanged; no new class_name; no bullet.
+
 ## 289. Lore is read by one class, Lore, and asked one thing: what a knower knows
 
 `Lore` (`sim/lore.gd`) reads levels/lore/ once and keeps it (read on first use,

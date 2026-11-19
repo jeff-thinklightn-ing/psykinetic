@@ -59,7 +59,7 @@ check "$(count '\[state\] final save: 10 level entities, 10 keyed' "$DIR/first.l
 run_host second --test-exit-after=2
 check "$(count '\[state\] loaded 10 entities and 1 player records' "$DIR/second.log")" 1 "second run loads 10 entities and 1 player record from the snapshot"
 check "$(count '\[state\] lockers: 0 players' "$DIR/second.log")" 1 "and counts the players' chests that hold something (722)"
-check "$(count '\[net\] Player \(dev-host\) joined as Player1 at \(8, 2\) \(back\)' "$DIR/second.log")" 1 "the host comes back where it left off, as Player1"
+check "$(count '\[net\] Player \(#[0-9]+\) joined as Player1 at \(8, 2\) \(back\)' "$DIR/second.log")" 1 "the host comes back where it left off, as Player1"
 check "$(count 'tiles: .*Crate1=\(7, 2\)' "$DIR/second.log")" 1 "second run has Crate1 where the first left it"
 
 # 2b. The kit: chest -> the host's slots -> chest, each across a restart.

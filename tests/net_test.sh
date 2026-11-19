@@ -193,12 +193,12 @@ phase_1_2() {
 	server server2 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE"
 	wait_for server2 'listening on port'
 	client clientC "--settings=$LOGS/settings.cfg"
-	wait_for server2 'Casey \(c0ffee00\) joined'
+	wait_for server2 'Casey \(#[0-9]+\) joined'
 	client clientE $GOOD "--player-id=$ID_C" --name=Impostor
 	wait_for clientC 'you joined from elsewhere'
-	wait_for server2 'Impostor \(c0ffee00\) joined'
+	wait_for server2 'Impostor \(#[0-9]+\) joined'
 	client clientD $GOOD "--player-id=$ID_D" --name=Dana
-	wait_for server2 'Dana \(d0d0d0d0\) joined'
+	wait_for server2 'Dana \(#[0-9]+\) joined'
 	finish
 }
 
@@ -219,7 +219,7 @@ phase_3() {
 	wait_for server3 'listening on port'
 	# Fay is another build with the same protocol: she plays (decision 239).
 	client clientF $GOOD --name=Fay --test-version=0.0.2 --test-move=-6,10 --test-contest=12,12,120
-	wait_for server3 'Fay \([a-z0-9-]+\) joined as Player1 '
+	wait_for server3 'Fay \(#[0-9]+\) joined as Player1 '
 	client clientG $GOOD --name=Gus --test-move=0,11 --test-contest=5,12,120
 	wait_for clientF 'reached the contested tile'
 	wait_for clientG 'reached the contested tile'
@@ -233,10 +233,10 @@ phase_4() {
 	server server4 --server --still-monsters --no-companions "--token=$TOKEN" --test-wait-players=2
 	wait_for server4 'listening on port'
 	client clientH $GOOD --name=Hal --test-move=-3,0
-	wait_for server4 'Hal \([a-z0-9-]+\) joined as Player1 '
+	wait_for server4 'Hal \(#[0-9]+\) joined as Player1 '
 	client clientI $GOOD --name=Ivy --test-reset=70
 	wait_for server4 '\[world\] Ivy reset the room'
-	wait_for server4 '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' 4
+	wait_for server4 '\[net\] (Hal|Ivy) \(#[0-9]+\) joined as Player' 4
 	finish
 	# Phase 4b: a player dies and is brought back in another zone in the same
 	# frame, as the at-once return from near death does (587). Her client must
@@ -269,7 +269,7 @@ phase_5() {
 	eval "wait \$pid_server5" || restart_code=$?
 	echo "$restart_code" >"$LOGS/restart_code"
 	server server6 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$LOGS/restart.json" "--admin-port=$ADMIN"
-	wait_for server6 'Rex \(5e5e5e5e\) joined'
+	wait_for server6 'Rex \(#[0-9]+\) joined'
 	wait_for clientR '\[net\] reconnected'
 	finish
 	# A server stopped the moment its console is up (its stdin thread still
@@ -366,7 +366,7 @@ phase_8() {
 	wait_for serverC 'slots: Player2 moved bandaging_kit'
 	quit clientMa
 	CLIENTS=" clientLe"
-	wait_for serverC 'Max \([a-z0-9-]+\) left'
+	wait_for serverC 'Max \(#[0-9]+\) left'
 	finish
 }
 
@@ -399,7 +399,7 @@ check() {
 }
 count() { grep -cE "$1" "$2" 2>/dev/null || true; }
 
-joined=$(count '\[net\] .+ \([a-z0-9-]+\) joined as Player' "$LOGS/server.log")
+joined=$(count '\[net\] .+ \(#[0-9]+\) joined as Player' "$LOGS/server.log")
 movers=$(grep -oE '\[net\] Player[12] \(peer [0-9]+\) moved' "$LOGS/server.log" 2>/dev/null |
 	grep -oE 'Player[0-9]+' | sort -u | wc -l | tr -d ' ')
 rejected=$(count 'rejected order' "$LOGS/server.log")
@@ -443,17 +443,22 @@ winner=$(cat $clients | grep -cE 'display: .*server_tile=\(9, 1\) ' || true)
 check "$winner" 1 "the winner is on (9, 1)"
 loser=$(cat $clients | grep -cE 'display: .*server_tile=\((8|9|10), (0|1|2)\) ' || true)
 check "$loser" 2 "the loser stands beside it (703: a free body stops where the other is)"
-check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at ' "$LOGS/server.log")" 1 "phase 1: Casey joined as Player3"
-check "$(count '\[net\] Casey \(c0ffee00\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and id"
+check "$(count '\[net\] Casey \(#[0-9]+\) joined as Player3 at ' "$LOGS/server.log")" 1 "phase 1: Casey joined as Player3"
+check "$(count '\[net\] Casey \(#[0-9]+\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and her tag, never her id"
 check "$(count '\[state\] loaded 10 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"
 color_before=$(grep -oE 'display: Player3 .*color=[0-9a-f]+' "$LOGS/client4.log" | grep -oE 'color=[0-9a-f]+' | head -1)
 color_after=$(grep -oE 'display: Player3 server_tile=\(11, 3\).*color=[0-9a-f]+' "$LOGS/clientE.log" | grep -oE 'color=[0-9a-f]+' | head -1)
 check "$([ -n "$color_before" ] && echo "$color_after")" "$color_before" "phase 2: Casey is back on (11, 3) as Player3 in her colour"
-check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: the server says she joined back"
-check "$(count '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \([0-9]+, [0-9]+\)$' "$LOGS/server2.log")" 1 "phase 2: a new id gets a fresh spawn as Player4"
+check "$(count '\[net\] Casey \(#[0-9]+\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: the server says she joined back"
+check "$(count '\[net\] Dana \(#[0-9]+\) joined as Player4 at \([0-9]+, [0-9]+\)$' "$LOGS/server2.log")" 1 "phase 2: a new id gets a fresh spawn as Player4"
 check "$(count '\[net\] replaced a stale peer' "$LOGS/server2.log")" 1 "phase 2: a second connection with an online id replaces the first (721)"
-check "$(count '\[net\] Impostor \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: and comes in as her, where she stood"
-check "$(count '\[net\] you joined from elsewhere' "$LOGS/clientC.log")$(count 'reconnecting' "$LOGS/clientC.log")$(count 'Casey \(c0ffee00\) joined' "$LOGS/server2.log")" 101 "phase 2: the first is told so and stays off"
+check "$(count '\[net\] Impostor \(#[0-9]+\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: and comes in as her, where she stood"
+# 284 amended (3): a player's id is logged as its per-boot tag, one id one tag: the impostor comes in under Casey's.
+casey_tag=$(grep -oE '\[net\] Casey \(#[0-9]+\) joined' "$LOGS/server2.log" | grep -oE '#[0-9]+' | head -1)
+impostor_tag=$(grep -oE '\[net\] Impostor \(#[0-9]+\) joined' "$LOGS/server2.log" | grep -oE '#[0-9]+' | head -1)
+check "$([ -n "$casey_tag" ] && echo "$impostor_tag")" "$casey_tag" "phase 2: one id, one tag: the impostor is logged under Casey's"
+check "$(count 'c0ffee00|d0d0d0d0' "$LOGS/server2.log")" 0 "phase 2: no line of the server's carries a player's id or its letters"
+check "$(count '\[net\] you joined from elsewhere' "$LOGS/clientC.log")$(count 'reconnecting' "$LOGS/clientC.log")$(count 'Casey \(#[0-9]+\) joined' "$LOGS/server2.log")" 101 "phase 2: the first is told so and stays off"
 # 724 amended (3): every phase whose sim waits for its players had them all in
 # before it began. On a loaded machine a client joined after the server's 60 s
 # players wait gave up, so the sim ran without it: phase 3's contest went off
@@ -478,7 +483,7 @@ check "$(count '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: l
 first_push=$(grep -nE 'push: Player1 -> Crate1' "$LOGS/server4.log" 2>/dev/null | head -1 | cut -d: -f1)
 reset_at=$(grep -nE '\[world\] Ivy reset the room' "$LOGS/server4.log" 2>/dev/null | head -1 | cut -d: -f1)
 check "$([ -n "$first_push" ] && [ -n "$reset_at" ] && [ "$first_push" -lt "$reset_at" ] && echo 1)$(count '\[world\] Ivy reset the room' "$LOGS/server4.log")" 11 "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
-check "$(count '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' "$LOGS/server4.log")" 4 "phase 4: both players were put back into the rebuilt room"
+check "$(count '\[net\] (Hal|Ivy) \(#[0-9]+\) joined as Player' "$LOGS/server4.log")" 4 "phase 4: both players were put back into the rebuilt room"
 # Hal stood on the crate's spawn tile, so he is put on the nearest free one.
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=' "$LOGS/clientI.log")" 1 "phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself"
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)' "$LOGS/clientH.log")" 1 "phase 4: Hal, who did not ask, sees the same room"
@@ -491,7 +496,7 @@ check "$restart_code" 75 "phase 5: and exits 75, for systemd to start it again"
 check "$(cat "$LOGS/server5.log" "$LOGS/server5.err" | grep -c '^ERROR' || true)" 0 "phase 5: holding three zones, it went without an ERROR (decision 299)"
 check "$quick_code" 0 "phase 5: a server stopped as soon as its console is up exits 0"
 check "$(count '\[net\] lost the server; reconnecting' "$LOGS/clientR.log")$(count '\[net\] reconnected \(try [0-9]+\)' "$LOGS/clientR.log")" 11 "phase 5: Rex's client reconnects by itself"
-check "$(count '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)' "$LOGS/server6.log")" 1 "phase 5: the restarted server puts him back on (9, 2)"
+check "$(count '\[net\] Rex \(#[0-9]+\) joined as Player1 at \(9, 2\) \(back\)' "$LOGS/server6.log")" 1 "phase 5: the restarted server puts him back on (9, 2)"
 check "$(count '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)' "$LOGS/clientR.log")" 1 "phase 5: and his client shows him there"
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)$' "$LOGS/clientR.log")" 1 "phase 5: and the room as it was, its entities sent again"
 # Phase 6: the server told her zone a lunge with her in it, and her client got

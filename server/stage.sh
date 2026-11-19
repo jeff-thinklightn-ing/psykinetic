@@ -101,7 +101,7 @@ HOME="$STAGE/client" APPDATA="$STAGE/client" "$GODOT" --headless --path "$REPO" 
 	"--token=$TOKEN" --name=Stager --player-id=57a6e000-0000-4000-8000-000000000057 --test-move=0,1 \
 	"--test-exit-on=$STAGE/client.done" --test-exit-after=90 </dev/null >"$STAGE/client.log" 2>&1 &
 CLIENT=$!
-wait_for "$STAGE/server.log" 'Stager \(57a6e000\) joined as Player' 60 || fail "the client was not given a player"
+wait_for "$STAGE/server.log" 'Stager \(#[0-9]+\) joined as Player' 60 || fail "the client was not given a player"
 wait_for "$STAGE/client.log" '\[test\] Player[0-9]+ (ordered|arrived)' 30 || fail "the client never saw its player"
 touch "$STAGE/client.done" "$STAGE/client.done.quit"
 wait "$CLIENT" || true

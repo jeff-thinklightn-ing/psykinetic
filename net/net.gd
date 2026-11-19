@@ -2087,7 +2087,7 @@ func _admit(peer: int, id: String, player_name_given: String) -> void:
 		# 724 amended (3): when each of a test's players got in, for perf (net_test prints it).
 		print("[test] player %d of %d in at %d ms" % [_admitted_ever, test_wait_players, Time.get_ticks_msec()])
 	print("[net] peer %d authenticated as %s (%s) (%d of %d)" % [
-		peer, player_name_given, id.left(8), _authenticated.size(), max_players])
+		peer, player_name_given, Companion.tag(id), _authenticated.size(), max_players])
 	peer_authenticated.emit(peer, id, player_name_given)
 
 

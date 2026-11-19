@@ -169,6 +169,10 @@ signal made(town: String, worker_id: String, uid: int)
 ## and the MIND (each 1..10; neither a companion's), card (npc's, kept as
 ## it is) and heard (companions' Hearsay's, kept as it is)}.
 var _workers: Dictionary[String, Dictionary] = {}
+## Counts each change to who the workers are or where they came from (add_worker,
+## remove_worker, set_origin, from_dict): World.masked reads its staying
+## companions again when it moves (284 amended (3)).
+var workers_rev := 0
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
 ## Id -> {id, kind (make, rework), recipe, town, workshop, worker, state
@@ -248,6 +252,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0, "hunt_due": 0,
 		"loan": 0.0, "working_off": false, "heard": [], "card": {}, "owed": 0, "sick": false, "apprentice": "", "master": ""}
+	workers_rev += 1
 	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
 	# roll), and the four rolled about their trade's and type's profile by
 	# the id, so the same every load; a companion's comes from her card.
@@ -423,8 +428,8 @@ func spend(worker_id: String, amount: int, why := "") -> bool:
 		return false
 	_workers[worker_id]["purse"] = int(_workers[worker_id]["purse"]) - amount
 	if gold_lines:
-		print("[production] %s spent %d gold (%s), step %d (%d left)" % [_workers[worker_id]["name"], amount, why, now(),
-			_workers[worker_id]["purse"]])
+		print(World.masked("[production] %s spent %d gold (%s), step %d (%d left)" % [log_name(worker_id), amount, why, now(),
+			_workers[worker_id]["purse"]]))
 	else:
 		_gold_moved[0] += 1
 		_gold_moved[1] += amount
@@ -660,13 +665,28 @@ func remove_worker(worker_id: String) -> void:
 	if _workers.has(master):
 		_workers[master]["apprentice"] = ""
 	_workers.erase(worker_id)
+	workers_rev += 1
 
 
 ## Where worker [param worker_id] came from, said again (a companion's
 ## player, once known: Towns.note_companion_in).
+## A worker as a server log line (284 amended (3)): a companion staying in a town
+## ("companion:<name>") as Companion.tag of her player's id (her origin,
+## "companion:<id>"), the per-boot "#n" she is logged by everywhere, or of her
+## worker id with no origin; anyone else by their name, or the id itself.
+## Nothing of a player's id is in it: the tag is a count in memory.
+func log_name(worker_id: String) -> String:
+	var who: Dictionary = _workers.get(worker_id, {})
+	if worker_id.begins_with("companion:"):
+		var origin := str(who.get("origin", ""))
+		return Companion.tag(origin.substr(10) if origin.begins_with("companion:") else "worker:" + worker_id)
+	return str(who.get("name", worker_id))
+
+
 func set_origin(worker_id: String, origin: String) -> void:
 	if _workers.has(worker_id):
 		_workers[worker_id]["origin"] = origin
+		workers_rev += 1
 
 
 ## The workshop [param worker_id] works at ("" for none).
@@ -698,7 +718,8 @@ func open_return(workshop_id: String, who: String, who_kind: String, place := ""
 	each["who"] = who
 	each["who_kind"] = who_kind
 	each["place"] = place
-	print("[production] %s (%s) to be brought back at %s by %s" % [who, who_kind, workshop_id, _workers[shop["worker"]]["name"]])
+	print(World.masked("[production] %s (%s) to be brought back at %s by %s" % [log_name(who) if who_kind == "resident" else Companion.tag(who), who_kind,
+		workshop_id, _workers[shop["worker"]]["name"]]))  # A player's id, or her player's for a companion: the tag (284 amended (3)).
 	return id
 
 
@@ -734,7 +755,8 @@ func open_work(workshop_id: String, uid: int, effect: String, owner: String, to_
 	each["needed"] = steps if steps > 0 else maxi(int(rules.get(effect, {}).get("steps", 600)), 1)
 	each["last"] = now()
 	book().place(uid, "job:%d" % id)
-	print("[production] %s (#%d) handed in at %s to %s for %s" % [book().id_of(uid), uid, workshop_id, effect, owner])
+	print(World.masked("[production] %s (#%d) handed in at %s to %s for %s" % [book().id_of(uid), uid, workshop_id, effect,
+		Stockpile.log_name(owner)]))  # "player:<id>" as "player:#n" (284 amended (3)).
 	return id
 
 
@@ -980,7 +1002,7 @@ func pay(worker_id: String, amount: int, why := "") -> void:
 	if not NOT_EARNED.any(func(not_earned: String) -> bool: return why.begins_with(not_earned)) and not why.begins_with("fenced"):
 		_earned[worker_id] = int(_earned.get(worker_id, 0)) + amount
 	if gold_lines:
-		print("[production] %s paid %d gold (%s), step %d" % [_workers[worker_id]["name"], amount, why, now()])
+		print(World.masked("[production] %s paid %d gold (%s), step %d" % [log_name(worker_id), amount, why, now()]))
 	else:
 		_gold_moved[2] += 1
 		_gold_moved[3] += amount
@@ -1130,8 +1152,8 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		_jobs.erase(int(each["id"]))
 		var done := each.duplicate(true)
 		done["by"] = str(_workers.get(each["worker"], {}).get("name", ""))
-		print("[production] %s %s at %s by %s, step %d" % [each["who"], "given up on, brought back as before" if done.get("fallback", false)
-			else "brought back", each["workshop"], done["by"], now()])
+		print(World.masked("[production] %s %s at %s by %s, step %d" % [log_name(str(each["who"])) if each.get("who_kind") == "resident" else Companion.tag(str(each["who"])), "given up on, brought back as before" if done.get("fallback", false)
+			else "brought back", each["workshop"], done["by"], now()]))
 		if returned.is_valid():
 			returned.call(done)
 		return
@@ -1233,12 +1255,12 @@ func _town_work_fee(each: Dictionary, worker_record: Dictionary) -> void:
 		worker_record["purse"] = int(worker_record["purse"]) + paid
 	var got := maxi(paid, 0) + given
 	if got >= owed:
-		print("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], got, owed, town, each["recipe"], now()])
+		print(World.masked("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], got, owed, town, each["recipe"], now()]))
 	else:
 		# Short at the treasury's floor (Jeff, 11-08: a town never owes; the rest is let go): the line carries the
 		# treasury and its floor at that step, the box's journal having no other treasury line.
-		print("[production] %s paid %d gold by %s for %s: treasury %d at its floor %d (%d due), step %d" % [worker_record["name"], got,
-			town, each["recipe"], stockpile.count(town, "gold"), int(rules.get("gold_floor", 0)), owed, now()])
+		print(World.masked("[production] %s paid %d gold by %s for %s: treasury %d at its floor %d (%d due), step %d" % [worker_record["name"], got,
+			town, each["recipe"], stockpile.count(town, "gold"), int(rules.get("gold_floor", 0)), owed, now()]))
 
 
 ## The town's fee for [param steps] of its work (rules' town_work): 0 for
@@ -1274,8 +1296,8 @@ func _rent(at: int) -> void:
 		# moves. upkeep counts what was paid.
 		town["upkeep"] = int(town["upkeep"]) + pay
 		stockpile.deposit(worker_record["town"], "gold", pay, "rent:%s" % id, "%s paid %d gold rent" % [worker_record["name"], pay])
-		print("[production] %s paid %d gold rent to %s's treasury, step %d (%d left)" % [worker_record["name"], pay,
-			worker_record["town"], at, worker_record["purse"]])
+		print(World.masked("[production] %s paid %d gold rent to %s's treasury, step %d (%d left)" % [worker_record["name"], pay,
+			worker_record["town"], at, worker_record["purse"]]))
 
 
 ## The town pays wages only for its official jobs (rules' "official":
@@ -1358,7 +1380,7 @@ func _official_wages(at: int) -> void:
 		var from_alms := clampi(int(wage_from.call(town, id, trade, wage)), 0, wage) if wage_from.is_valid() else 0
 		if from_alms > 0:
 			worker_record["purse"] = int(worker_record["purse"]) + from_alms
-			print("[production] %s the %s is paid %d gold from the alms, step %d" % [worker_record["name"], trade, from_alms, at])
+			print(World.masked("[production] %s the %s is paid %d gold from the alms, step %d" % [worker_record["name"], trade, from_alms, at]))
 			wage -= from_alms
 			if wage <= 0:
 				continue
@@ -1369,11 +1391,11 @@ func _official_wages(at: int) -> void:
 			# keeps back for its officials can't grow without end.
 			var cap := owed_ceiling(id)
 			worker_record["owed"] = mini(int(worker_record.get("owed", 0)) + wage, maxi(cap, int(worker_record.get("owed", 0))))
-			print("[production] %s the %s goes unpaid: %s's treasury is at its floor; owed %d, step %d" % [worker_record["name"], trade, town,
-				int(worker_record["owed"]), at])
+			print(World.masked("[production] %s the %s goes unpaid: %s's treasury is at its floor; owed %d, step %d" % [worker_record["name"], trade, town,
+				int(worker_record["owed"]), at]))
 			continue
 		worker_record["purse"] = int(worker_record["purse"]) + wage
-		print("[production] %s the %s is paid %d gold by %s, step %d" % [worker_record["name"], trade, wage, town, at])
+		print(World.masked("[production] %s the %s is paid %d gold by %s, step %d" % [worker_record["name"], trade, wage, town, at]))
 
 
 # --- Signals and tiers ---------------------------------------------------------------
@@ -1545,9 +1567,9 @@ func site_turn(town: String, id: String, trade: String) -> String:
 		_site_said[site["id"]] = why
 		var who := str(_workers.get(id, {}).get("name", id))
 		if why.is_empty():
-			print("[production] %s's %s is the town's again: %s works it, step %d" % [town, site["kind"].replace("_", " "), who, now()])
+			print(World.masked("[production] %s's %s is the town's again: %s works it, step %d" % [town, site["kind"].replace("_", " "), who, now()]))
 		else:
-			print("[production] %s's %s is %s: %s gets nothing from it, step %d" % [town, site["kind"].replace("_", " "), why, who, now()])
+			print(World.masked("[production] %s's %s is %s: %s gets nothing from it, step %d" % [town, site["kind"].replace("_", " "), why, who, now()]))
 	if not why.is_empty():
 		_trips.erase(id)
 		_trip_from.erase(id)
@@ -2063,9 +2085,9 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	each["worked"] = 0
 	each["last"] = now()
 	shop["job"] = id
-	print("[production] %s (%s) starts %s%s #%d at %s for %s, step %d; takes %s; done in %d steps" % [
+	print(World.masked("[production] %s (%s) starts %s%s #%d at %s for %s, step %d; takes %s; done in %d steps" % [
 		_workers[shop["worker"]]["name"], shop["trade"], "a mend of " if mending else "a rework of " if rework != 0 else "", bid["recipe"], id,
-		bid["workshop"], bid["want"], now(), needs if not needs.is_empty() else "nothing", each["needed"]])
+		bid["workshop"], bid["want"], now(), needs if not needs.is_empty() else "nothing", each["needed"]]))
 	return true
 
 
@@ -2131,13 +2153,14 @@ func to_dict() -> Dictionary:
 ## book). Anything that makes no sense is left out with a word; a job whose
 ## workshop is gone gives its materials back.
 func from_dict(saved: Dictionary) -> void:
+	workers_rev += 1
 	var workers: Variant = saved.get("workers", {})
 	var mended := 0  # Cards given their name's own pronoun (398 amended (1), npc's side).
 	if workers is Dictionary:
 		for id: String in workers:
 			var entry: Variant = workers[id]
 			if not entry is Dictionary or not entry.get("trades") is Array:
-				print("[production] the snapshot's worker %s makes no sense; left out" % id)
+				print(World.masked("[production] the snapshot's worker %s makes no sense; left out" % id))
 				continue
 			add_worker(id, str(entry.get("name", id)), entry["trades"], str(entry.get("town", "")), str(entry.get("origin", "placeholder")),
 				str(entry.get("type", "")))

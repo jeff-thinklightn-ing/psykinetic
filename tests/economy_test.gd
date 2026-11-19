@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_robbers_band()
 	_test_restart()
 	_test_give_gold()
+	_test_print_names()
 	await _test_in_town()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1026,6 +1027,72 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## 284 amended (3) (TASK 9, the coordinator's call, 2026-11-19): a server print carries no player's id. A
+## whole id, alone or after a ledger's kind ("debt:<id>", a purse's "companion:<id>"), is printed as
+## Companion.tag of it, the per-boot "#n" its companion is logged by (a count kept in memory); a
+## companion staying in a town by the same tag, read from Production's workers, whatever zone the
+## World holds. The ledger keeps by and from as written. Each row fails on main before it: these
+## lines printed the id there.
+class _Printed extends Logger:
+	var lines: Array[String] = []
+
+	func _log_message(message: String, _error: bool) -> void:
+		lines.append(message)
+
+
+func _test_print_names() -> void:
+	print("\n== the economy's printed lines: no player's id; a staying companion by her player's tag ==")
+	var economy := _fresh()
+	var pid := "0f1e2d3c-4b5a-4968-8776-655443322110"  # A made-up id, Net.new_uuid's form.
+	var tag := Companion.tag(pid)
+	_check(Stockpile.log_name("debt:" + pid) == "debt:" + tag and Stockpile.log_name(pid) == tag
+		and Stockpile.log_name("companion:" + pid) == "companion:" + tag and Stockpile.log_name("player:" + pid) == "player:" + tag and Stockpile.log_name("folk:bram") == "folk:bram"
+		and Stockpile.log_name("given:" + pid) == "given:" + tag and Stockpile.log_name("companion:Wren") == "companion:Wren"
+		and Stockpile.log_name("test") == "test", "a ledger's by: a whole id, alone or after its kind, as its tag; any other as it is")
+	var short := "dev-host9"  # A made-up id of no uuid shape, as the server takes (net.gd: up to 64 letters).
+	_check(Stockpile.log_name("debt:" + short) == "debt:" + Companion.tag(short) and Stockpile.log_name("sale:" + short) == "sale:" + Companion.tag(short)
+		and Stockpile.log_name("player:" + short) == "player:" + Companion.tag(short) and Stockpile.log_name("sale:trader") == "sale:trader"
+		and Stockpile.log_name("given:" + short) == "given:" + short and not Companion.tag(short) in [tag, ""],
+		"after debt:, sale: or player: any id is tagged (sale:trader as it is); elsewhere only the uuid's shape")
+	var upper := pid.to_upper()  # One key, one tag: the id as held, at a direct site and through masked alike.
+	_check(Companion.tag(upper) != tag and Stockpile.log_name("debt:" + upper) == "debt:" + Companion.tag(upper)
+		and World.mask_ids("paid by %s." % upper) == "paid by %s." % Companion.tag(upper),
+		"an id in capitals: one tag at a direct site, in a ledger's by and through masked (%s, %s)" % [Companion.tag(upper), tag])
+	var work := economy.production
+	work.add_worker("companion:Wren", "Wren", ["farmer"], TOWN, "companion:Wren")
+	work.set_origin("companion:Wren", "companion:" + pid)
+	work.add_worker("companion:Ash", "Ash", ["farmer"], TOWN, "companion:Ash")
+	_check(work.log_name("companion:Wren") == tag and work.log_name("bram") == "Bram" and work.log_name("companion:Ash").begins_with("#")
+		and work.log_name("companion:Ash") != tag, "a staying companion by her player's tag, one with no player known by a number of her own; a resident by name")
+	work.add_worker("priest:" + TOWN, "Osric", ["priest"], TOWN, "appointed")
+	work.add_workshop(TOWN + ":temple", "priest", TOWN)
+	work.assign(TOWN + ":temple", "priest:" + TOWN)
+	var printed := _Printed.new()
+	var was: Production = World.production
+	World.production = work  # Not the zone's: the World's zone holds no companion here.
+	OS.add_logger(printed)
+	economy.add_gold(pid, 20, "test")
+	work.set_loan("bram", 8.0)
+	var paid := economy.pay_loan(pid, "bram", 8)
+	var player_back := work.open_return(TOWN + ":temple", pid, "player")
+	var hers_back := work.open_return(TOWN + ":temple", pid, "companion")
+	var stayer_back := work.open_return(TOWN + ":temple", "companion:Wren", "resident")
+	economy.stockpile.deposit(TOWN, "gold", 3, "folk:companion:Wren", "Wren bought food from the store for 3 gold")
+	OS.remove_logger(printed)
+	World.production = was
+	var said := "\n".join(printed.lines)
+	_check(paid == 8 and player_back > 0 and hers_back > 0 and stayer_back > 0, "the loan paid, three returns opened")
+	_check(not pid in said.to_lower() and not pid.left(8) in said.to_lower(), "no printed line carries the id or its first letters:\n%s" % said)
+	_check("debt:%s banked 8 gold" % tag in said and "(from a player paid 8 of Bram's debt to the town)" in said,
+		"the debt's banking: by debt:<its tag>, the from words with the same tag")
+	_check(said.count("%s (player) to be brought back" % tag) == 1 and said.count("%s (companion) to be brought back" % tag) == 1
+		and said.count("%s (resident) to be brought back" % tag) == 1, "a player, their companion and their staying companion brought back: one tag, the pair's")
+	_check(not "Wren" in said and "folk:companion:%s banked 3 gold" % tag in said and "(from %s bought food" % tag in said,
+		"a staying companion's name, in her worker id and the from words, by the tag, with the World's zone not hers")
+	var last: Dictionary = economy.stockpile.ledger(TOWN).back()
+	_check(last["by"] == "folk:companion:Wren" and last["from"] == "Wren bought food from the store for 3 gold", "the ledger keeps by and from as written (%s)" % [last])
 
 
 ## Giving gold (decision 614): a transfer between records, both logs naming

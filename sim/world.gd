@@ -14821,6 +14821,15 @@ func _log(message: String) -> void:
 ## list is the mask's own (_mask_companions), walked from _entities when a
 ## body comes or goes (_roster_changed): the sim's lazy roster (_take_roster)
 ## is never filled by a line logged mid-step (the coordinator's condition).
+## 284 amended (3) (TASK 9, the coordinator's call of 2026-11-19): each
+## companion staying in a town (a worker "companion:<name>" in production,
+## in this zone or not) the same way, her name and her worker id's
+## "companion:<name>", as Production.log_name gives her (her player's tag),
+## the list read again when production's roster moves; then any whole player
+## id of Net.new_uuid's form (any case) as Companion.tag of it as held (one
+## key, one tag); an id of another shape is not caught here. A backstop
+## behind the printers' own tags: a printer handed a player's id tags it
+## itself (Stockpile.log_name, Production.log_name, Companion.tag).
 func masked(message: String) -> String:
 	if not _mask_current:
 		_mask_companions = []
@@ -14828,26 +14837,69 @@ func masked(message: String) -> String:
 			if entity is Companion:
 				_mask_companions.append(entity)
 		_mask_current = true
-	var tags: Dictionary[String, String] = {}
+	var tags: Dictionary[String, String] = _staying_tags()
+	if not _mask_companions.is_empty():
+		tags = tags.duplicate()  # The staying list is kept till the roster moves: added to only in a copy.
 	for each in _mask_companions:
 		if is_instance_valid(each):
 			var tag := Companion.tag((each as Companion).keeper_id)
 			for name_of: String in [String(each.name), each.label]:
 				if not name_of.is_empty():
 					tags[name_of] = tag
-	if tags.is_empty():
+	var out := message
+	if not tags.is_empty():
+		var key := "|".join(tags.keys())
+		if key != _mask_key:
+			_mask_key = key
+			_mask_pattern = mask_pattern(tags)
+		out = mask_line(message, tags, _mask_pattern)
+	return mask_ids(out)
+
+
+## [param message] with each whole player id (Net.new_uuid's form, any
+## case) as Companion.tag of it as held, never lower-cased: one key, one tag
+## (284 amended (3)).
+static func mask_ids(message: String) -> String:
+	if message.length() < 36:
 		return message
-	var key := "|".join(tags.keys())
-	if key != _mask_key:
-		_mask_key = key
-		_mask_pattern = mask_pattern(tags)
-	return mask_line(message, tags, _mask_pattern)
+	var ids := _PLAYER_ID.search_all(message)
+	var out := message
+	for i in range(ids.size() - 1, -1, -1):
+		out = out.substr(0, ids[i].get_start()) + Companion.tag(ids[i].get_string()) + out.substr(ids[i].get_end())
+	return out
+
+
+## Whether [param text] is a whole player id, Net.new_uuid's form, any case
+## (284 amended (3)): Stockpile.log_name's test of a ledger's by.
+static func is_player_id(text: String) -> bool:
+	return text.length() == 36 and _PLAYER_ID.search(text) != null
+
+
+## The companions staying in towns, by name, each her tag (284 amended (3)):
+## production's workers "companion:<name>", read again when its roster or an
+## origin changes (Production.workers_rev).
+func _staying_tags() -> Dictionary[String, String]:
+	if production == null:
+		return {}
+	if _staying_at != production.workers_rev or _staying_of != production:
+		_staying_at = production.workers_rev
+		_staying_of = production
+		_staying.clear()
+		for id in production.worker_ids():
+			if id.begins_with("companion:") and id.length() > 10:
+				_staying[id.substr(10)] = production.log_name(id)
+	return _staying
 
 
 var _mask_key := ""
 var _mask_pattern: RegEx = null
 var _mask_companions: Array[GridEntity] = []
 var _mask_current := false
+var _staying: Dictionary[String, String] = {}
+var _staying_at := -1
+var _staying_of: Production = null
+## A player's id as Net.new_uuid makes it, as a whole word.
+static var _PLAYER_ID := RegEx.create_from_string("(?i)(?<![0-9a-f-])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-f-])")
 
 
 ## The pattern that finds any of [param tags]' names as a whole word.
