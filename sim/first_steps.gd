@@ -6,7 +6,8 @@ extends RefCounted
 ## here is saved but [member card], her record's "first_steps").
 ##
 ## A newcomer's chain (CHAIN): after her first words (929) she proposes the
-## Mughouse's door, then the pond (her wish), then, with a catch in the
+## Mughouse's door, then, for a player with no rod, Rolf's stall for one
+## while he keeps it (945 amended (4)), then the pond (her wish), then, with a catch in the
 ## pack, its taker (the store window's pointer, Main.depot_pointer's rule);
 ## each a yes leads to. Then she offers, one a lull, when the server sees a
 ## player at a loss (Main._first_steps_signal); asked "where now?" she gives
@@ -16,7 +17,7 @@ extends RefCounted
 ## Off ("on": false) until the package is whole.
 
 ## The chain's steps, in order.
-const CHAIN: Array[String] = ["mughouse", "pond", "catch"]
+const CHAIN: Array[String] = ["mughouse", "rod", "pond", "catch"]
 ## A player asking her where to go: "where now?", "what now?", "I'm lost".
 const ASK_WAY := "(?i)\\b(where (now|to|next|should (we|i) go|shall (we|i) go|do (we|i) go)|what now|what (should|shall|do|can) (we|i) do|what'?s there to do|i'?m lost|show me (a)?round)\\b"
 ## A no to her offer.
@@ -28,7 +29,11 @@ const NO := "(?i)^\\W*(no|nah|nope|not now|not yet|no thanks|later|maybe later|a
 const PLACES: Array[String] = ["mughouse", "pond", "healer", "temple", "barrow"]
 const PLACE_WORDS := {"mughouse": ["mughouse", "inn", "tavern", "ale", "fire"], "pond": ["pond", "fish", "fishing", "pool"],
 	"healer": ["healer", "healer's", "medicine man", "hut", "remedies"], "temple": ["temple", "priest"],
-	"barrow": ["barrow", "mound", "door"]}
+	"barrow": ["barrow", "mound", "door"], "rod": ["rod", "rods", "stall", "rolf"]}
+## The chain's steps whose offer, left to lapse, is made once more at her next
+## lull before the step passes (945 amended (4): one missed bubble never loses
+## a new player the rest of the chain).
+const AGAIN_STEPS: Array[String] = ["rod", "pond"]
 
 ## Tests: 1 on, 0 off, -1 the JSON's "on".
 static var forced := -1
@@ -76,6 +81,11 @@ var hp := -1
 var no_where: Dictionary = {}
 ## The pond the chain's step led to ({} before): its catch step waits there.
 var pond: Dictionary = {}
+## The stall the chain's rod step led to ({} before, 945 amended (4)): the pond
+## waits there for a rod bought.
+var stall: Dictionary = {}
+## Her chain holds its next offer till this tick (a lapsed offer's once more).
+var again_tick := -100000
 ## A rising, from Main._on_returned: {kind, paid, tick}; {} for none.
 var rise: Dictionary = {}
 ## Her guide for her free talk (945 amended (2), Main._first_guide): since when her player has read

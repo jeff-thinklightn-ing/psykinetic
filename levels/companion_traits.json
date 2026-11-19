@@ -150,6 +150,45 @@
 				"That's the Mughouse. A hearth inside, ale at the counter, and rooms upstairs if we want one.",
 				"The Last Light Mughouse. Folk here just call it the Mughouse."
 			],
+			"offer.rod": {
+				"default": [
+					"You'll want a rod for the pond. Rolf sells them at his stall. Shall we?",
+					"Shall we see Rolf at his stall first? He sells rods.",
+					"Shall we get you a rod from Rolf's stall? Then we can try the pond."
+				],
+				"steady and watchful": [
+					"No fishing without a rod. Shall we see Rolf at his stall? He sells them."
+				],
+				"quick and wary": [
+					"Shall we get you a rod first? Rolf sells them at his stall."
+				],
+				"warm and talkative": [
+					"Oh, you'll want a rod! Rolf sells them at his stall. Shall we go and see him?"
+				],
+				"careful and thoughtful": [
+					"Shall we see Rolf at his stall first? A rod of your own is worth having."
+				],
+				"restless and curious": [
+					"I want to get fishing. Shall we get you a rod from Rolf's stall?"
+				],
+				"quiet and patient": [
+					"Shall we see Rolf for a rod? He keeps a stall."
+				],
+				"blunt and fearless": [
+					"You've no rod. Rolf sells them at his stall. Shall we?"
+				],
+				"cheerful under pressure": [
+					"Right, a rod first! Shall we see Rolf at his stall?"
+				]
+			},
+			"arrive.rod": [
+				"Here's Rolf's stall. Ask him for a rod.",
+				"That's Rolf. He's the one with the rods."
+			],
+			"rod.morning": [
+				"Rolf's stall opens in the morning. We'll see him for a rod then.",
+				"It's too late for Rolf's stall. We'll get you a rod from him in the morning."
+			],
 			"offer.pond": {
 				"default": [
 					"I've a mind to fish today. There's a pond a short walk south-east of the square. Shall we?",
@@ -296,6 +335,7 @@
 			],
 			"choice.mughouse": "the Mughouse, for a fire and an ale",
 			"choice.pond": "the pond, to fish a while",
+			"choice.rod": "Rolf's stall, for a rod",
 			"choice.healer": "the medicine man's hut, for his remedies",
 			"choice.temple": "the temple, where the priest brings the fallen back",
 			"choice.barrow": "the old mound outside town, for a look at its door",

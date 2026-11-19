@@ -3294,7 +3294,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (1125)
+## Lines in the data (1141)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3332,7 +3332,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (274)
+### levels/companion_traits.json (290)
 
 | | Line | Key |
 |---|---|---|
@@ -3371,6 +3371,21 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Right, shall we try the Mughouse? A hearth and an ale fix most things. | `first_steps.decks.offer.mughouse.cheerful under pressure[0]` |
 |  | That's the Mughouse. A hearth inside, ale at the counter, and rooms upstairs if we want one. | `first_steps.decks.arrive.mughouse[0]` |
 |  | The Last Light Mughouse. Folk here just call it the Mughouse. | `first_steps.decks.arrive.mughouse[1]` |
+|  | You'll want a rod for the pond. Rolf sells them at his stall. Shall we? | `first_steps.decks.offer.rod.default[0]` |
+|  | Shall we see Rolf at his stall first? He sells rods. | `first_steps.decks.offer.rod.default[1]` |
+|  | Shall we get you a rod from Rolf's stall? Then we can try the pond. | `first_steps.decks.offer.rod.default[2]` |
+|  | No fishing without a rod. Shall we see Rolf at his stall? He sells them. | `first_steps.decks.offer.rod.steady and watchful[0]` |
+|  | Shall we get you a rod first? Rolf sells them at his stall. | `first_steps.decks.offer.rod.quick and wary[0]` |
+|  | Oh, you'll want a rod! Rolf sells them at his stall. Shall we go and see him? | `first_steps.decks.offer.rod.warm and talkative[0]` |
+|  | Shall we see Rolf at his stall first? A rod of your own is worth having. | `first_steps.decks.offer.rod.careful and thoughtful[0]` |
+|  | I want to get fishing. Shall we get you a rod from Rolf's stall? | `first_steps.decks.offer.rod.restless and curious[0]` |
+|  | Shall we see Rolf for a rod? He keeps a stall. | `first_steps.decks.offer.rod.quiet and patient[0]` |
+|  | You've no rod. Rolf sells them at his stall. Shall we? | `first_steps.decks.offer.rod.blunt and fearless[0]` |
+|  | Right, a rod first! Shall we see Rolf at his stall? | `first_steps.decks.offer.rod.cheerful under pressure[0]` |
+|  | Here's Rolf's stall. Ask him for a rod. | `first_steps.decks.arrive.rod[0]` |
+|  | That's Rolf. He's the one with the rods. | `first_steps.decks.arrive.rod[1]` |
+|  | Rolf's stall opens in the morning. We'll see him for a rod then. | `first_steps.decks.rod.morning[0]` |
+|  | It's too late for Rolf's stall. We'll get you a rod from him in the morning. | `first_steps.decks.rod.morning[1]` |
 |  | I've a mind to fish today. There's a pond a short walk south-east of the square. Shall we? | `first_steps.decks.offer.pond.default[0]` |
 |  | I'd like to fish a while. Shall we try the pond? It holds more fish than any other water. | `first_steps.decks.offer.pond.default[1]` |
 |  | Shall we go and fish? The pond's a short walk south-east of the square. | `first_steps.decks.offer.pond.default[2]` |
@@ -3433,6 +3448,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | We're at the medicine man's hut. Those in his care who fall are brought back here. | `first_steps.decks.risen.healer[1]` |
 |  | the Mughouse, for a fire and an ale | `first_steps.decks.choice.mughouse` |
 |  | the pond, to fish a while | `first_steps.decks.choice.pond` |
+|  | Rolf's stall, for a rod | `first_steps.decks.choice.rod` |
 |  | the medicine man's hut, for his remedies | `first_steps.decks.choice.healer` |
 |  | the temple, where the priest brings the fallen back | `first_steps.decks.choice.temple` |
 |  | the old mound outside town, for a look at its door | `first_steps.decks.choice.barrow` |
