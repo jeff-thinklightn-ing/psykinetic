@@ -25939,6 +25939,7 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	if model.get("people_stance", false):
 		rig.stood_as = PEOPLE_PREFIX
 	# A posture's arms ease out through these (AnimRig.gaits, 953 amended (3)).
+	rig.kind = str(model["scene"]).get_file().get_basename()  # vary_log's kind (977 amended (2)).
 	rig.gaits = PackedStringArray((model.get("gaits", GAITS) as Array).map(func(gait: Array) -> String: return str(gait[0])))
 	rig.loop(_idle_clip(puppet))
 	if model.has("sockets"):
@@ -26871,6 +26872,28 @@ func _rest_of(entity: GridEntity, puppet: Node3D, ids: Array, rig: AnimRig, now:
 	if not calm or now - int(puppet.get_meta("stood_at", now)) < int(REST_STAND_SECONDS * 1000.0):
 		return {}
 	return rest
+
+
+## Whether a people's walk and stand may vary (977 amended (2); TASK 10's first term, the coordinator, 11-19: the
+## head keeps still where it is busy): nothing readied, drawn or aimed (raised; its piece's state other than empty
+## hands, at rest, stowed or sheathed: VARY_QUIET_STATES), not hurt (below TIRED_BELOW) or in a fight (_calm: nothing
+## raised, struck or rousing it, and no blow near it, REST_SECONDS), carrying nothing (a load on the shoulder, a
+## lantern) and at nothing else (a work or its aside, a fidget or any one-off, a kneel, a seat), and up.
+const VARY_QUIET_STATES: Array[String] = ["", "stowed", "rest", "sheathed"]
+func _vary_calm(entity: GridEntity, puppet: Node3D, rig: AnimRig, now: int, work: Dictionary, crouched: bool, aside: String) -> bool:
+	if rig.busy() or rig.striking() or not work.is_empty() or crouched or aside != "" or bool(puppet.get_meta("fidgeting", false)) \
+			or str(puppet.get_meta("load", "")) != "" or bool(puppet.get_meta("downed", false)) or bool(puppet.get_meta("seated", false)):
+		return false
+	var lantern := puppet.get_node_or_null("CarriedLantern") as Node3D
+	if lantern != null and lantern.visible:
+		return false
+	var state := str(puppet.get_meta("bow_state", ""))
+	var held := in_hand(puppet)
+	if state not in VARY_QUIET_STATES or state == "" and not held.is_empty() and str(held[0]) != "":
+		return false
+	if entity == null:
+		return now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) >= int(REST_SECONDS * 1000.0)
+	return not (entity.max_hp > 0 and float(entity.hp) / entity.max_hp < TIRED_BELOW) and _calm(entity, puppet, rig, now)
 
 
 ## Whether [param entity] has been calm REST_SECONDS (662 (b)): nothing raised,
@@ -29175,6 +29198,11 @@ func _animate(puppet: Node3D) -> void:
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
 	var crouched: bool = puppet.get_meta("crouched", false) and rig.has(CLIP_CROUCH)
 	var aside := str(puppet.get_meta("aside_of", ""))
+	if rig.varies():
+		# The walk and the stand vary only calm, at its own stand, while seen (977 amended (2)).
+		rig.vary_calm = _vary_calm(entity, puppet, rig, now, work, crouched, aside)
+		rig.vary_stand = str(puppet.get_meta("idle", CLIP_IDLE))
+		rig.seen = rig.every != POSE_UNSEEN_EVERY
 	if aside != "" and (aside != str(puppet.get_meta("work", "")) or speed > WALKING or not calm):
 		puppet.set_meta("aside_of", "")  # A work's aside (its show, its give) goes with the work.
 		puppet.set_meta("fidgeting", false)

@@ -241,6 +241,7 @@ func _ready() -> void:
 		_test_told_kinds_known()
 		await _test_gait_holds()  # It lets frames run (the hold's rows).
 		_test_run_arms_held()
+		_test_vary_calm()  # 977 amended (2): after run_arms_held, its player bare-handed and still standing.
 		await _test_shield_seen()
 		await _test_reel_clock()
 		await _test_barrow_deaths()
@@ -20944,6 +20945,114 @@ func _test_asleep() -> void:
 	her.free()
 	_rig._sync_work(player, puppet)
 	_rig._process(0.0)
+
+
+## The walk's and the stand's layer at 0 where the body is busy (977 amended (2), the coordinator's first term, 11-19):
+## Client3D._vary_calm, read on the host's own player's puppet, true bare-handed and calm with nothing near it, and
+## false for each busy state on its own: a piece raised, a bow drawn, held or loosed, a shield up, a piece ready, a
+## blade drawn in hand, a flinch (a clip played once), hurt below TIRED_BELOW, a blow near it inside REST_SECONDS, a
+## shoulder load, a lantern carried, work, crouched, stood aside, a fidget, downed, seated. And _animate writes it to
+## the rig: a blow near the body, the rig's vary_calm false after its next frame.
+func _test_vary_calm() -> void:
+	print("\n== the walk's and the stand's variation only calm: each busy state stops it ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to read")
+		return
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was_slots := slots.duplicate()
+	var was_hp := player.hp
+	var was_raised := player.raised
+	slots[Items.RIGHT_HAND] = ""
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	player.raised = ""
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	var id := int(puppet.get_meta("entity_id", 0))
+	var combat_was: Variant = _rig._combat_at.get(id)
+	var metas := {}
+	for key: String in ["roused_at", "roused_look_at", "roused_seen", "bow_state", "load", "fidgeting", "downed", "seated"]:
+		metas[key] = puppet.get_meta(key) if puppet.has_meta(key) else null
+	var now := Time.get_ticks_msec()
+	var quiet := func() -> void:
+		puppet.set_meta("roused_at", now - 60000)
+		puppet.set_meta("roused_look_at", now + 600000)
+		puppet.set_meta("roused_seen", false)
+		puppet.set_meta("bow_state", "")
+		for key: String in ["load", "fidgeting", "downed", "seated"]:
+			puppet.remove_meta(key)
+		_rig._combat_at.erase(id)
+		player.raised = ""
+		player.hp = player.max_hp
+	var calm := func(work := {}, crouched := false, aside := "") -> bool:
+		return _rig._vary_calm(player, puppet, rig, now, work, crouched, aside)
+	var bad: Array[String] = []
+	quiet.call()
+	if not calm.call():
+		bad.append("bare-handed and calm it reads busy")
+	var states: Array[String] = ["raised", "draw", "hold", "loose", "block", "ready", "drawn in hand", "flinch", "hurt",
+			"a blow near", "load", "lantern", "work", "crouched", "aside", "fidgeting", "downed", "seated"]
+	for state in states:
+		quiet.call()
+		var work := {}
+		var crouched := false
+		var aside := ""
+		var lantern: Node3D = null
+		match state:
+			"raised": player.raised = "sword"
+			"draw", "hold", "loose", "block", "ready": puppet.set_meta("bow_state", state)
+			"drawn in hand":
+				slots[Items.RIGHT_HAND] = "sword"
+				player.slots = slots
+				_rig._process(0.0)
+				quiet.call()
+			"flinch": rig.once(Client3D.CLIP_HIT, 1.0)
+			"hurt": player.hp = maxi(1, int(player.max_hp * Client3D.TIRED_BELOW) - 1)
+			"a blow near": _rig._combat_at[id] = now - 1000
+			"load": puppet.set_meta("load", "log")
+			"lantern":
+				lantern = Node3D.new()
+				lantern.name = "CarriedLantern"
+				puppet.add_child(lantern)
+			"work": work = {"kind": "chop"}
+			"crouched": crouched = true
+			"aside": aside = "folk:1"
+			_: puppet.set_meta(state, true)
+		if calm.call(work, crouched, aside):
+			bad.append("%s reads calm" % state)
+		if lantern != null:
+			lantern.free()
+		if state == "drawn in hand":
+			slots[Items.RIGHT_HAND] = ""
+			player.slots = slots
+			_rig._process(0.0)
+		if state == "flinch":
+			rig._busy_msec = 0
+	# _animate writes it: a blow near the body, and the rig's vary_calm after a frame.
+	quiet.call()
+	_rig._combat_at[id] = Time.get_ticks_msec()
+	_rig._process(0.0)
+	var written := rig.vary_calm
+	quiet.call()
+	player.slots = was_slots
+	player.hp = was_hp
+	player.raised = was_raised
+	if combat_was != null:
+		_rig._combat_at[id] = combat_was
+	for key: String in metas:
+		if metas[key] == null:
+			puppet.remove_meta(key)
+		else:
+			puppet.set_meta(key, metas[key])
+	_rig._process(0.0)
+	if written:
+		bad.append("_animate left vary_calm true with a blow near it")
+	print("  %d busy states read: %s" % [states.size(), ", ".join(states)])
+	_check(bad.is_empty(), "the walk's and the stand's variation is calm only: bare-handed and quiet it varies, each of %d busy states stops it, and _animate writes it to the rig (%s)" % [states.size(), "; ".join(bad)])
 
 
 func _player() -> Player:

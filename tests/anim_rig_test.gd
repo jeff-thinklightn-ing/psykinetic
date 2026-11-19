@@ -46,6 +46,9 @@ func _ready() -> void:
 	_test_people_jog()
 	_test_run_body()
 	_test_run_vary()
+	_test_walk_vary()
+	_test_idle_vary()
+	_test_vary_cost()
 	await _test_gait_phases()
 	await _test_gait_switch_feet()
 	await _test_run_arms()
@@ -3899,6 +3902,278 @@ func _test_run_vary() -> void:
 		for body: Array in bodies:
 			(body[0] as Node3D).free()
 
+
+## The walk and the stand vary (977 amended (2); TASK 10, the coordinator's terms, 11-19), on rigs with a fixed draw
+## (term 2: a row's rigs seeded, VARY_SEED, the game's drawn locally). Two people's rigs for the man and the woman,
+## one with the layer and one without, started together; the layer's legs (LEG_BONES and the hips) within VARY_LEGS of
+## the plain body's every frame, and each weight's step a frame within its ease's steepest (smoothstep's 1.5 times the
+## even share of its ease over twice its size).
+const VARY_SEED := 977
+const WALK_HEAD_YAW := 8.0
+const STAND_SECONDS := 60.0
+const STAND_LOOKS := 8
+const STAND_CARRIES := 5
+func _vary_bodies(lib: AnimationLibrary, path: String, clip: String) -> Array:
+	var bodies := []
+	for vary in [true, false]:
+		var model := (load(path) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var rig := AnimRig.make(model, lib, 0.15, true, null, vary)
+		rig._vary_rng.seed = VARY_SEED
+		rig.stood_as = "People_"
+		rig.gaits = PackedStringArray(["Walk", "Jog_Short", "Sprint_Short"])
+		rig.loop(clip, 1.0, 0.0, true)
+		rig._process(0.0)
+		bodies.append([model, rig, model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D])
+	return bodies
+
+
+static func _vary_reads(k: Skeleton3D) -> Dictionary:
+	var g := func(b: String) -> Transform3D: return k.get_bone_global_pose(k.find_bone(b))
+	var t: Vector3 = ((g.call("LeftUpperArm") as Transform3D).origin + (g.call("RightUpperArm") as Transform3D).origin) * 0.5 - (g.call("Hips") as Transform3D).origin
+	var z: Vector3 = (g.call("Head") as Transform3D).basis.z
+	return {"trunk": rad_to_deg(atan2(t.z, t.y)), "yaw": rad_to_deg(atan2(z.x, z.z))}
+
+
+static func _legs_off(sk: Skeleton3D, plain: Skeleton3D) -> float:
+	var most := 0.0
+	var legs: Array[String] = ["Hips"]
+	legs.append_array(AnimRig.LEG_BONES)
+	for b: String in legs:
+		most = maxf(most, sk.get_bone_global_pose(sk.find_bone(b)).origin.distance_to(plain.get_bone_global_pose(plain.find_bone(b)).origin))
+	return most
+
+
+## The walk (VARY_SECONDS at 1/60): the head's yaw off the plain walk's at least VARY_SEEN of the walk's cap
+## (AnimRig.VARY_WALK_LOOK times the run's 3.7) and never over WALK_HEAD_YAW; the lean within VARY_LEAN; "look" drawn
+## every VARY_WALK_LOOK_STEPS footfalls (each "carry" draw a footfall), VARY_LOOKS times or more. Then busy (vary_calm
+## false) the walk's weights at 0 within the blend, and the jog busy still the run's (977's, untouched).
+func _test_walk_vary() -> void:
+	print("== the walk varies, its look larger and more often than the run's, at 0 while busy ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var bodies := _vary_bodies(lib, build[1], "Idle")
+		for body: Array in bodies:
+			(body[1] as AnimRig).loop("Walk", 1.0, 0.0, true)
+		var rig: AnimRig = bodies[0][1]
+		var sk: Skeleton3D = bodies[0][2]
+		var plain_sk: Skeleton3D = bodies[1][2]
+		var step_s := lib.get_animation(rig.as_played("Walk")).length / 2.0
+		var steepest := 1.5 * 2.0 * AnimRig.VARY_WALK_LOOK / (step_s * AnimRig.VARY_WALK_EASE * 60.0) + 0.0001
+		var most := {"legs": 0.0, "lean": 0.0, "yaw": 0.0, "step": 0.0}
+		var gaps: Array[int] = []
+		var falls_at := -1
+		for i in int(VARY_SECONDS * 60.0):
+			var was := [rig.vary_weight("carry"), rig.vary_weight("look"), int(rig._vary_draws["look"])]
+			for body: Array in bodies:
+				(body[1] as AnimRig)._process(1.0 / 60.0)
+			most["step"] = maxf(most["step"], maxf(absf(rig.vary_weight("carry") - float(was[0])), absf(rig.vary_weight("look") - float(was[1]))))
+			# A footfall draws "carry" (AnimRig._vary_draws); "look" drawn on a footfall, its gap counted in footfalls.
+			if int(rig._vary_draws["look"]) != int(was[2]):
+				if falls_at >= 0:
+					gaps.append(int(rig._vary_draws["carry"]) - falls_at)
+				falls_at = int(rig._vary_draws["carry"])
+			most["legs"] = maxf(most["legs"], _legs_off(sk, plain_sk))
+			var a := _vary_reads(sk)
+			var b := _vary_reads(plain_sk)
+			most["lean"] = maxf(most["lean"], absf(float(a["trunk"]) - float(b["trunk"])))
+			most["yaw"] = maxf(most["yaw"], absf(wrapf(float(a["yaw"]) - float(b["yaw"]), -180.0, 180.0)))
+		var bad: Array[String] = []
+		var cap := 3.7 * AnimRig.VARY_WALK_LOOK
+		if most["legs"] > VARY_LEGS:
+			bad.append("a leg %.4f m off the plain walk's" % most["legs"])
+		if most["lean"] > VARY_LEAN:
+			bad.append("the lean %.2f deg off" % most["lean"])
+		if most["yaw"] > WALK_HEAD_YAW or most["yaw"] < cap * VARY_SEEN:
+			bad.append("the head's yaw %.2f deg off (at least %.2f, at most %.1f)" % [most["yaw"], cap * VARY_SEEN, WALK_HEAD_YAW])
+		if most["step"] > steepest:
+			bad.append("a weight's step %.4f a frame (cap %.4f)" % [most["step"], steepest])
+		if gaps.size() + 1 < VARY_LOOKS or gaps.any(func(n: int) -> bool: return n < AnimRig.VARY_WALK_LOOK_STEPS.x or n > AnimRig.VARY_WALK_LOOK_STEPS.y):
+			bad.append("look drawn %d times, footfalls between %s" % [gaps.size() + 1, gaps])
+		# Busy (a piece readied, a fight, a load): the walk's layer at 0 within the blend.
+		rig.vary_calm = false
+		for k in int(ceil(rig.blend * 60.0)) + 1:
+			rig._process(1.0 / 60.0)
+		var busy := [rig.vary_weight("carry"), rig.vary_weight("look")]
+		# The jog busy: 977's run, varying as landed.
+		rig.loop("Jog_Short", 1.0, 0.0, true)
+		for k in 90:
+			rig._process(1.0 / 60.0)
+		var jog := absf(rig.vary_weight("carry")) + absf(rig.vary_weight("look"))
+		rig.vary_calm = true
+		if float(busy[0]) != 0.0 or float(busy[1]) != 0.0 or jog <= 0.0:
+			bad.append("busy at the walk %s; the jog busy %.3f" % [busy, jog])
+		print("  %s: %.0f s walking: legs %.5f m off, lean %.2f, head yaw %.2f deg at most (cap %.1f); %d footfalls, look drawn %d times, footfalls between %s; largest step %.4f (cap %.4f)" % [
+			build[0], VARY_SECONDS, most["legs"], most["lean"], most["yaw"], cap, int(rig._vary_draws["carry"]), gaps.size() + 1, gaps, most["step"], steepest])
+		_check(bad.is_empty(), "%s: the walk varies within its caps, its look the run's twice over and every 3 to 6 footfalls, the legs untouched, at 0 while busy and the jog as landed (%s)" % [build[0], "; ".join(bad)])
+		for body: Array in bodies:
+			(body[0] as Node3D).free()
+
+
+## The stand (STAND_SECONDS at 1/60, at Idle, vary_stand Idle): the plain body's rate kept to the layer's (its stand
+## rate drawn each cycle), so the legs and the hips within VARY_LEGS of it every frame (the feet planted); the trunk off
+## the plain's at least VARY_SEEN of VARY_LEAN and never over it, the head's yaw at least half the walk's cap and never
+## over WALK_HEAD_YAW; "look" drawn STAND_LOOKS times or more at intervals within VARY_STAND_LOOK, at least STAND_LOOKS
+## of them different at the frame's 1/60 (two draws may land on one frame count), and
+## "carry" STAND_CARRIES or more within VARY_STAND_CARRY; the rate within VARY_STAND_RATE and not one value. Then each
+## of the stand's stops at 0 within the blend, its rate back to the clip's: busy (vary_calm), unseen (seen), not its
+## stand (vary_stand ""), Idle_Tired; a look held gives the look none. And from a jog's stop the stand's draws wait for
+## the settle to be done.
+func _test_idle_vary() -> void:
+	print("== the stand varies on the rig's clock, the feet planted, at 0 while busy or unseen ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var bodies := _vary_bodies(lib, build[1], "Idle")
+		var rig: AnimRig = bodies[0][1]
+		var plain: AnimRig = bodies[1][1]
+		var sk: Skeleton3D = bodies[0][2]
+		var plain_sk: Skeleton3D = bodies[1][2]
+		rig.vary_stand = "Idle"
+		var look_cap := 1.5 * 2.0 * AnimRig.VARY_WALK_LOOK / (AnimRig.VARY_STAND_LOOK_EASE * 60.0) + 0.0001
+		var carry_cap := 1.5 * 2.0 / (AnimRig.VARY_STAND_CARRY_EASE * 60.0) + 0.0001
+		var most := {"legs": 0.0, "lean": 0.0, "yaw": 0.0, "look_step": 0.0, "carry_step": 0.0}
+		var draws := {"look": [], "carry": []}
+		var rates := {}
+		for i in int(STAND_SECONDS * 60.0):
+			var was := [rig.vary_weight("carry"), rig.vary_weight("look"), rig._vary_draws.duplicate()]
+			rig._process(1.0 / 60.0)
+			plain.set_speed(rig._stand_rate)
+			plain._process(1.0 / 60.0)
+			most["carry_step"] = maxf(most["carry_step"], absf(rig.vary_weight("carry") - float(was[0])))
+			most["look_step"] = maxf(most["look_step"], absf(rig.vary_weight("look") - float(was[1])))
+			for layer: String in draws:
+				if int(rig._vary_draws[layer]) != int((was[2] as Dictionary)[layer]):
+					(draws[layer] as Array).append(i / 60.0)
+			rates[snappedf(rig._stand_rate, 0.0001)] = true
+			most["legs"] = maxf(most["legs"], _legs_off(sk, plain_sk))
+			var a := _vary_reads(sk)
+			var b := _vary_reads(plain_sk)
+			most["lean"] = maxf(most["lean"], absf(float(a["trunk"]) - float(b["trunk"])))
+			most["yaw"] = maxf(most["yaw"], absf(wrapf(float(a["yaw"]) - float(b["yaw"]), -180.0, 180.0)))
+		var gaps := {}
+		for layer: String in draws:
+			var at: Array = draws[layer]
+			gaps[layer] = []
+			for k in range(1, at.size()):
+				(gaps[layer] as Array).append(snappedf(float(at[k]) - float(at[k - 1]), 0.001))
+		var bad: Array[String] = []
+		var yaw_cap := 3.7 * AnimRig.VARY_WALK_LOOK
+		if most["legs"] > VARY_LEGS:
+			bad.append("a leg or the hips %.4f m off the plain stand's" % most["legs"])
+		if most["lean"] > VARY_LEAN or most["lean"] < VARY_LEAN * VARY_SEEN:
+			bad.append("the lean %.2f deg off" % most["lean"])
+		if most["yaw"] > WALK_HEAD_YAW or most["yaw"] < yaw_cap * VARY_SEEN:
+			bad.append("the head's yaw %.2f deg off" % most["yaw"])
+		if most["look_step"] > look_cap or most["carry_step"] > carry_cap:
+			bad.append("a step a frame: look %.4f (cap %.4f), carry %.4f (cap %.4f)" % [most["look_step"], look_cap, most["carry_step"], carry_cap])
+		var look_gaps: Array = gaps["look"]
+		var carry_gaps: Array = gaps["carry"]
+		var unique := {}
+		for gap: float in look_gaps:
+			unique[gap] = true
+		if (draws["look"] as Array).size() < STAND_LOOKS or unique.size() < STAND_LOOKS or look_gaps.any(func(s: float) -> bool: return s < AnimRig.VARY_STAND_LOOK.x - 0.02 or s > AnimRig.VARY_STAND_LOOK.y + 0.02):
+			bad.append("look drawn %d times, seconds between %s" % [(draws["look"] as Array).size(), look_gaps])
+		if (draws["carry"] as Array).size() < STAND_CARRIES or carry_gaps.any(func(s: float) -> bool: return s < AnimRig.VARY_STAND_CARRY.x - 0.02 or s > AnimRig.VARY_STAND_CARRY.y + 0.02):
+			bad.append("carry drawn %d times, seconds between %s" % [(draws["carry"] as Array).size(), carry_gaps])
+		if rates.size() < 2 or rates.keys().any(func(r: float) -> bool: return r < AnimRig.VARY_STAND_RATE.x or r > AnimRig.VARY_STAND_RATE.y):
+			bad.append("the stand's rate %s" % [rates.keys()])
+		print("  %s: %.0f s standing: legs and hips %.5f m off, lean %.2f, head yaw %.2f deg at most; look drawn %d times, s between %s; carry %d, s between %s; rates %s; largest steps look %.4f, carry %.4f" % [
+			build[0], STAND_SECONDS, most["legs"], most["lean"], most["yaw"], (draws["look"] as Array).size(), look_gaps,
+			(draws["carry"] as Array).size(), carry_gaps, rates.keys(), most["look_step"], most["carry_step"]])
+		# Each of the stand's stops, and the stand again between them.
+		var stops: Array[String] = []
+		for stop: String in ["busy", "unseen", "not its stand", "tired", "held"]:
+			for k in 120:
+				rig._process(1.0 / 60.0)
+			match stop:
+				"busy": rig.vary_calm = false
+				"unseen": rig.seen = false
+				"not its stand": rig.vary_stand = ""
+				"tired": rig.loop("Idle_Tired", 1.0, 0.0, true)
+				"held": rig.look_held = 1.0
+			for k in int(ceil(rig.blend * 60.0)) + 1:
+				rig._process(1.0 / 60.0)
+			var scale := float(rig.tree.get("parameters/%s_speed/scale" % AnimRig._slot_name(rig._slot)))
+			var look := float(rig.tree.get("parameters/vary_look/add_amount"))
+			var ok := look == 0.0 if stop == "held" else (rig.vary_weight("carry") == 0.0 and rig.vary_weight("look") == 0.0 and is_equal_approx(scale, float(rig._base_speed[rig._slot])))
+			if not ok:
+				stops.append("%s: carry %.3f, look %.3f, its rate %.3f" % [stop, rig.vary_weight("carry"), look, scale])
+			rig.vary_calm = true
+			rig.seen = true
+			rig.vary_stand = "Idle"
+			rig.look_held = 0.0
+			if stop == "tired":
+				rig.loop("Idle", 1.0, 0.0, true)
+		# A jog's stop: the stand's draws wait for the settle.
+		rig.loop("Jog_Short", 1.0, 0.0, true)
+		for k in 60:
+			rig._process(1.0 / 60.0)
+		var early := false
+		for k in 18:
+			rig.settle("Idle", 0.3)
+			rig._process(1.0 / 60.0)
+		rig.loop("Idle", 1.0)
+		for k in 120:
+			rig._process(1.0 / 60.0)
+			if rig._vary_mode == "stand" and (rig.settled() > 0.0 or rig._settle_rising):
+				early = true
+		if early or rig._vary_mode != "stand":
+			stops.append("after a jog's stop: the stand drew inside the settle %s, standing %s" % [early, rig._vary_mode])
+		bad.append_array(stops)
+		_check(bad.is_empty(), "%s: the stand varies over a minute within its caps, never a loop (intervals drawn, the rate drawn each cycle), the feet planted, at 0 busy, unseen, tired, off its stand or in a settle (%s)" % [build[0], "; ".join(bad)])
+		for body: Array in bodies:
+			(body[0] as Node3D).free()
+
+
+## The stand's cost (term 3: a count from a row): VARY_COST_RIGS people's rigs standing at Idle, the man's and the
+## woman's in turn, stepped VARY_COST_FRAMES at 1/60 (each _process: the layer's step and the tree's), timed with the
+## stand's layer on and then with it off (vary_on false: as main's tip stands, its weights at 0), each twice, the
+## least kept. The layer's work a rig a frame is the difference over the rigs; printed, and failed only past
+## VARY_COST_MOST (a loaded machine's noise kept out of it: the coordinator's twentieth of a millisecond is read from
+## the print).
+const VARY_COST_RIGS := 30
+const VARY_COST_FRAMES := 300
+const VARY_COST_MOST := 0.5
+func _test_vary_cost() -> void:
+	print("== the stand's cost: %d people standing ==" % VARY_COST_RIGS)
+	var lib := load(CLIPS) as AnimationLibrary
+	var rigs: Array[AnimRig] = []
+	var models: Array[Node3D] = []
+	for i in VARY_COST_RIGS:
+		var model := (load("res://art/models/characters/human_m.glb" if i % 2 == 0 else "res://art/models/characters/human_f.glb") as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var rig := AnimRig.make(model, lib, 0.15, true, null, true)
+		rig._vary_rng.seed = VARY_SEED + i
+		rig.stood_as = "People_"
+		rig.gaits = PackedStringArray(["Walk", "Jog_Short", "Sprint_Short"])
+		rig.vary_stand = "Idle"
+		rig.loop("Idle", 1.0, 0.0, true)
+		rig._process(0.0)
+		rigs.append(rig)
+		models.append(model)
+	var was := AnimRig.vary_on
+	var timed := {}
+	var standing := 0
+	for on: bool in [true, false, true, false]:
+		AnimRig.vary_on = on
+		for k in 30:
+			for rig in rigs:
+				rig._process(1.0 / 60.0)
+		if on:
+			standing = rigs.filter(func(rig: AnimRig) -> bool: return rig._vary_mode == "stand").size()
+		var start := Time.get_ticks_usec()
+		for k in VARY_COST_FRAMES:
+			for rig in rigs:
+				rig._process(1.0 / 60.0)
+		var ms := (Time.get_ticks_usec() - start) / 1000.0 / VARY_COST_FRAMES
+		timed[on] = minf(float(timed.get(on, INF)), ms)
+	AnimRig.vary_on = was
+	var layer := (float(timed[true]) - float(timed[false])) / VARY_COST_RIGS
+	print("  a frame, %d rigs standing: %.3f ms with the stand's layer, %.3f ms without (as main's tip); the layer %.4f ms a rig a frame (%d of %d varying)" % [
+		VARY_COST_RIGS, timed[true], timed[false], layer, standing, VARY_COST_RIGS])
+	_check(standing == VARY_COST_RIGS and layer < VARY_COST_MOST, "the stand's layer costs %.4f ms a rig a frame (under %.1f), every rig varying (%d)" % [layer, VARY_COST_MOST, standing])
+	for model in models:
+		model.free()
 
 ## [param anim]'s stride on [param skeleton] over 240 samples: "pace", the planted toe's median backward
 ## speed (as tools/gait_pace.gd: a toe within 2 cm of the lowest on both samples); "flight", the share of

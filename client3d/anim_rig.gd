@@ -63,6 +63,26 @@ const VARY_LOOK: Array[String] = ["Vary_Look_Minus", "Vary_Look_Plus"]
 const VARY_EASE := 0.5
 const VARY_LOOK_STEPS := Vector2i(4, 10)
 static var vary_on := not "--no-vary" in OS.get_cmdline_user_args()
+## The walk and the stand vary too (977 amended (2); TASK 10, the coordinator's terms, 11-19). At the walk (gaits' first)
+## "look" is drawn to VARY_WALK_LOOK times the run's (the head's yaw to +-7.4, its pitch +-4) every VARY_WALK_LOOK_STEPS
+## footfalls, eased over VARY_WALK_EASE of a step; "carry" as the run's. Standing at its own stand clip (vary_stand,
+## Client3D's: a body's idle, never Idle_Tired) the two are drawn on the rig's clock, not footfalls: "look" to the walk's
+## size every VARY_STAND_LOOK seconds, eased over VARY_STAND_LOOK_EASE; "carry" to the run's every VARY_STAND_CARRY,
+## eased over VARY_STAND_CARRY_EASE, each on its own timer; and the stand clip's rate drawn in VARY_STAND_RATE at each
+## of its cycles (its feet are planted). The stand's draws wait for a stop's settle to be done, and run only while the
+## rig is seen (seen: Client3D's, its body in the camera's frustum). The walk and the stand vary only while vary_calm
+## (Client3D's: nothing readied, drawn or aimed, not hurt or in a fight, neither carrying nor working nor in a one-off),
+## eased to 0 over the blend otherwise; the jog and the sprint are 977's, untouched. vary_log (--vary-log, a debug
+## build only) prints each draw: the rig's kind (its model's file), its clip, the layer, the weights and the time.
+const VARY_WALK_LOOK := 2.0
+const VARY_WALK_LOOK_STEPS := Vector2i(3, 6)
+const VARY_WALK_EASE := 1.0
+const VARY_STAND_LOOK := Vector2(2.5, 7.0)
+const VARY_STAND_LOOK_EASE := 1.0
+const VARY_STAND_CARRY := Vector2(4.0, 9.0)
+const VARY_STAND_CARRY_EASE := 1.5
+const VARY_STAND_RATE := Vector2(0.92, 1.08)
+static var vary_log := OS.is_debug_build() and "--vary-log" in OS.get_cmdline_user_args()
 ## A strike's speed is kept within these (a blow can be hurried or held back
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
@@ -134,6 +154,20 @@ var _vary_rng := RandomNumberGenerator.new()
 var _vary_w := {"carry": {"now": 0.0, "from": 0.0, "to": 0.0, "eased": 1.0}, "look": {"now": 0.0, "from": 0.0, "to": 0.0, "eased": 1.0}}
 var _vary_step: Array = ["", -1]
 var _vary_look_in := 0
+## The walk's and the stand's (977 amended (2)): the stand clip a body varies at ("" none), whether it may vary (calm),
+## whether it is seen, the model's kind for vary_log; the mode last stepped ("", "gait", "stand"), the stand's seconds
+## till each layer draws, its rate and the cycle it was drawn at.
+var vary_stand := ""
+var vary_calm := true
+var seen := true
+var kind := ""
+var _vary_mode := ""
+var _stand_in := {"look": 0.0, "carry": 0.0}
+var _stand_rate := 1.0
+var _stand_cycle := -1
+var _stand_last := 0.0
+var _vary_zeroed := false
+var _vary_draws := {"look": 0, "carry": 0, "rate": 0}  # Draws so far, by layer (a row counts them).
 ## A stop's settle (settle): the stand clip the trunk eases to, its share now (0 to 1), the seconds it rises over, the
 ## gait it rises from, whether it rises, and the seconds the base has played the stand clip.
 var _settle_clip := ""
@@ -629,7 +663,8 @@ func vary_weight(layer: String) -> float:
 	return float(_vary_w[layer]["now"]) if _vary else 0.0
 
 
-## Steps the variation by [param delta] seconds (_process; a test steps it): a footfall of a gait draws, else it eases.
+## Steps the variation by [param delta] seconds (_process; a test steps it): a footfall of a gait draws, a stand's
+## timers draw (977 amended (2)), else it eases to 0.
 ## A people's stop (869 amended (4); the coordinator on ui-design's look of 977, 11-18: the body stood leaning 19
 ## degrees through STOP_HOLD, held with the gait, then dropped to 8 inside the stand's 0.15 s blend, the trunk's
 ## largest 40 ms change 5.3 to 8.1 times a mid-stride's): from the hold's first frame the trunk (SETTLE_BONES, above
@@ -712,7 +747,24 @@ func _vary_ease(delta: float) -> void:
 		return
 	var clip: String = _base_clip[_slot]
 	var length := player.get_animation(clip).length if clip != "" and player.has_animation(clip) else 0.0
-	var gait := vary_on and base_clip() in gaits and length > 0.0
+	var walk := not gaits.is_empty() and base_clip() == gaits[0]
+	var gait := vary_on and base_clip() in gaits and length > 0.0 and (vary_calm or not walk)
+	var stand := not gait and vary_on and vary_calm and seen and vary_stand != "" and base_clip() == vary_stand \
+			and length > 0.0 and not striking() and _settle <= 0.0 and not _settle_rising
+	var mode := "gait" if gait else ("stand" if stand else "")
+	if mode != _vary_mode:
+		_vary_mode = mode
+		_vary_step = ["", -1]
+		_vary_look_in = 0
+		_stand_in = {"look": 0.0, "carry": 0.0}
+		_stand_cycle = -1
+		for layer: String in _vary_w:
+			(_vary_w[layer] as Dictionary)["from"] = (_vary_w[layer] as Dictionary)["now"]  # Out from here (or a draw).
+		if _stand_rate != 1.0:
+			_stand_rate = 1.0
+			tree.set("parameters/%s_speed/scale" % _slot_name(_slot), _base_speed[_slot])
+	elif mode == "" and _vary_zeroed:
+		return
 	var step_s := length / 2.0 / maxf(absf(_base_speed[_slot]), 0.01)
 	if gait:
 		var half := int(floor(base_position() / (length / 2.0)))
@@ -721,30 +773,58 @@ func _vary_ease(delta: float) -> void:
 			_vary_draw("carry")
 			_vary_look_in -= 1
 			if _vary_look_in <= 0:
-				_vary_look_in = _vary_rng.randi_range(VARY_LOOK_STEPS.x, VARY_LOOK_STEPS.y)
-				_vary_draw("look")
-	else:
-		_vary_step = ["", -1]
-		_vary_look_in = 0
+				var steps := VARY_WALK_LOOK_STEPS if walk else VARY_LOOK_STEPS
+				_vary_look_in = _vary_rng.randi_range(steps.x, steps.y)
+				_vary_draw("look", VARY_WALK_LOOK if walk else 1.0)
+	elif stand:
+		for layer: String in ["look", "carry"]:
+			_stand_in[layer] = float(_stand_in[layer]) - delta
+			if float(_stand_in[layer]) <= 0.0:
+				var every_s := VARY_STAND_LOOK if layer == "look" else VARY_STAND_CARRY
+				_stand_in[layer] = _vary_rng.randf_range(every_s.x, every_s.y)
+				_vary_draw(layer, VARY_WALK_LOOK if layer == "look" else 1.0)
+		# A new cycle of the stand clip (its position wraps): its rate drawn again.
+		var at := base_position()
+		if _stand_cycle < 0 or at < _stand_last:
+			_stand_cycle += 1
+			_stand_rate = _vary_rng.randf_range(VARY_STAND_RATE.x, VARY_STAND_RATE.y)
+			_vary_draws["rate"] = int(_vary_draws["rate"]) + 1
+			if vary_log:
+				_vary_print("rate", 1.0, _stand_rate)
+		_stand_last = at
+		tree.set("parameters/%s_speed/scale" % _slot_name(_slot), _base_speed[_slot] * _stand_rate)
 	for layer: String in _vary_w:
 		var w: Dictionary = _vary_w[layer]
-		if gait:
-			w["eased"] = minf(1.0, float(w["eased"]) + delta / maxf(step_s * VARY_EASE, 0.01))
+		if mode != "":
+			var over := (VARY_STAND_LOOK_EASE if layer == "look" else VARY_STAND_CARRY_EASE) if stand \
+					else step_s * (VARY_WALK_EASE if walk and layer == "look" else VARY_EASE)
+			w["eased"] = minf(1.0, float(w["eased"]) + delta / maxf(over, 0.01))
 			w["now"] = lerpf(float(w["from"]), float(w["to"]), smoothstep(0.0, 1.0, float(w["eased"])))
 		else:
-			w["now"] = move_toward(float(w["now"]), 0.0, delta / maxf(blend, 0.01))
-			w["from"] = w["now"]
+			# Out within the blend from whatever size it was drawn to (the walk's and the stand's look twice the run's).
+			w["now"] = move_toward(float(w["now"]), 0.0, delta / maxf(blend, 0.01) * maxf(1.0, absf(float(w["from"]))))
 			w["to"] = 0.0
 			w["eased"] = 1.0
+	_vary_zeroed = mode == "" and float(_vary_w["carry"]["now"]) == 0.0 and float(_vary_w["look"]["now"]) == 0.0
 	tree.set("parameters/vary_carry/add_amount", float(_vary_w["carry"]["now"]))
 	tree.set("parameters/vary_look/add_amount", float(_vary_w["look"]["now"]) * (1.0 - clampf(look_held, 0.0, 1.0)))
 
 
-func _vary_draw(layer: String) -> void:
+## A new weight for [param layer], drawn to within [param size] each way (the walk's and the stand's look larger).
+func _vary_draw(layer: String, size := 1.0) -> void:
 	var w: Dictionary = _vary_w[layer]
 	w["from"] = w["now"]
-	w["to"] = _vary_rng.randf_range(-1.0, 1.0)
+	w["to"] = _vary_rng.randf_range(-1.0, 1.0) * size
 	w["eased"] = 0.0
+	_vary_draws[layer] = int(_vary_draws[layer]) + 1
+	if vary_log:
+		_vary_print(layer, float(w["from"]), float(w["to"]))
+
+
+## vary_log's line: nothing of whose body it is (the rig's own node number, its model's file, its clip).
+func _vary_print(layer: String, from: float, to: float) -> void:
+	print("VARY_LOG t=%d body=%d kind=%s clip=%s mode=%s layer=%s from=%+.3f to=%+.3f" % [
+		now_msec(), get_instance_id(), kind, base_clip(), _vary_mode, layer, from, to])
 
 
 ## How much of a strike's legs give way to the base's (0 its own footwork,
