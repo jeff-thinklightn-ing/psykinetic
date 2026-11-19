@@ -271,6 +271,7 @@ func _ready() -> void:
 		await _test_told_sweep()  # After tell_killed: the player it strikes flinches, still standing.
 		_test_told_kinds_known()
 		await _test_gait_holds()  # It lets frames run (the hold's rows).
+		_test_pose_edge()  # 390 amended (5): its own camera, put back after.
 		_test_run_arms_held()
 		_test_vary_calm()  # 977 amended (2): after run_arms_held, its player bare-handed and still standing.
 		await _test_shield_seen()
@@ -21438,6 +21439,173 @@ func _test_stop_settles(player: Player, puppet: Node3D, rig: AnimRig, pace: floa
 			+ "(off: %.1f, %.1f, %.1f); the feet at the hold's end %.4f m from the held gait's") % [on["jog"], on["stop"],
 			float(on["stop"]) / maxf(float(on["stride"]), 0.001), on["stride"], off["stop"], float(off["stop"]) / maxf(float(off["stride"]), 0.001),
 			off["stride"], on["first"], on["held"], on["last"], off["first"], off["held"], off["last"], moved])
+
+
+## 390 amended (5) (TASK 12, the companion's set-off skip at the low camera's side edge): a body is unseen (posed 1
+## frame in POSE_UNSEEN_EVERY) only once the point 1 m up it is POSE_UNSEEN_MARGIN past a plane of the frustum; inside
+## that band the distance rule holds as in the frame. Main's rule (the point itself out of the frustum) is worked
+## beside it here, so each row says what main gave. The constants are read through the script's map, so the row
+## loads on main's Client3D and fails there.
+func _test_pose_edge() -> void:
+	print("\n== 390 amended (5): a body at the frame's edge posed as one in it ==")
+	const FPS := 30.0
+	const RUN := 4.3  # m/s: her jog's pace on the look's (d) as she sets off.
+	var consts: Dictionary = (load("res://client3d/client3d.gd") as Script).get_script_constant_map()
+	var margin: float = consts.get("POSE_UNSEEN_MARGIN", 0.0)
+	var unseen: int = consts["POSE_UNSEEN_EVERY"]
+	var cam := _rig._camera
+	var was := [cam.projection, cam.fov, cam.global_transform, _rig._camera_target]
+	# The low camera at the look's: perspective LOW_FOV, pitched 12 degrees down, 8 m off its aim.
+	var target := Vector3(40.0, 0.0, 40.0)
+	cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+	cam.fov = Client3D.LOW_FOV
+	var eye := target + Vector3.UP + Vector3(0.0, sin(deg_to_rad(12.0)), cos(deg_to_rad(12.0))) * 8.0
+	cam.global_transform = Transform3D(Basis(), eye).looking_at(target + Vector3.UP, Vector3.UP)
+	_rig._camera_target = target
+	_rig.set("_pose_planes_frame", -1)
+	var planes := cam.get_frustum()  # near, far, left, top, right, bottom
+	var left: Plane = planes[2]
+	var inside := target + Vector3.UP
+	# The ground point whose point 1 m up is [param past] metres past the left plane (inside when under 0).
+	var past_left := func(past: float) -> Vector3:
+		return inside + left.normal * (past - left.distance_to(inside)) - Vector3.UP
+	var by_distance := func(at: Vector3) -> int:
+		var away := Vector2(at.x - target.x, at.z - target.z).length_squared()
+		return 1 if away <= Client3D.POSE_NEAR * Client3D.POSE_NEAR else (2 if away <= Client3D.POSE_MID * Client3D.POSE_MID else Client3D.POSE_FAR_EVERY)
+	var main_every := func(puppet: Node3D) -> int:
+		var at := puppet.global_position + Vector3.UP
+		return unseen if not cam.is_position_in_frustum(at) else int(by_distance.call(at))
+	var body := Node3D.new()
+	_rig.add_child(body)
+	body.add_child(Client3D._make_model(Client3D.HUMAN_F, body))
+	var rig := body.get_meta("rig") as AnimRig
+	var meshes := body.find_children("*", "MeshInstance3D", true, false)
+	# Whether any of the body is drawn (a corner of a mesh's box in the frustum), and its reach from the point 1 m up.
+	var drawn := func() -> bool:
+		for mesh: MeshInstance3D in meshes:
+			var box := mesh.get_aabb()
+			for corner in 8:
+				if cam.is_position_in_frustum(mesh.global_transform * box.get_endpoint(corner)):
+					return true
+		return false
+	var reach := 0.0
+	for mesh: MeshInstance3D in meshes:
+		var box := mesh.get_aabb()
+		for corner in 8:
+			reach = maxf(reach, (mesh.global_transform * box.get_endpoint(corner) - body.global_position - Vector3.UP).length())
+	print("  the woman's reach from her point 1 m up: %.2f m (her meshes' boxes); a sprint's 8.5 m/s (the look's) covers %.2f m in 8 frames at 30 a second, %.2f at 60, %.2f in one frame at 30" % [
+			reach, 8.5 * 8.0 / 30.0, 8.5 * 8.0 / 60.0, 8.5 / 30.0])
+	# (a) Her shoulder in the frame, the point 0.3 m past the edge: the distance rule's rate, main's 1 in 8.
+	body.position = past_left.call(0.3)
+	var at_edge := _rig._pose_every(body)
+	_check(margin >= reach + 8.5 / 30.0 and drawn.call() and main_every.call(body) == unseen and at_edge == int(by_distance.call(body.global_position + Vector3.UP)),
+			"a body with its point 0.3 m past the frame's side edge and some of it drawn: posed every %d (the distance rule's %d; main's %d), the margin %.2f m over its reach %.2f and a frame's sprint" % [
+			at_edge, by_distance.call(body.global_position + Vector3.UP), main_every.call(body), margin, reach])
+	body.position = past_left.call(margin - 0.1)
+	var in_band := _rig._pose_every(body)
+	_check(not drawn.call() and in_band == int(by_distance.call(body.global_position + Vector3.UP)),
+			"a body undrawn %.1f m past the edge, inside the margin: every %d, the distance rule's" % [margin - 0.1, in_band])
+	# (c) Beyond the margin, unseen as ever; a hundred wholly out of the frame all 1 in 8, and a rig there posed 1 frame in 8.
+	body.position = past_left.call(margin + 3.0)
+	_check(_rig._pose_every(body) == unseen, "a body 3 m beyond the margin: every %d" % _rig._pose_every(body))
+	var points := []
+	var out := 0
+	for i in 100:
+		var spot := Node3D.new()
+		_rig.add_child(spot)
+		var plane: Plane = planes[[0, 2, 4][i % 3]]
+		var from := inside + Vector3(float(i % 7) - 3.0, 0.0, float(i % 5) - 2.0)
+		spot.position = from + plane.normal * (margin + 0.5 + float(i) * 0.2 - plane.distance_to(from)) - Vector3.UP
+		points.append(spot)
+		out += 1 if _rig._pose_every(spot) == unseen else 0
+	for spot: Node3D in points:
+		spot.queue_free()
+	rig.every = unseen
+	rig.loop(Client3D.CLIP_JOG, 1.0)
+	var posed := 0
+	var share_was := rig.base_position()
+	for i in unseen * 4:
+		rig._process(1.0 / FPS)
+		posed += 1 if not is_equal_approx(rig.base_position(), share_was) else 0
+		share_was = rig.base_position()
+	_check(out == 100 and posed == 4, "a hundred bodies wholly out of the frame (behind, left, right): %d posed 1 in %d; a rig there posed %d of %d frames" % [out, unseen, posed, unseen * 4])
+	# A rig whose rate falls poses on that frame, whatever its remainder: from 8 to 3 and to 2 on a frame neither's turn.
+	rig.every = unseen
+	for i in unseen:
+		rig._process(1.0 / FPS)
+	var falls := []
+	for to: int in [3, 2]:
+		rig.every = unseen
+		rig._process(1.0 / FPS)
+		rig._frames = 16  # The next frame is 17: not 8's turn, nor 3's, nor 2's.
+		share_was = rig.base_position()
+		rig.every = to
+		rig._process(1.0 / FPS)
+		falls.append(not is_equal_approx(rig.base_position(), share_was))
+	_check(falls == [true, true], "a rig posed 1 in 8 whose rate falls to 3, then to 2, on a frame not its new rate's turn: posed that frame %s" % [falls])
+	# (b) Coming in across the side edge: no drawn frame whose pose is older than the distance rule's rate allows (the
+	# clip unmoved past its rate's own frames). [param depth] metres beyond the aim along the camera's way, so a body
+	# entering far is at the far rate (3); [param seen] says whether any of it is drawn; every starting remainder.
+	var ahead := Vector3(target.x - eye.x, 0.0, target.z - eye.z).normalized()
+	var run := func(rate: Callable, speed: float, fps: float, depth: float, seen: Callable) -> Array:
+		var length := maxf(rig.length(rig.base_clip()), 0.001)
+		var stale := 0
+		var largest := 0.0
+		var frames := 0
+		var entry := 0
+		for phase in unseen:
+			var start := inside + ahead * depth
+			body.position = start + left.normal * (margin + 3.0 - left.distance_to(start)) - Vector3.UP
+			rig.every = unseen
+			rig._process(1.0 / fps)
+			rig._frames = phase
+			share_was = rig.base_position()
+			var since := 0
+			var steps := 0
+			while left.distance_to(body.global_position + Vector3.UP) > -1.0 and steps < 200:
+				body.position -= left.normal * speed / fps
+				rig.every = rate.call(body)
+				rig._process(1.0 / fps)
+				var step := fposmod(rig.base_position() - share_was, length) / length
+				share_was = rig.base_position()
+				steps += 1
+				since = 0 if step >= 0.0001 else since + 1
+				if seen.call():
+					var due := int(by_distance.call(body.global_position + Vector3.UP))
+					entry = due if entry == 0 else entry
+					stale += 1 if since >= due else 0
+					largest = maxf(largest, step)
+			frames += steps
+		return [stale, largest, frames, 1.0 / fps / length * rig.speed(), entry]
+	var take_rule := func(puppet: Node3D) -> int: return _rig._pose_every(puppet)
+	var main_run: Array = run.call(main_every, RUN, FPS, 0.0, drawn)
+	var take_run: Array = run.call(take_rule, RUN, FPS, 0.0, drawn)
+	print("  main's rule: %d drawn frames with the clip unmoved, the largest drawn step %.3f of a cycle (a frame's %.3f)" % [main_run[0], main_run[1], main_run[3]])
+	_check(int(main_run[0]) > 0 and int(take_run[0]) == 0 and float(take_run[1]) <= float(take_run[3]) * 1.5 + 0.0001,
+			"jogging in across the edge at %.1f m/s, %d frames over %d starting remainders: %d drawn frames with the clip unmoved (main's rule %d), the largest drawn step %.3f of a cycle (a frame's %.3f)" % [
+			RUN, take_run[2], unseen, take_run[0], main_run[0], take_run[1], take_run[3]])
+	# The orc's reach (2.15 m from its point 1 m up, the largest body's: a sphere that size touching the frame counts as
+	# drawn), sprinting in at 8.5 m/s where it enters at the far rate, at 30 frames a second and at 100 ms frames.
+	const ORC_REACH := 2.15
+	const SPRINT := 8.5
+	var orc_seen := func() -> bool:
+		var at := body.global_position + Vector3.UP
+		for plane: Plane in planes:
+			if plane.distance_to(at) > ORC_REACH:
+				return false
+		return true
+	for fps: float in [FPS, 10.0]:
+		var orc_run: Array = run.call(take_rule, SPRINT, fps, 20.0, orc_seen)
+		var orc_main: Array = run.call(main_every, SPRINT, fps, 20.0, orc_seen)
+		_check(int(orc_run[4]) == Client3D.POSE_FAR_EVERY and int(orc_run[0]) == 0,
+				"a body of the orc's reach sprinting in at %.1f m/s, %d ms frames, entering at the rate %d, %d frames over %d starting remainders: %d drawn frames with the clip unmoved past its rate (main's rule %d)" % [
+				SPRINT, roundi(1000.0 / fps), orc_run[4], orc_run[2], unseen, orc_run[0], orc_main[0]])
+	body.queue_free()
+	cam.projection = was[0]
+	cam.fov = was[1]
+	cam.global_transform = was[2]
+	_rig._camera_target = was[3]
+	_rig.set("_pose_planes_frame", -1)
 
 
 ## 869 amended (4): a burst at the body's own pace only; a burst's sprint drops back at its dwell's end. The client's

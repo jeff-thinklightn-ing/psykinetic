@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Anyone at the edge of your view, your companion trailing at the side among them, moves smoothly for as long as any part of them is on the screen (390 amended (5)).
 - When you jog past your companion, from behind or toward them, they fall in behind you on the line you walk once you've come by them (485 amended (7)).
 - With a companion out, everyone and everything around you keeps moving in step with you (945 amended (5)).
 - Ask your companion the way and they stay by you as they answer (960).

@@ -1923,13 +1923,19 @@ const STRIKE_HOLD_LEAST := 0.02
 const LEGS_FADE := 0.12
 const CLIP_BLEND := 0.15
 ## A body's pose's level of detail (_pose_every): metres from the camera's
-## aim (the view is CAMERA_SIZE across) posed every frame, then every other; beyond, every POSE_FAR_EVERY; out
-## of the frame, every POSE_UNSEEN_EVERY. A hundred bodies posed every frame
+## aim (the ortho view is CAMERA_SIZE across) posed every frame, then every other; beyond, every POSE_FAR_EVERY; out
+## of the frame by more than POSE_UNSEEN_MARGIN, every POSE_UNSEEN_EVERY. A hundred bodies posed every frame
 ## cost 2.6 ms (26 us each).
 const POSE_NEAR := 9.0
 const POSE_MID := 16.0
 const POSE_FAR_EVERY := 3
 const POSE_UNSEEN_EVERY := 8
+## Metres past a plane of the camera's frustum the point 1 m up a body goes before it is unseen (390 amended (5),
+## TASK 12: the companion trailing on the low camera's side edge was posed 1 frame in 8 with her shoulder in the
+## frame). It covers a body's reach from that point (the orc's 2.15 m the largest) and the planes' one frame of
+## staleness (_sync_puppets runs before _follow) at a sprint at 30 frames a second; not every slow frame or fast
+## turn (the paragraph's arithmetic).
+const POSE_UNSEEN_MARGIN := 2.5
 ## How long after a blow's news a drawn body's blow lands: remote bodies are
 ## drawn about a tick and a half behind the sim (decision 390).
 const STRIKE_LANDS_IN := 1.5 * World.TICK_DT
@@ -2533,6 +2539,9 @@ var _shapes := {
 
 var _camera: Camera3D
 var _camera_target := Vector3.ZERO
+## The camera's frustum planes (world space, normals out) as _pose_every last read them, and the frame it read them in.
+var _pose_planes: Array[Plane] = []
+var _pose_planes_frame := -1
 ## The player as the camera follows them: a jump eased, a slide not
 ## (client3d/camera_ease.gd).
 var _camera_ease: RefCounted = preload("res://client3d/camera_ease.gd").new()
@@ -29802,16 +29811,23 @@ func _knocked(puppet: Node3D, rig: AnimRig, speed: float, now: int) -> bool:
 
 
 ## How often [param puppet]'s body is posed (AnimRig.every, decision 390):
-## every frame near what the camera looks at (POSE_NEAR, on the ground: the
-## view is orthographic, so nearer the camera is nothing), every other
-## within POSE_MID, every POSE_FAR_EVERY beyond, every POSE_UNSEEN_EVERY out
-## of the frame.
+## every frame near what the camera looks at (POSE_NEAR, on the ground: under
+## the ortho view nearer the camera is nothing; the low camera's perspective
+## is measured the same way), every other within POSE_MID, every
+## POSE_FAR_EVERY beyond, every POSE_UNSEEN_EVERY once the point 1 m up it is
+## POSE_UNSEEN_MARGIN past a plane of the frustum (390 amended (5)): wholly
+## out of the frame, never at its edge. The planes are read once a frame.
 func _pose_every(puppet: Node3D) -> int:
 	if _camera == null:
 		return 1
+	var frame := Engine.get_process_frames()
+	if frame != _pose_planes_frame:
+		_pose_planes = _camera.get_frustum()
+		_pose_planes_frame = frame
 	var at := puppet.global_position + Vector3.UP
-	if not _camera.is_position_in_frustum(at):
-		return POSE_UNSEEN_EVERY
+	for plane: Plane in _pose_planes:
+		if plane.distance_to(at) > POSE_UNSEEN_MARGIN:
+			return POSE_UNSEEN_EVERY
 	var away := Vector2(at.x - _camera_target.x, at.z - _camera_target.z).length_squared()
 	if away <= POSE_NEAR * POSE_NEAR:
 		return 1

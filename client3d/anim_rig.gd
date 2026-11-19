@@ -112,6 +112,9 @@ var gaits := PackedStringArray()
 ## The tree is posed every this many frames (its level of detail: the caller
 ## sets it by how near and how seen the body is), with the time since.
 var every := 1
+## The every it last had: a rig whose every falls poses that frame, whatever the remainder (390 amended (5)), so a
+## body coming into the frame from 1 in 8 draws no share held on the frames before its new rate's turn.
+var _every_was := 1
 var _since := 0.0
 var _frames := 0
 var _root: AnimationNodeBlendTree
@@ -946,7 +949,9 @@ func _process(delta: float) -> void:
 	_ease_posture_arms(delta)
 	_vary_ease(delta)
 	_settle_ease(delta)
-	if every <= 1 or _frames % every == 0:
+	var falls := every < _every_was
+	_every_was = every
+	if every <= 1 or falls or _frames % every == 0:
 		tree.advance(_since)
 		_since = 0.0
 		_settle_trunk()
