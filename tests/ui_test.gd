@@ -73,6 +73,7 @@ func _ready() -> void:
 	await _test_open_window_rects()
 	await _test_person_give()
 	_test_taker_hint()
+	_test_held_yes()  # Last: its "yes" is a line said in the room, which the imps hear.
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1292,6 +1293,69 @@ func _test_deal_window() -> void:
 	World.despawn(draugr)
 	await get_tree().process_frame
 	await get_tree().process_frame
+
+
+## A Y pressed under the arrival card is kept and answers once when the card clears (TASK 7: guidea7's pond offer, Y "sent an answer: false",
+## the card lifting 597 ms later). The resident's standing offer is the one here; her own offer to lead is companion_test's.
+func _test_held_yes() -> void:
+	print("
+== a Y pressed under the arrival card is kept and answers once when it clears ==")
+	var card: ArrivalCard = _main.arrival_card
+	if card == null or _main._local_player() == null:
+		_check(false, "the arrival card and a local player exist")
+		return
+	var press_yes := func() -> void:
+		var ev := InputEventKey.new()
+		ev.keycode = int(Keys.bound.get("yes", Keys.DEFAULTS.get("yes", KEY_Y)))
+		ev.pressed = true
+		_main._unhandled_input(ev)
+	var standing_was: String = _main.standing_title
+	var sent_was: int = _main._chat_sent_at
+	var holding_was: bool = card.holding
+	var view_was: Client3D = _main._client3d
+	var stand_in := Client3D.new()  # The scene has no 3D view here: _arriving asks for one, so the row is given an empty one (no frame runs in it).
+	_main._client3d = stand_in
+	_main._yes_held = false
+	_main._chat_sent_at = -100000
+	_main.standing_title = "(a test offer) Bring Bram home"
+	card.holding = true
+	_check(_main._arriving(), "the card holding: the world is arriving")
+	press_yes.call()
+	_main._answer_held_yes()
+	_check(_main._chat_sent_at == -100000 and _main._yes_held, "Y under the card sends nothing, and is kept")
+	card.holding = false
+	_main._answer_held_yes()
+	_check(_main._chat_sent_at != -100000 and not _main._yes_held, "the card lifted: the kept Y answers (a say goes out)")
+	var said_at: int = _main._chat_sent_at
+	_main._answer_held_yes()
+	_check(_main._chat_sent_at == said_at, "and only once")
+	# The offer lapses under the card: the kept Y has nothing to answer, and is not kept for the next one.
+	_main._chat_sent_at = -100000
+	card.holding = true
+	press_yes.call()
+	_main.standing_title = ""
+	card.holding = false
+	_main._answer_held_yes()
+	_check(_main._chat_sent_at == -100000 and not _main._yes_held, "an offer gone by the time the card lifts: nothing sent")
+	# No offer stood when Y was pressed under the card: not kept (a Y with nothing to answer would answer the next offer).
+	card.holding = true
+	press_yes.call()
+	_check(not _main._yes_held, "Y under the card with no offer standing is not kept")
+	card.holding = false
+	# Other keys are dropped under the card as before.
+	_main.standing_title = "(a test offer) Bring Bram home"
+	card.holding = true
+	var other := InputEventKey.new()
+	other.keycode = KEY_H
+	other.pressed = true
+	_main._unhandled_input(other)
+	_check(not _main._yes_held, "another key under the card is not kept")
+	card.holding = holding_was
+	_main.standing_title = standing_was
+	_main._chat_sent_at = sent_was
+	_main._yes_held = false
+	_main._client3d = view_was
+	stand_in.free()
 
 
 ## A note on a door, read (643, ui's side; npc's "notes" message).

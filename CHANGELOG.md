@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Press Y to answer an offer while a place's name is up on the screen, and your yes is given as soon as the name clears (660 amended (15)).
 - If you come out of the Mughouse with no fishing rod, your companion offers to take you to Rolf's stall for one before the pond, and after dark tells you that his stall opens in the morning (945 amended (4)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).

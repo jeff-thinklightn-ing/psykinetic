@@ -5275,6 +5275,30 @@ func _test_guide_refuses() -> void:
 	chat_was = _main._chat_sent_at
 	press_yes.call()
 	_check(not (pet.guide != null and pet.guide.going()) and _main._chat_sent_at == chat_was, "Y after it lapses does nothing to her")
+	# TASK 7: a Y pressed under the arrival card is kept and takes her offer when the card clears, inside her 90 s; past them, nothing.
+	var held_card: ArrivalCard = _main.arrival_card
+	if held_card != null:
+		var held_view: Client3D = _main._client3d
+		var held_stand_in := Client3D.new()  # No 3D view in this scene: _arriving asks for one (no frame runs in the rows).
+		_main._client3d = held_stand_in
+		offer_stands.call()
+		held_card.holding = true
+		press_yes.call()
+		_check(_main._yes_held and not (pet.guide != null and pet.guide.going()), "Y under the card: her offer is not taken yet, and the Y is kept")
+		held_card.holding = false
+		_main._answer_held_yes()
+		_check(pet.guide != null and pet.guide.going() and pet.guide.goal["key"] == "test/short" and not _main._yes_held, "the card lifted: the kept Y sets her leading, once")
+		_main._guide_done(pet, "moved")
+		offer_stands.call()
+		held_card.holding = true
+		press_yes.call()
+		_main._lead_offer_msec = Time.get_ticks_msec() - int(Guide.OFFER_S * 1000.0) - 1000
+		held_card.holding = false
+		chat_was = _main._chat_sent_at
+		_main._answer_held_yes()
+		_check(not (pet.guide != null and pet.guide.going()) and _main._chat_sent_at == chat_was and not _main._yes_held, "her offer lapsed under the card: the kept Y does nothing")
+		_main._client3d = held_view
+		held_stand_in.free()
 	_main._guide_offers.erase(Net.player_id)
 	offer_stands.call()
 	_main._guide_said(owner, pet, "yes")

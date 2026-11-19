@@ -774,6 +774,10 @@ var _channel_seen: Dictionary = {}
 ## "offers" message's "standing" title, "" for none): said on the HUD
 ## line, taken by "yes" (Y, or typed).
 var standing_title := ""
+## A Y pressed while the area card was up or the room was building (_arriving), with an offer standing, kept to answer once when the
+## arrival clears (TASK 7: ui-design's guidea7 run, Y at the pond's offer sent nothing, the card lifting 597 ms later); the offer's own
+## lapse (Guide.OFFER_S) still rules when it is answered.
+var _yes_held := false
 ## Client: when (Time.get_ticks_msec) her own companion last said a line offering to lead (Companion.LEAD_OFFER), -1 for none:
 ## Y answers it while Guide.OFFER_S lasts (929, ui's side; the typed "yes" is the same word to the same rule).
 var _lead_offer_msec := -1
@@ -1338,6 +1342,7 @@ func _process(delta: float) -> void:
 	_show_home_zone()
 	_follow_player(delta)
 	_update_neighbour()  # 822, off till switched on.
+	_answer_held_yes()
 	if _client3d != null and DisplayServer.get_name() != "headless":
 		# Alt shows every HP bar; the view only reads it.
 		_client3d.show_all_bars = Input.is_key_pressed(KEY_ALT)
@@ -1498,6 +1503,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_typing():
 		return
 	if _arriving():
+		if Keys.pressed(event, "yes") and (not standing_title.is_empty() or lead_offer_stands()):
+			_yes_held = true  # Kept, not sent: the card or the build has the keys; every other key is dropped as before.
 		return
 	if _builder_ui != null and _builder_ui.handle_input(event):
 		get_viewport().set_input_as_handled()
@@ -1544,14 +1551,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Keys.pressed(event, "screenshot"):
 		take_screenshot()
 		return
-	if Keys.pressed(event, "yes") and not standing_title.is_empty() and not is_typing():
-		_send_chat("yes", 0, _window_to())  # 536: the word, said; the server takes it (802: to the window's person).
-		return
-	if Keys.pressed(event, "yes") and not is_typing() and lead_offer_stands():
-		_lead_offer_msec = -1
-		# Her offer to lead taken (551 amended (5)): the typed word's own line, with her name after it so a resident beside them is
-		# not the one who answers (_resident_addressed hands a line naming her to her); the rule that takes it is today's.
-		_send_chat("yes, %s" % Companion._name_of(_own_companion()))
+	if Keys.pressed(event, "yes") and not is_typing() and _answer_yes():
 		return
 	if Keys.pressed(event, "hints"):
 		toggle_hints()
@@ -5325,6 +5325,28 @@ func _on_card_lifted(how: String, held_msec: int) -> void:
 	tell_view_ready(map_name)
 	if _client3d != null:
 		_client3d.lifted(how, held_msec)
+
+
+## Y answers the offer that stands, if one does: a resident's standing offer first (536: the word, said; the server takes it; 802: to the
+## window's person), else her own offer to lead (551 amended (5): the typed word's own line with her name after it so a resident beside them
+## is not the one who answers; the rule that takes it is today's). True when one was answered (live Y and the Y kept through an arrival).
+func _answer_yes() -> bool:
+	if not standing_title.is_empty():
+		_send_chat("yes", 0, _window_to())
+		return true
+	if lead_offer_stands():
+		_lead_offer_msec = -1
+		_send_chat("yes, %s" % Companion._name_of(_own_companion()))
+		return true
+	return false
+
+
+## The Y kept through an arrival answers once when the card and the build are done (once: the flag is cleared first).
+func _answer_held_yes() -> void:
+	if not _yes_held or _arriving():
+		return
+	_yes_held = false
+	_answer_yes()
 
 
 ## What waited on the view's build (decision 660), done now, in order.
