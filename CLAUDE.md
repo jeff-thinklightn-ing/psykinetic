@@ -137,6 +137,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   next row. Since 278 amended (10) level_test is two scenes too, two scripts over
   `tests/level_test_base.gd`: level_dungeons_test holds the laid levels (the barrow and its deep,
   the crypts, camps and bands, the castle), level_test the rest; a new row goes in its half.
+  Since 278 amended (13) (771b40942) view_world_test is two scenes too: view_bodies_test (the
+  same script, `_half()` 2, port 17725) holds the bodies' rows (people, their looks, gear and
+  clips: the gaits, the stops and stands, the variation; creatures' clips; hair and the look's
+  pins) and view_world_test the rest, the every-var check (`_test_neighbour_swap`) with it; a
+  new row goes in the scene whose header names its subject.
   Never run the same scene twice at once from one checkout: both take one port.
   After any rebase that brings in other trees' landings, a take that changes a `.gd` runs `bash
   tools/load_check.sh` again before its gate take, and a FAIL is not queued: two takes that each
