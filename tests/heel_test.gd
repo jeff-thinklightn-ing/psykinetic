@@ -47,6 +47,7 @@ func _ready() -> void:
 		return
 	_test_escort()
 	_test_through()
+	_test_slow()
 	_test_shuttle()
 	_test_turn_back()
 	_test_stop()
@@ -129,6 +130,7 @@ func _log(him: Player, body: GridEntity, log: Array) -> void:
 		"stunned": World.is_stunned(him) or World.is_stunned(body),
 		"settled": heel != null and not heel.catching_up, "goal": heel.get("_goal") if heel != null else null,
 		"fall": heel.get("_fall_goal") if heel != null else null, "ticks": body.move_ticks,
+		"stretched": heel != null and heel.get("_stretched") == true,
 		"guarded": heel != null and heel.get("falls_in") == true and not (heel.get("_trail") as Array).is_empty()
 			and heel.get("_her_left") == (heel.get("_trail") as Array)[0],
 		"trail": (heel.get("_trail") as Array).slice(0, 2) if heel != null else [],
@@ -248,6 +250,96 @@ func _test_through() -> void:
 				if not (ok and faults.is_empty()):
 					_dump(log)
 				_idle(him, pet, 25)
+
+
+## Her steps once he is past her, while he walks on, in [param log]: each
+## {"speed": m/s over the ground (the client's cell a metre), "stretched": a
+## fall-in step _pace stretched, "at": where it ended, "ticks": her move_ticks}.
+func _speeds(log: Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var prev_end := float(log[0]["until"])
+	for i in range(1, log.size()):
+		var r: Dictionary = log[i]
+		var was: Dictionary = log[i - 1]
+		if int(r["last"]) == int(was["last"]):
+			continue
+		var at := float(r["t"])
+		var start := prev_end if at - prev_end < 1.0 else at
+		prev_end = float(r["until"])
+		var metres := Vector2(r["her"] - was["her"]).length()
+		if metres > 0.0 and was["past"] and was["moving"]:
+			out.append({"speed": metres / maxf((float(r["until"]) - start) * World.TICK_DT, 0.001), "stretched": r["stretched"], "at": r["her"], "ticks": r["ticks"]})
+	return out
+
+
+## Her fall-in where her steps are slow (the coordinator's ask on 28668dfaf: the
+## cap reads the ground she crosses, hers, not her base alone): through a ford on
+## the wilds if a straight of one is there, on plain ground and laden (her body's
+## load, walk_load 1.6) straight and on the diagonal, each at ten start phases of
+## his. Each stretched step no slower over the ground than Heel.FALL_IN_SPEED,
+## above every person's jog-to-walk drop in the client; heavily laden (walk_load
+## 2.6, her own step already under it), no step stretched at all. On 28668dfaf's
+## cap (2 of her base_ticks) the slowest was 2.50 m/s (the plain and laden
+## diagonals), the ford none stretched; the speed cap moved none of these steps.
+func _test_slow() -> void:
+	print("
+== slow steps: her stretched step never under FALL_IN_SPEED over the ground ==")
+	var him := _player()
+	var pet := _companion()
+	var passes: Array = []
+	var ford := Heel.NONE
+	var ford_way := Vector2i.ZERO
+	for f: Vector2i in World._fords.keys():
+		for u: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var whole := true
+			for k in range(-9, 4):
+				var at := f + k * u
+				if not (World._fords.has(at) and World.is_walkable(at) and World.is_free(at)):
+					whole = false
+					break
+			if whole and ford == Heel.NONE:
+				ford = f
+				ford_way = u
+	print("  a straight ford on the wilds: %s" % (str([ford, ford_way]) if ford != Heel.NONE else "none"))
+	if ford != Heel.NONE:
+		passes.append({"what": "ford", "at": ford, "w": Vector2(ford_way), "load": 1.0})
+	for w: Vector2 in [Vector2(1, 0), Vector2(1, 1)]:
+		passes.append({"what": "plain", "at": STARTS[0], "w": w, "load": 1.0})
+		passes.append({"what": "laden", "at": STARTS[0], "w": w, "load": 1.6})
+	passes.append({"what": "heavily laden", "at": STARTS[0], "w": Vector2(1, 0), "load": 2.6})
+	var was_load := pet.load_body
+	for p: Dictionary in passes:
+		var c: Vector2i = p["at"]
+		var w: Vector2 = p["w"]
+		var u := Vector2i(w.normalized().round())
+		pet.load_body = ((float(p["load"]) - 1.0) / World.load_k + World.load_free) * World.load_capacity(pet) if float(p["load"]) > 1.0 else 0.0
+		var steps: Array[Dictionary] = []
+		var hers := 0.0
+		# Each at his start phases (he 2 or 3 off, his centre f of a cell further
+		# back), so a step stretched as far as he lets it is met.
+		for off: int in [2, 3]:
+			for f: float in [0.0, 0.2, 0.4, 0.6, 0.8]:
+				_place(him, pet, c + off * u, c)
+				him.free_pos = Vector2(c + off * u) + Vector2(u) * f * 0.45
+				pet.facing = u
+				_idle(him, pet, 15)
+				var log: Array = []
+				_jog(him, pet, -w, 30, log)
+				hers = World.step_ticks(pet, -u, pet.tile) / maxf(pet.move_ticks, 0.0001)
+				steps.append_array(_speeds(log))
+				_idle(him, pet, 25)
+		var stretched := steps.filter(func(s: Dictionary) -> bool: return s["stretched"])
+		var slowest := 99.0
+		for s: Dictionary in stretched:
+			slowest = minf(slowest, s["speed"])
+		print("  %s %s at %s: walk_load %.2f, her step's multiple here %.2f; her steps (m/s, * stretched): %s" % [p["what"], w, c, World.walk_load(pet), hers,
+				", ".join(steps.map(func(s: Dictionary) -> String: return "%.2f%s(%.2f)" % [s["speed"], "*" if s["stretched"] else "", s["ticks"]]))])
+		if p["what"] == "heavily laden":
+			_check(stretched.is_empty(), "%s %s: her own step already under %.1f m/s, none stretched (%d)" % [p["what"], w, Heel.FALL_IN_SPEED, stretched.size()])
+		else:
+			_check(slowest >= Heel.FALL_IN_SPEED - 0.01, "%s %s: her stretched steps (%d) at %.2f m/s or more, slowest %.2f"
+					% [p["what"], w, stretched.size(), Heel.FALL_IN_SPEED, slowest])
+	pet.load_body = was_load
 
 
 ## The look's D2 shuttle (ui-design's): he from (185,177) to (191,177) and back,

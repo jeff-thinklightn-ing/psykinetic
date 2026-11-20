@@ -61,17 +61,20 @@ var paces := false
 var base_ticks := -1.0
 ## Her fall-in (485 amended (7); the coordinator's TASK 13, from the stands
 ## counted while her player jogs on): on, while he walks on and she is behind
-## his centre along his heading, her own cell is never a footstep or heel she
-## has arrived at; she sets off at once onto his nearest footstep (the cell a
-## cell back from him), that one step stretched (_pace) so she reaches it as
-## he comes STOP off it, the gap kept walked through, not stood out. Companion
-## sets it; anything else on a Heel (npc's escorts) follows as before.
+## his centre along his heading, her own cell is no footstep she has arrived
+## at; she sets off onto his nearest footstep (the cell a cell back from him)
+## when it is a step from her and ahead of her, that one step stretched (_pace)
+## so she reaches it as he comes STOP off it. Where none is (on a diagonal pass
+## the one ahead of her is the cell level with her he still holds), she still
+## stands at "arrived" after K2's stay-put ends, about 0.4 s: not mended here.
+## Companion sets it; anything else on a Heel (npc's escorts) follows as before.
 var falls_in := false
-## Her stretched fall-in step at most this many of her own (base_ticks): 2, a
-## cell in 0.4 s, 2.5 m/s (the client's cell a metre), over every person's
-## jog-to-walk drop (at most 1.64 m/s, client3d's gaits at the tallest
-## stature), so the one long step is drawn in her jog, not a walk for a cell.
-const FALL_IN_CAP := 2.0
+## Her stretched fall-in step never slower over the ground than this, m/s (the
+## client's cell a metre), whatever slows her step (her load, the ground, a
+## slant): over every person's jog-to-walk drop (at most 1.64 m/s, client3d's
+## gaits at the tallest stature), so the one long step is drawn in her jog, not
+## a walk for a cell. A step of hers already slower than it is not stretched.
+const FALL_IN_SPEED := 2.0
 ## Her paced step time against his while she has fallen more than STOP + 1
 ## behind him (task 4): a little quicker, never under her own (base_ticks).
 const CATCH_UP := 0.9
@@ -321,11 +324,12 @@ func _pace(body: GridEntity, leader: GridEntity, goal: Vector2i) -> void:
 			# Her fall-in (falls_in): the one step onto his nearest footstep ends on
 			# the tick he is STOP off it, counted from where World.try_move starts it
 			# (her last step's end, if under a tick ago): stretched only, never under
-			# his pace (the trail's step below), FALL_IN_CAP of her own at most.
+			# his pace (the trail's step below), never slower over the ground than FALL_IN_SPEED.
 			var paced := maxf(base_ticks, his / maxf(hers, 0.01))
-			var start := body.next_move_tick if World.tick - body.next_move_tick < 1.0 else float(World.tick)
-			var end := ceilf(World.tick + _off_in(leader, goal, his) - 0.001)
-			want = clampf((end - start) / maxf(hers, 0.01), paced, maxf(paced, FALL_IN_CAP * base_ticks))
+			var step_from := body.next_move_tick if World.tick - body.next_move_tick < 1.0 else float(World.tick)
+			var step_end := ceilf(World.tick + _off_in(leader, goal, his) - 0.001)
+			var slowest := Vector2(way).length() / (FALL_IN_SPEED * World.TICK_DT) / maxf(hers, 0.01)
+			want = clampf((step_end - step_from) / maxf(hers, 0.01), paced, maxf(paced, slowest))
 			_stretched = want > paced + 0.001
 		else:
 			# Fallen behind (more than STOP + 1 off him): a little quicker than he
