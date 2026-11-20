@@ -4728,6 +4728,7 @@ func reload_zone(zone_name: String, read := {}, message := {}, config := {}) -> 
 		return
 	var was := World.enter_named(zone_name)
 	_counter_cells.erase(zone_name)  # Its buildings may have changed (807 amended (8): read again at the next ask).
+	_guide_levels.erase(zone_name)  # The same for her guide's door points and buildings (945 amended (5)).
 	for kept: Dictionary in [_seat_decor, _camp_bedrolls, _camp_carts]:
 		kept.erase(zone_name)  # Its decor may have changed: kept again from the level laid below (853 amended (21)).
 	_zone_levels.erase(zone_name)  # 943: the same for its cached parse and rooms.
@@ -5219,6 +5220,7 @@ func _on_terrain(data: Dictionary) -> void:
 	var level_name := str(data.get("name", ""))
 	_terrain_hash[level_name] = terrain_hash(data)  # The left level's test (822 amended (6)).
 	_counter_cells.erase(level_name)  # A level changed live (a builder's accept): its counters are read again (807 amended (8)).
+	_guide_levels.erase(level_name)  # The same for her guide's door points and buildings (945 amended (5)).
 	_zone_levels.erase(level_name)  # 943: the same for its cached parse and rooms.
 	_rooms_read.erase(level_name)
 	if level_name == map_name:
@@ -11481,7 +11483,7 @@ func _first_dest(kind: String, pet: Companion, player: Player, record: PlayerRec
 					to = {"key": id, "kind": "place", "name": str(place["name"]), "area": str(place["area"]), "cell": place["cell"]}
 					break
 		"barrow":
-			var at: Variant = Level.load_level(player.zone).get("spawn_points", {}).get("from_barrow")
+			var at: Variant = _guide_level(player.zone)["spawn_points"].get("from_barrow")
 			if at is Vector2i:
 				to = {"key": "barrow", "kind": "area", "name": "the old mound", "area": player.zone, "cell": at}
 		"catch":
@@ -11529,11 +11531,23 @@ func _first_sight(to: Dictionary) -> Dictionary:
 	return to
 
 
+## What her guide reads of [param zone]'s level (945 amended (5)): its "spawn_points" and "buildings", kept from one
+## Level.load_level at the guide's first ask there. A parse of the wilds takes about 250 ms, and _first_unfound asked
+## for three of them every "every_s" (the joined server's "camps, lawspeaker" stall). Erased where _counter_cells is
+## (reload_zone, _on_terrain), so an edited level is read again at the next ask. Nothing of a player is kept here.
+var _guide_levels := {}
+func _guide_level(zone: String) -> Dictionary:
+	if not _guide_levels.has(zone):
+		var level := Level.load_level(zone)
+		_guide_levels[zone] = {"spawn_points": level.get("spawn_points", {}), "buildings": level.get("buildings", [])}
+	return _guide_levels[zone]
+
+
 ## The building in [param area] nearest [param cell], within Level.PLACE_RADIUS of it; Rect2i() for none.
 func _first_building(area: String, cell: Vector2i) -> Rect2i:
 	var best := Rect2i()
 	var best_far := Level.PLACE_RADIUS + 1
-	for building: Dictionary in Level.load_level(area).get("buildings", []):
+	for building: Dictionary in _guide_level(area)["buildings"]:
 		var laid: Variant = Level.building_rect(building)
 		if not laid is Rect2i:
 			continue
@@ -11570,7 +11584,7 @@ func _first_in_use(id: String, place: Dictionary) -> bool:
 ## The Mughouse's door seen from [param zone] (945): its stop cell, the
 ## first of FIRST_DOOR_POINTS laid in that level; {} for none.
 func _first_door(zone: String) -> Dictionary:
-	var points: Dictionary = Level.load_level(zone).get("spawn_points", {})
+	var points: Dictionary = _guide_level(zone)["spawn_points"]
 	var tavern := ""
 	for id: String in World.holdings.all_places() if World.holdings != null else []:
 		if str(World.holdings.place(id).get("kind", "")) == "tavern":
@@ -11611,7 +11625,7 @@ func _first_stall(zone: String) -> Dictionary:
 ## The cell before the counter at [param cell] in [param zone] (945 amended (4)): from the stall's place cell (his
 ## side) along the counter's facing to the first cell past it, the nearest free; the cell itself with no counter.
 func _first_counter_front(zone: String, cell: Vector2i) -> Vector2i:
-	for each: Variant in Level.load_level(zone).get("buildings", []):
+	for each: Variant in _guide_level(zone)["buildings"]:
 		if not each is Dictionary or not str(each.get("slot", "")) in COUNTERS:
 			continue
 		var laid: Variant = Level.building_rect(each)

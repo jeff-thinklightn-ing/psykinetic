@@ -61236,6 +61236,23 @@ day); _test_rod_lapse (once more, a second lapse passing, a no, walked off rodle
 (the stall in the pond's place, taken by naming it; neither at night; the pond with a rod). The earlier rows play a
 player with a rod. Server and level data (the client's Y pattern reads the decks: an older client arms no Y on
 the stall's offer, a typed yes answers it); protocol unchanged, no new class_name.
+945 amended (5): her guide's level reads kept per zone (the script's label; the coordinator's TASK 13 and its approval of
+companions' design, 11-20: the joined test server's "camps, lawspeaker" slow tick, 0.6 to 2.6 s every 50 ticks on this PC,
+the laptops and the box). _first_unfound runs every "every_s" (5 s) for each companion out with her player, and its
+_first_dest parsed the player's whole level (Level.load_level, about 250 ms for the wilds on this PC) three times: the
+Mughouse's door (_first_door's spawn_points), the healer's hut and the temple (_first_sight's _first_building). The stall
+rig (a host on the wilds, its player joined, one companion out) timed each place, and no other call reached 20 ms. The
+parses ran for a player who had found every place too: the list came back empty, and each way was still worked out before
+its found check. Main._guide_level(zone) now keeps "spawn_points" and "buildings" from one Level.load_level at the guide's
+first ask in a zone, and nothing of a player. _first_door, _first_building, _first_counter_front (the rod's stall) and
+_first_dest's from_barrow read it. It is erased where _counter_cells is (807 amended (8)): in reload_zone and in
+_on_terrain. A level edited in the game is read again at the next ask. A level file changed on disk with no reload keeps
+its old door until the next reload, as the counters do. The places, their order and her stops are unchanged, since
+holdings, the in-use checks and the record's found places are still read live each refresh. first_steps_test
+_test_guide_reads covers three things. First, two guide refreshes plus every place's way asked again read the zone once
+at most. Second, a level changed but not reloaded keeps its door, and after reload_zone the next ask reads it again and
+gives the moved door (guide_inn on from_tavern's cell). Third, unregistered and reloaded, the door is as it was. Server
+only; protocol unchanged; no new class_name.
 ## 940. A town's people heard idle: a cleared throat, a sniff, a shifted foot
 
 (sound; the label from tools/decision_number.sh; the coordinator's approval 11-15 after sound's look at

@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_off()
 	FirstSteps.forced = -1
 	_test_switch()
+	_test_guide_reads()
 	_finish()
 
 
@@ -127,6 +128,46 @@ func _test_switch() -> void:
 == the guide switched on: the JSON's switch, nothing forced ==")
 	_check(FirstSteps.forced == -1 and FirstSteps.on() and FirstSteps.table().get("on") == true,
 		"FirstSteps.on() from levels/companion_traits.json's first_steps.on (%s)" % FirstSteps.table().get("on"))
+
+
+## 945 amended (5): her guide reads a level's door points and buildings once a zone, not each refresh (three
+## parses of the wilds every "every_s", the joined server's "camps, lawspeaker" stall); a reload reads it again.
+## Last of the rows: it reloads the wilds twice (a door moved, then as it was).
+func _test_guide_reads() -> void:
+	print("
+== her guide's level reads: once a zone, read again after reload_zone (945 amended (5)) ==")
+	var pet := _companion()
+	var player := _player()
+	var record: PlayerRecord = _main._records.get(Net.player_id)
+	if pet == null or player == null or record == null:
+		_check(false, "(a player, their record and their companion)")
+		return
+	var zone := player.zone
+	_main._guide_levels.erase(zone)
+	var before := int(Level.loads.get(zone, 0))
+	_guide_tick(pet)
+	var first := int(Level.loads.get(zone, 0)) - before
+	_guide_tick(pet)
+	for kind: String in FirstSteps.PLACES:
+		_main._first_dest(kind, pet, player, record)
+	var door: Dictionary = _main._first_door(zone)
+	var reads := int(Level.loads.get(zone, 0)) - before
+	_check(first <= 1 and reads == first and pet.first_steps.guide_at == World.tick,
+		"two guide refreshes and every place's way asked again: %s read once at most (%d, then %d in all)" % [zone, first, reads])
+	_check(door.get("cell") == Vector2i(183, 206), "the Mughouse's door from the kept copy: guide_inn (%s)" % [door.get("cell")])
+	var source := Level.source(zone)
+	var config: Dictionary = (source["config"] as Dictionary).duplicate(true)
+	config["spawn_points"]["guide_inn"] = config["spawn_points"]["from_tavern"]
+	Level.register(zone, source["layout"], source["height"], config, source["relief"])
+	_check(_main._first_door(zone).get("cell") == Vector2i(183, 206), "the level changed but not reloaded: the kept door, as the counters keep theirs")
+	_main.reload_zone(zone)
+	var moved_at := int(Level.loads.get(zone, 0))
+	var moved: Dictionary = _main._first_door(zone)
+	_check(moved.get("cell") == Vector2i(181, 208) and int(Level.loads.get(zone, 0)) == moved_at + 1,
+		"after reload_zone the next ask reads the level again and gives the moved door (%s)" % [moved.get("cell")])
+	Level.unregister(zone)
+	_main.reload_zone(zone)
+	_check(_main._first_door(zone).get("cell") == Vector2i(183, 206), "its registration gone and reloaded: the door as it was")
 
 
 ## 945 amended (3) (the coordinator's ruling: a pointer names only a place that is in use and someone who
