@@ -59,6 +59,19 @@ var start := START
 ## their own.
 var paces := false
 var base_ticks := -1.0
+## Her fall-in (485 amended (7); the coordinator's TASK 13, from the stands
+## counted while her player jogs on): on, while he walks on and she is behind
+## his centre along his heading, her own cell is never a footstep or heel she
+## has arrived at; she sets off at once onto his nearest footstep (the cell a
+## cell back from him), that one step stretched (_pace) so she reaches it as
+## he comes STOP off it, the gap kept walked through, not stood out. Companion
+## sets it; anything else on a Heel (npc's escorts) follows as before.
+var falls_in := false
+## Her stretched fall-in step at most this many of her own (base_ticks): 2, a
+## cell in 0.4 s, 2.5 m/s (the client's cell a metre), over every person's
+## jog-to-walk drop (at most 1.64 m/s, client3d's gaits at the tallest
+## stature), so the one long step is drawn in her jog, not a walk for a cell.
+const FALL_IN_CAP := 2.0
 ## Her paced step time against his while she has fallen more than STOP + 1
 ## behind him (task 4): a little quicker, never under her own (base_ticks).
 const CATCH_UP := 0.9
@@ -74,6 +87,21 @@ var _goal := NONE
 var _trail: Array[Vector2i] = []
 ## Her goal is one of their footsteps (_footstep), dropped when they stop.
 var _on_trail := false
+## This tick she falls in (falls_in: he walks on, she behind his centre), and
+## the footstep she falls in on (NONE if none), the one step _pace stretches.
+var _falling := false
+var _fall_goal := NONE
+## Her cell, and the one she held before it (her fall-in never goes straight
+## back onto that one within FALL_IN_BACK_TICKS of leaving it, nor ever while
+## it is no nearer him than hers).
+var _her_at := NONE
+var _her_left := NONE
+## A step of hers straight back onto the cell she left within this many ticks
+## reads as a bounce (678, Jeff: "she catches up into the same tile and bounces
+## off"; companion_test's BOUNCE_TICKS): her fall-in leaves that cell be.
+const FALL_IN_BACK_TICKS := 6
+## Her pace is a fall-in step's stretch, for that one step: her own again once it ends.
+var _stretched := false
 ## Stepped aside for a leader setting off through her cell (678 amended
 ## (2)): till she is on their trail, or they stop, any footstep of theirs
 ## (their last too) as near them as she is serves, so she falls in behind
@@ -122,6 +150,12 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	if leader == null or not is_instance_valid(leader) or not leader.spawned:
 		catching_up = false
 		return
+	if _stretched and World.tick >= body.step_until:
+		_stretched = false
+		unpace(body)
+	if body.tile != _her_at:
+		_her_left = _her_at
+		_her_at = body.tile
 	var distance := World.distance(body.tile, leader.tile)
 	if distance >= start and not catching_up:
 		catching_up = true
@@ -192,7 +226,10 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	# Walking on, she makes for their footsteps, so she goes along the line
 	# they walk (Jeff on v0.1.179: "Pip now does zig zag run behind me");
 	# else a heel cell, kept while it serves.
+	_falling = falls_in and not astray and moving(leader) \
+			and (Vector2(body.tile) - World.body_centre(leader)).dot(_heading(leader).normalized()) < -0.001
 	var footstep := _footstep(body, leader, avoid) if walking_on(leader) else NONE
+	_fall_goal = footstep if _falling else NONE
 	if footstep != NONE:
 		_goal = footstep
 		_on_trail = true
@@ -268,6 +305,7 @@ func _pace(body: GridEntity, leader: GridEntity, goal: Vector2i) -> void:
 	if base_ticks < 0.0:
 		base_ticks = body.move_ticks
 	var want := base_ticks
+	_stretched = false
 	var way := Vector2i(signi(goal.x - body.tile.x), signi(goal.y - body.tile.y))
 	# Every step for one of his footsteps while he walks on, not only the one
 	# onto a footstep next to her (task 4, Jeff 11-17: "companion trails you
@@ -279,13 +317,53 @@ func _pace(body: GridEntity, leader: GridEntity, goal: Vector2i) -> void:
 		if World.free_body(leader) and his_way.x != 0 and his_way.y != 0:
 			his = his / World.DIAGONAL_TICK_SCALE * sqrt(2.0)  # A free body's slant crosses a cell in its straight time times root two.
 		var hers := World.step_ticks(body, way, body.tile) / maxf(body.move_ticks, 0.0001)
-		# Fallen behind (more than STOP + 1 off him): a little quicker than he
-		# goes, so the gap closes evenly instead of a run and a stand.
-		if World.distance(body.tile, leader.tile) > STOP + 1:
-			his *= CATCH_UP
-		want = maxf(base_ticks, his / maxf(hers, 0.01))
+		if goal == _fall_goal and World.distance(body.tile, goal) == 1 and World.distance(body.tile, leader.tile) <= STOP + 1:
+			# Her fall-in (falls_in): the one step onto his nearest footstep ends on
+			# the tick he is STOP off it, counted from where World.try_move starts it
+			# (her last step's end, if under a tick ago): stretched only, never under
+			# his pace (the trail's step below), FALL_IN_CAP of her own at most.
+			var paced := maxf(base_ticks, his / maxf(hers, 0.01))
+			var start := body.next_move_tick if World.tick - body.next_move_tick < 1.0 else float(World.tick)
+			var end := ceilf(World.tick + _off_in(leader, goal, his) - 0.001)
+			want = clampf((end - start) / maxf(hers, 0.01), paced, maxf(paced, FALL_IN_CAP * base_ticks))
+			_stretched = want > paced + 0.001
+		else:
+			# Fallen behind (more than STOP + 1 off him): a little quicker than he
+			# goes, so the gap closes evenly instead of a run and a stand.
+			if World.distance(body.tile, leader.tile) > STOP + 1:
+				his *= CATCH_UP
+			want = maxf(base_ticks, his / maxf(hers, 0.01))
 	if absf(body.move_ticks - want) > 0.001:
 		body.move_ticks = want
+
+
+## The ticks till [param leader], crossing a cell in [param his], is STOP off
+## [param at] (her fall-in, falls_in): till he leaves the cell he holds (a free
+## body's centre to FREE_HYSTERESIS past its cell's edge along his way, where
+## World.free_cell gives him the next; a grid body's step to its next), then
+## a cell's time each; 0 once he is.
+static func _off_in(leader: GridEntity, at: Vector2i, his: float) -> float:
+	var d := World.distance(at, leader.tile)
+	if d >= STOP:
+		return 0.0
+	var left := float(STOP - d - 1) * his
+	if World.free_body(leader):
+		var off := World.body_centre(leader) - Vector2(leader.tile)
+		var way := travel(leader)
+		var gone := -0.5
+		if way.x != 0:
+			gone = maxf(gone, off.x * signf(way.x))
+		if way.y != 0:
+			gone = maxf(gone, off.y * signf(way.y))
+		return left + clampf(0.5 + World.FREE_HYSTERESIS - gone, 0.0, 1.0 + World.FREE_HYSTERESIS) * his
+	return left + maxf(leader.next_move_tick - World.tick, 0.0)
+
+
+## Whether [param leader] is moving now (her fall-in, falls_in): a step of
+## his not ended a tick ago, not walking_on's WALK_ON_TICKS after it, so a
+## stop is a stand at once.
+static func moving(leader: GridEntity) -> bool:
+	return World.tick <= leader.step_until + 1.0 and leader.step_velocity != Vector2.ZERO
 
 
 ## [param body] back on her own pace (485 amended (2)): she is not following.
@@ -308,22 +386,35 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 	if due and not next.is_empty() and World.distance(next[0], leader.tile) == 1 and World.is_free(next[0]):
 		lead = next[0]
 		steps.push_front(leader.tile)
-	for at: Vector2i in steps.slice(0 if _rejoin else 1):
+	# Falling in (falls_in), his nearest footstep too, and her own cell no
+	# arrival: she goes on to his nearest, a cell back from him. Only in one
+	# step (two off, a path to it starts off his line, so the one before it), and
+	# never straight back onto the cell she has just left (a bounce).
+	var open := _rejoin or _falling
+	var fall_only := _falling and not _rejoin
+	for i in range(0 if open else 1, steps.size()):
+		var at := steps[i]
 		if World.distance(at, lead) > STOP:
 			break
 		if clear.has(at) or shut_cell(at) or Companion._inside_of(at) != Companion._inside_of(leader.tile):
 			continue
+		if fall_only and (i == 0 and World.distance(at, body.tile) > 1
+				or at == _her_left and World.tick - body.last_step_tick <= FALL_IN_BACK_TICKS):
+			continue
 		if at == body.tile:
+			if _falling:
+				continue
 			return at
-		# Rejoining, only a footstep ahead of her (678 amended (3)): not the cell
-		# he set off from, behind her once she stepped aside; nor one he has yet
-		# to cross, an old footstep he walks back over (a tap back past her).
-		if _rejoin and (not _with(body, leader, at) or _yet_to_cross(leader, at)):
+		# Rejoining or falling in, only a footstep ahead of her (678 amended (3)):
+		# not the cell he set off from, behind her once she stepped aside; nor one
+		# he has yet to cross, an old footstep he walks back over (a tap back past her).
+		if open and (not _with(body, leader, at) or _yet_to_cross(leader, at)):
 			continue
 		# Only one that brings her nearer them: none back onto their line
-		# after a step aside, a cell no nearer.
+		# after a step aside, a cell no nearer. Falling in, never a cell no nearer
+		# that she stepped aside from (on his line and off it again the next step).
 		if World.is_walkable(at) and World.is_free(at) and (World.distance(at, lead) < World.distance(body.tile, lead)
-				or _rejoin and World.distance(at, lead) <= World.distance(body.tile, lead)):
+				or open and World.distance(at, lead) <= World.distance(body.tile, lead) and not (fall_only and at == _her_left)):
 			return at
 	return NONE
 

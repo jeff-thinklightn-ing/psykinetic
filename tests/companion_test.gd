@@ -8703,7 +8703,7 @@ func _test_heel_paced() -> void:
 	_settle(pet)
 	var owner_was := owner.tile
 	var pet_was := pet.tile
-	var base := pet.move_ticks
+	var base := pet.heel.base_ticks if pet.heel.base_ticks >= 0.0 else pet.move_ticks  # Her own pace: a paced step of the check before may still be set.
 	var his := World.step_ticks(owner, Vector2i(1, 0), owner.tile) / World.ground_drag(owner.tile, Vector2i(1, 0))
 	# East along row 9, her two behind; then west back past where she stood.
 	var stood := 0

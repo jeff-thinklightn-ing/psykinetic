@@ -1322,6 +1322,7 @@ func _init() -> void:
 	World.loosed.connect(_on_loosed_any)
 	slots = Items.tidy([], SLOTS)
 	heel.paces = true  # Her step paced to her player's while she follows (485 amended (2)).
+	heel.falls_in = true  # Her fall-in behind him while he walks on, no stand (485 amended (7)); escorts keep main's follow.
 	# So a client draws her paced steps at their time (485 amended (2)); put
 	# ahead of "tile" in the config, so a step's move_ticks is in hand when
 	# its tile arrives: after it, each slide was drawn at the step before's

@@ -17426,6 +17426,44 @@ step of hers on his trail takes under 0.9 of his, and she is at his heel
 when he stops (on main: a 4-tick stand, and her steps from (221,201) on at
 2.0 ticks). Server only; protocol unchanged; no new class_name.
 
+485 amended (7): her fall-in behind her player while he walks on (the
+script's label; the coordinator's TASK 13, K1 alone, from the stands counted
+on 6f1060b55, C:/dev/review/companions/heel_stands_1120/stands.txt: 182
+stands of 120 ms or more in 126 passes, 408 of their ticks held at "arrived",
+her own cell her goal). Heel.falls_in, set by Companion alone: anything else on
+a Heel (npc's escorted resident) follows as on main, cell for cell. While he
+walks on (Heel.moving: a step of his not ended a tick ago) and she is behind
+his centre along his heading, her own cell is no footstep she has arrived at:
+_footstep takes his nearest footstep too (the cell a cell back from him), only
+one a step from her (two off, a path to it sets off away from his line), only
+ahead of her (_with, not _yet_to_cross, as a rejoin), and never the cell she
+has just stepped aside from: within FALL_IN_BACK_TICKS (6, companion_test's
+BOUNCE_TICKS: 678's bounce, Jeff's "she catches up into the same tile and
+bounces off") nor while it is no nearer him than hers (on his line and off it
+again the next step, companion_test's turn straight back). _pace stretches
+that one step so it ends as he comes STOP off it (Heel._off_in: a free
+body's tile changes FREE_HYSTERESIS past its cell's edge), never under his
+pace and at most FALL_IN_CAP (2) of her own: 0.4 s a cell, 2.5 m/s, over every
+person's jog-to-walk drop in the client (at most 1.64 m/s), so the long step
+is drawn in her jog and her gait does not flip for a cell. Her own pace again
+once that step ends. Not here: K2 (beside his line as he comes by, the
+stay-put within CLOSE; on the diagonal the one footstep ahead of her is the
+cell level with her he still holds, 600 to 700 ms as on main), K3 (555's
+start band, 1.2 to 1.3 s at 2:1, as on main), K4, K5. tests/heel_test (new):
+through her straight, at 2:1 and on the diagonal, she facing him and away
+(main: 242 to 244 ms stands straight; the take: none, the diagonal's one 450
+ms K2); ui-design's shuttle, ten legs turned at once and after 0.3 s (main: a
+250 ms and nine 550 ms a run; the take: 3 and 6, 250 to 350 ms, each the
+bounce guard's); a turn straight back in her fall-in (no swap, no bump, he goes
+on 5.9 cells or more; she is behind him at tick 6, main 0, starting level);
+a stop and 555's start; the escort's steps as main's. The probe's 126 passes
+on the take: 14 with no stand (main 3), 112 stands (182), 140 ticks at
+"arrived" (408), every one either K2's diagonal or the shuttle's bounce
+guard (C:/dev/review/companions/heel_stands_1120/stands_take.txt).
+companion_test's own-pace row reads her own as base_ticks (it read the
+move_ticks a paced step of the check before had left). Server only; protocol
+unchanged; no new class_name.
+
 Amended (Jeff: "no birds at night, maybe owls bats"): birds belong to the
 day only. The drips' take with birds (freesound 841641) is dropped, and the
 deep night bed's owl-dense takes (475376, 151241) are replaced by two quiet
