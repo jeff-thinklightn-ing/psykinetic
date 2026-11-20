@@ -14,7 +14,7 @@ var _until_frames := 0
 
 
 ## Its base port: not 7777 (the editor may be hosting there), nor any other
-## test's or eval's. view_land_test, view_world_test and view_land_far_test have their own.
+## test's or eval's. view_land_test, view_world_test, view_bodies_test and view_land_far_test have their own.
 func _base_port() -> int:
 	return preload("res://tests/test_ports.gd").of(17791)
 
@@ -28,11 +28,12 @@ func _land() -> bool:
 	return false
 
 
-## Which half of its list this scene runs (278 amended (k)): 0 the first, 1 the
+## Which part of its list this scene runs (278 amended (k)): 0 the first, 1 the
 ## second (view_world_test, view_land_far_test, the same script with ports of
-## their own). Each list is cut at a subject line and keeps its order, so the
-## suite's longest scene (view_test, 271 s on saturn) runs in two of about 140.
-## A new section's call line goes in the half its subject belongs to.
+## their own), 2 the bodies (view_bodies_test, 278 amended (13): cut out of the second, its
+## rows in the second's order). Each list is cut at a subject line and keeps its
+## order, so the suite's longest scene (view_test, 271 s on saturn) runs in parts
+## of about 140. A new section's call line goes in the part its subject belongs to.
 func _half() -> int:
 	return 0
 
@@ -165,8 +166,8 @@ func _ready() -> void:
 		_test_damp_look()
 		_test_night_look_2()
 		_test_dusk_floor()
-	else:
-		# view_world_test: places and decor, water, buildings and doors, people and gear, creatures, music.
+	elif _half() == 1:
+		# view_world_test: places and decor, water, buildings and doors, the telegraphs, music and the options panel.
 		await _as_at_the_cut()
 		_test_dais()
 		_test_dark_set()
@@ -213,6 +214,36 @@ func _ready() -> void:
 		_test_telegraph_fill_honest()
 		_test_telegraph_disc_rim()
 		await _test_target_marked()
+		_test_shadows_in_view()
+		_test_no_2d_under_3d()
+		await _test_doors_swing()
+		await _test_door_states()
+		_test_door_shades_near()
+		_test_art_puppets()
+		_test_undrawn_puppet()
+		_test_breakable_hooked_once()
+		await _test_phased_build()
+		await _test_kept_fields()
+		await _test_indoor_phased_build()
+		_test_steady_frames()
+		await _test_shade_mid_build()
+		await _test_seeded_fill_shade()
+		await _test_neighbour_swap()
+		_test_piles()
+		_test_tufts_under_piles()
+		_test_heard_as_monsters_hear()
+		_test_ambience_runs()
+		_test_heartbeat()
+		_test_bandaging()
+		_test_title_music()
+		_test_level_music()
+		_test_room_music()
+		_test_options_panel()
+		_test_body_on_screen()
+	else:
+		# view_bodies_test: people, their looks, gear and clips (the gaits, the stops and stands, the variation), creatures' clips, hair.
+		await _as_at_the_cut()
+		await _frames(10)  # The scene's opening frames past: the first after its load is long, and _test_goblin's 0.6 s timer took it as game time (519 ms of wall clock, its flinch still drawn).
 		await _test_goblin()
 		_test_humans()
 		_test_worn()
@@ -266,21 +297,6 @@ func _ready() -> void:
 		_test_steadied_heard()
 		await _test_blow_wait_outlives_body()
 		_test_bandit_look()
-		_test_shadows_in_view()
-		_test_no_2d_under_3d()
-		await _test_doors_swing()
-		await _test_door_states()
-		_test_door_shades_near()
-		_test_art_puppets()
-		_test_undrawn_puppet()
-		_test_breakable_hooked_once()
-		await _test_phased_build()
-		await _test_kept_fields()
-		await _test_indoor_phased_build()
-		_test_steady_frames()
-		await _test_shade_mid_build()
-		await _test_seeded_fill_shade()
-		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
 		await _test_hill_cat_clips()
@@ -289,16 +305,6 @@ func _ready() -> void:
 		await _test_creature_down()
 		await _test_creature_tells()
 		await _test_steadied()
-		_test_piles()
-		_test_tufts_under_piles()
-		_test_heard_as_monsters_hear()
-		_test_ambience_runs()
-		_test_heartbeat()
-		_test_bandaging()
-		_test_title_music()
-		_test_level_music()
-		_test_room_music()
-		_test_options_panel()
 		await _test_preview_tunic()
 		_test_hair_covers_head()
 		_test_hair_root()
@@ -307,7 +313,6 @@ func _ready() -> void:
 		_test_look_pins()
 		_test_hair_pick_kept()
 		_test_belt_over_tunic()
-		_test_body_on_screen()
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
