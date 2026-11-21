@@ -60,7 +60,8 @@ var start := START
 var paces := false
 var base_ticks := -1.0
 ## Her fall-in (485 amended (7); the coordinator's TASK 13, from the stands
-## counted while her player jogs on): on, while he walks on and she is behind
+## counted while her player jogs on): on, while he walks on, has come by her
+## this walk (_passed; a plain follow is main's, cell for cell) and she is behind
 ## his centre along his heading, her own cell is no footstep she has arrived
 ## at; she sets off onto his nearest footstep (the cell a cell back from him)
 ## when it is a step from her and ahead of her, that one step stretched (_pace)
@@ -94,6 +95,12 @@ var _on_trail := false
 ## the footstep she falls in on (NONE if none), the one step _pace stretches.
 var _falling := false
 var _fall_goal := NONE
+## He has come by her this walk (her fall-in only then): she was level with or
+## ahead of his centre while he walked on, kept till he stops walking on. A
+## plain follow, she behind him from the start, never falls in: she keeps to
+## his footsteps STOP back as on main, so his stop never finds her stepping
+## onto the cell a cell back from him (the coordinator's TASK 13, job 2).
+var _passed := false
 ## Her cell, and the one she held before it (her fall-in never goes straight
 ## back onto that one within FALL_IN_BACK_TICKS of leaving it, nor ever while
 ## it is no nearer him than hers).
@@ -177,6 +184,12 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	var astray := Companion.door_cells().has(body.tile) or Companion._inside_of(body.tile) != Companion._inside_of(leader.tile)
 	if astray:
 		catching_up = true
+	# He has come by her (her fall-in's only case): walking on, he had her
+	# level with or ahead of his centre; held till he stops walking on.
+	if not falls_in or astray or not walking_on(leader):
+		_passed = false
+	elif moving(leader) and (Vector2(body.tile) - World.body_centre(leader)).dot(_heading(leader).normalized()) >= -0.001:
+		_passed = true
 	if not catching_up:
 		_goal = NONE
 		# Settled, and his held line or order runs through her cell: she steps
@@ -229,7 +242,7 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	# Walking on, she makes for their footsteps, so she goes along the line
 	# they walk (Jeff on v0.1.179: "Pip now does zig zag run behind me");
 	# else a heel cell, kept while it serves.
-	_falling = falls_in and not astray and moving(leader) \
+	_falling = falls_in and _passed and not astray and moving(leader) \
 			and (Vector2(body.tile) - World.body_centre(leader)).dot(_heading(leader).normalized()) < -0.001
 	var footstep := _footstep(body, leader, avoid) if walking_on(leader) else NONE
 	_fall_goal = footstep if _falling else NONE

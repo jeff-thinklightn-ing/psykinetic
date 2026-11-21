@@ -4,7 +4,8 @@ extends Node
 ## her player a free body jogging through her and on, straight and at 2:1,
 ## she facing him and facing away; the look's shuttle, turned at once and after
 ## 0.3 s; a turn straight back in the middle of her fall-in; a jog and a stop,
-## and from still 555's start band; and the fence: a body on a Heel made as an
+## and from still 555's start band; a plain follow's stop, she on his footsteps
+## two behind ending STOP off him; and the fence: a body on a Heel made as an
 ## escort makes it follows as before. Prints PASS/FAIL per assertion and quits
 ## with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -51,6 +52,7 @@ func _ready() -> void:
 	_test_shuttle()
 	_test_turn_back()
 	_test_stop()
+	_test_plain_stop()
 	_finish()
 
 
@@ -454,6 +456,44 @@ func _test_stop() -> void:
 				break
 		_check(first >= pet.heel.start, "%s from still: she sets off with him %d off (start %d)" % [w, first, pet.heel.start])
 		_idle(him, pet, 25)
+
+
+## A plain follow's stop (the coordinator's TASK 13 job 2, from the 670 follows
+## on 334e10f0e): she two behind him on his line, he jogs five cells and stops
+## (his key let go within 0.35 m of the fifth cell's centre, as the probe's legs),
+## the eight headings, ten start phases each (his free body k * 0.045 m on along
+## his way, k more ticks settled). Behind him from the start, he never comes by
+## her (Heel._passed), so no fall-in: she ends STOP off him, never a cell
+## nearer, as on main (on 334e10f0e 20 of the 80 ended a cell off him).
+func _test_plain_stop() -> void:
+	print("\n== a plain follow's stop: on his footsteps she ends STOP off him ==")
+	var him := _player()
+	var pet := _companion()
+	var near: Array[String] = []
+	var follows := 0
+	for h: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+			Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		for k in 10:
+			var c := STARTS[0]
+			_place(him, pet, c, c - 2 * h)
+			him.free_pos = Vector2(c) + Vector2(h).normalized() * k * 0.045
+			him.facing = h
+			pet.facing = h
+			_idle(him, pet, 20 + k)
+			var to := c + h * 5
+			var log: Array = []
+			for i in 80:
+				if him.free_pos.distance_to(Vector2(to)) <= 0.35:
+					break
+				_jog(him, pet, Vector2(to) - him.free_pos, 1, log)
+			_idle(him, pet, 15, log)
+			follows += 1
+			if World.distance(pet.tile, him.tile) < Heel.STOP:
+				near.append("%s k=%d: she at %s, he at %s" % [h, k, pet.tile, him.tile])
+				if OS.has_environment("DEBUG_HEEL"):
+					_dump(log)
+	_check(near.is_empty(), "%d plain follows, none ends nearer him than STOP (%d did: %s)" % [follows, near.size(), ", ".join(near.slice(0, 4))])
+	_idle(him, pet, 10)
 
 
 ## The fence (the coordinator's term 2): a body on a Heel made as an escort

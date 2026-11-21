@@ -17473,6 +17473,30 @@ stretched). The probe's 126 passes
 on 28668dfaf: 14 with no stand (main 3), 112 stands (182), 140 ticks at
 "arrived" (408): the diagonal passes' 0.4 s after the stay-put (above) and the
 shuttle's bounce guard (C:/dev/review/companions/heel_stands_1120/stands_take.txt).
+Only once he has come by her (Heel._passed, the coordinator's TASK 13 job 2,
+from 670 plain follows a side, C:/dev/review/companions/heel_follow_1120):
+falling in on every walk, she on his footsteps STOP back stepped on to the
+cell a cell back from him, stretched to end as he came STOP off it, and his
+stop found her there, ending a leg one cell off him in 54 follows of 670 at
+an even 0.1 s a tick, 65 at 25 to 45 ms frames and 176 with hitches (main 0,
+0 and 47), the next leg then waiting 4 to 5 of his moving ticks for the start
+band in place of 1 to 2. _passed is set while he walks on (Heel.moving) with
+her level with or ahead of his centre, and cleared when he stops walking on
+(walking_on, so a hitch's gap keeps it): a plain follow, she behind him from
+the start, is main's. (Not her footsteps alone: after a pass she stands on
+his trail STOP back too, where the fall-in is what keeps her going, and
+heel_test's pass and shuttle rows failed on that.) The follows on the mend:
+even and the frames row for row main's, none ending one off; with hitches
+main's 47 one off, the same follows, and five follows' steps not main's (four
+of them the take's in that leg).
+The 126 passes: 12 with no stand (the take 14), shuttle8's
+legs 3 and 7 a 193 ms stand at "arrived" each, where the take had none: he
+turns back with her beside the cell he sets off from, and by her first tick
+his centre is past her (a check against that cell too gave the take's 126 back,
+but counted the tour's start beside him a pass as well, and with hitches 48
+ended one off). heel_test _test_plain_stop: 80 follows, she two behind him on
+his footsteps, eight headings, ten start phases each; none ends nearer him
+than STOP (on 334e10f0e 20 did).
 companion_test's own-pace row reads her own as base_ticks (it read the
 move_ticks a paced step of the check before had left). Server only; protocol
 unchanged; no new class_name.
