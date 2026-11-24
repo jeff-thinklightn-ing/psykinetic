@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When you jog past your companion, from behind or toward them, they fall in behind you on the line you walk once you've come by them (485 amended (7)).
 - With a companion out, everyone and everything around you keeps moving in step with you (945 amended (5)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
