@@ -30120,6 +30120,9 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"quick":  # 451 amended (13), test-only: never in the help, unknown without --test-hp beside --run-marker.
 			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _quick_command(words)
+		"root":  # 451 amended (13), test-only: never in the help, unknown without --test-hp beside --run-marker.
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _root_command(words)
 		"foes":
 			if hp_verb_allowed(not Net.test_foe.is_empty(), Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _foes_command(words)
@@ -30273,6 +30276,19 @@ func _strike_command(words: PackedStringArray) -> String:
 	if player == null:
 		return "no player %s in the game" % words[1]
 	var wanted := " ".join(words.slice(2)).to_lower()
+	var struck := _monster_called(player, wanted)
+	if struck == null:
+		return "strike: no monster in %s is called %s; none struck" % [player.zone, wanted]
+	var name_said := monster_name(struck)
+	World.damage(struck, struck.hp, player, &"attack")
+	print("[test] strike: %s struck %s in %s (896)" % [player.name, name_said, player.zone])
+	return "strike: %s struck %s, %d hp left" % [words[1], name_said, struck.hp if is_instance_valid(struck) else 0]
+
+
+## The living monster in [param player]'s zone called [param wanted] as a
+## player reads it (its name, given name or named id, any case); several of
+## that name, the nearest; null if none. For strike and root.
+func _monster_called(player: Player, wanted: String) -> Monster:
 	var found: Array[Monster] = []
 	for entity in zone_entities(player.zone):
 		if not is_instance_valid(entity) or not entity is Monster or not entity.spawned or entity.hp <= 0:
@@ -30281,13 +30297,33 @@ func _strike_command(words: PackedStringArray) -> String:
 		if wanted in [monster_name(monster).to_lower(), monster.given_name.to_lower(), monster.named_id.to_lower()]:
 			found.append(monster)
 	if found.is_empty():
-		return "strike: no monster in %s is called %s; none struck" % [player.zone, wanted]
+		return null
 	found.sort_custom(func(a: Monster, b: Monster) -> bool: return World.distance(a.tile, player.tile) < World.distance(b.tile, player.tile))
-	var struck := found[0]  # Several of that name: the nearest.
-	var name_said := monster_name(struck)
-	World.damage(struck, struck.hp, player, &"attack")
-	print("[test] strike: %s struck %s in %s (896)" % [player.name, name_said, player.zone])
-	return "strike: %s struck %s, %d hp left" % [words[1], name_said, struck.hp if is_instance_valid(struck) else 0]
+	return found[0]
+
+
+## root <player> <monster> <seconds> (451 amended (13), test-only, the "hp"
+## verb's gate): a monster near that online player, named as strike reads
+## it, held on its cell that long: its next step put off (next_move_tick),
+## which puts off its blows too (World's attacks wait on it as on a step),
+## with no stun (no recoil drawn, no stun cause). 0 lets it go now. For a
+## tour's foe on one cell for a run before and after: laid by "foes", the
+## held imp comes on or wanders within half a second, whatever its temper.
+func _root_command(words: PackedStringArray) -> String:
+	if words.size() < 4 or not words[words.size() - 1].is_valid_float():
+		return "root <player> <monster> <seconds>: that monster held on its cell (test-only)"
+	var id := str(_admin_player(words[1]).get("id", ""))
+	var player := _player_of_id(id) if not id.is_empty() else null
+	if player == null:
+		return "no player %s in the game" % words[1]
+	var wanted := " ".join(words.slice(2, words.size() - 1)).to_lower()
+	var held := _monster_called(player, wanted)
+	if held == null:
+		return "root: no monster in %s is called %s; none held" % [player.zone, wanted]
+	var seconds := maxf(float(words[words.size() - 1]), 0.0)
+	held.next_move_tick = World.tick + seconds * World.TICK_RATE if seconds > 0.0 else float(World.tick)
+	print("[test] root: %s held at %s for %.1f s (451 amended (13))" % [monster_name(held), held.tile, seconds])
+	return "root: %s held at %s for %s s" % [monster_name(held), held.tile, words[words.size() - 1]]
 
 
 ## "makers [<filter>]" (562 amended (7)): town by town, one line a worker

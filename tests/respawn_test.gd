@@ -221,6 +221,18 @@ func _test_console() -> void:
 	reply = _main.admin_command("quick %s 0.6 5" % host.name)
 	_check(reply.begins_with("unknown command") and host.buffs.get("speed", null) == speed_was,
 			"'quick' without --test-hp is an unknown command, no speed given (%s)" % reply)
+	# 451 amended (13): and the tour's root (a monster held on its cell).
+	var foe: Monster = null
+	for entity in _main.zone_entities(host.zone):
+		if is_instance_valid(entity) and entity is Monster and entity.spawned and entity.hp > 0:
+			foe = entity
+			break
+	if foe != null:
+		foe = _main._monster_called(host, _main.monster_name(foe).to_lower())  # root holds the nearest of a name
+	var foe_was := foe.next_move_tick if foe != null else 0.0
+	reply = _main.admin_command("root %s %s 5" % [host.name, _main.monster_name(foe) if foe != null else "imp"])
+	_check(reply.begins_with("unknown command") and (foe == null or foe.next_move_tick == foe_was),
+			"'root' without --test-hp is an unknown command, nothing held (%s)" % reply)
 	_check(not Main.hp_verb_allowed(true, ["--map=test_room"]), "--test-hp without a --run-marker is refused")
 	_check(not Main.hp_verb_allowed(false, ["--run-marker=7"]), "a --run-marker without --test-hp is refused")
 	_check(Main.hp_verb_allowed(true, ["--run-marker=7"]), "--test-hp beside a --run-marker is honoured")
@@ -236,6 +248,17 @@ func _test_console() -> void:
 	_check(not marked or World.buff(host, "speed") == Main.QUICK_LEAST, "'quick' under 0 slows, set in place and held to QUICK_LEAST (%s)" % reply)
 	reply = _main.admin_command("quick %s 0 5" % host.name)
 	_check(not marked or not host.buffs.has("speed"), "'quick' at 0 takes the speed buff off (%s)" % reply)
+	reply = _main.admin_command("root %s nobody here 5" % host.name)
+	_check(not marked or reply.begins_with("root: no monster"), "'root' names no monster when none is called so (%s)" % reply)
+	if foe != null:
+		reply = _main.admin_command("root %s %s 5" % [host.name, _main.monster_name(foe)])
+		_check(not marked or reply.begins_with("root: ") and foe.next_move_tick >= World.tick + 5 * World.TICK_RATE - 1,
+				"'root' with --test-hp and the marker holds the nearest of that name (%s)" % reply)
+		reply = _main.admin_command("root %s %s 0" % [host.name, _main.monster_name(foe)])
+		_check(not marked or foe.next_move_tick <= World.tick, "'root' at 0 lets it go (%s)" % reply)
+		foe.next_move_tick = foe_was
+	else:
+		print("  respawn_test: no monster in %s for root's hold row; its gate and no-name rows ran" % host.zone)
 	host.buffs.erase("speed")
 	if speed_was != null:
 		host.buffs["speed"] = speed_was
