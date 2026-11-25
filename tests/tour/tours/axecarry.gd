@@ -5,6 +5,8 @@ extends RefCounted
 ## Jeff's goblin (the held imp, laid by the console's foes) beside the place, the low camera at its nearest zoom (zoom_min) on
 ## the player standing in the place, pan zero, never a panned lens. Run it with a window for the stills:
 ##   TOUR_SERVER_ARGS="--test-hp --no-companions --test-foe=imp,,1,held" sh tools/tour.sh axecarry --offscreen
+## A section alone (_sections), minutes: TOUR_ONLY=wrists (the giant axe's jog with its wrist stills), TOUR_ONLY=pace (two
+## sprints, no still), TOUR_ONLY=wrists_pace both; on a laptop remote_shot.sh's --tour-only wrists (or pace, wrists_pace).
 ## Rows: the man with the battle axe, the giant axe and the tomb sledge; the woman with the battle axe, the giant axe and the
 ## pick (seed 11, middling; the look set by a reconnect, the settings pointed at the run's own folder). Each weapon: a still
 ## standing beside the goblin, the goblin struck down (the console's strike: at 1d3acca3f it came on and struck the plain
@@ -68,6 +70,9 @@ const OTHER_WAIT := 0.8
 ## (<still>_wrist): the 3x crop is the window's pixels enlarged, a hand about 20 px in it.
 const WRIST_SCALE := 4
 const WRIST_CROP := 0.3  # the cut's side, a share of the render's height
+## The cut, shrunk to the window's pixels, against the window's own pixels of the same rect: their mean difference, each
+## channel 0..1, at most this (the same frame drawn twice; a wrong lens, ground and sky for the runner, is far over it).
+const WRIST_SAME := 0.08
 const ROOT_SECONDS := 120  # the laid goblin held on its cell (the console's root) this long
 ## The swing runs (the coordinator's (2)): at the jog, before and after, one clip from standing to standing. A swing
 ## "where you stand" (Shift and a click) is not a player's mid-run: a free body's walk drops a swing order at once
@@ -77,6 +82,12 @@ const ROOT_SECONDS := 120  # the laid goblin held on its cell (the console's roo
 const SWING_RUNS := {"man": ["rot_hammer", "giant_axe"]}
 const SWING_LEAD := 0.4  # s of standing clipped before the first click
 const SWING_TAIL := 1.2  # s clipped after the stop (a swing run: after its first blow, SWING_TAIL twice)
+## Each run logs its frames past the stop until the carry is out and the ready in (the upper layer's share READY_SHARE),
+## then READY_TAIL s more, STOP_MOST s after the stop at most: at e05f0de48 the runs with no clip ended 0.3 s after
+## the stop, mid-ease, and their ready was not logged.
+const READY_SHARE := 0.99
+const READY_TAIL := 0.3
+const STOP_MOST := 3.0
 ## [name, body, look, weapons at the jog and the sprint, weapons at the jog only]
 const ROWS: Array[Array] = [
 	["man", &"male", "seed=11 build=middling hair=cropped hair_colour=brown beard=none", ["battle_axe", "giant_axe", "tomb_sledge"], ["rot_hammer"]],
@@ -195,8 +206,13 @@ func _grab(bot: Node) -> Image:
 
 ## The view now rendered again at WRIST_SCALE times the window's pixels from a copy of the camera (its place, lens,
 ## near and far) on the same world, cut round the runner's chest (as _crop_of, WRIST_CROP of the height) at its own
-## pixels. A SubViewport rendered once and freed.
-func _wrist_grab(bot: Node) -> Image:
+## pixels. A SubViewport rendered once and freed, in the frame of [param seen] (the window's still, _grab's, no frame
+## between): [cut, its mean difference from the window's pixels of the same rect, each channel 0..1]. At e05f0de48 all
+## eight were flat ground under a sky band, no runner: the eye's global transform was set after it entered the tree,
+## and a transform set so reaches the renderer only at the tree's next flush of its changes, after the forced draw, so
+## the eye drew from the world's origin. It is now set before it enters the tree and pushed at once
+## (force_update_transform), and the cut checked against the window's own pixels (WRIST_SAME).
+func _wrist_grab(bot: Node, seen: Image) -> Array:
 	var cam := _cam(bot)
 	var vp := cam.get_viewport()
 	var sub := SubViewport.new()
@@ -209,10 +225,12 @@ func _wrist_grab(bot: Node) -> Image:
 	var eye := Camera3D.new()
 	for key: String in ["projection", "fov", "size", "near", "far", "keep_aspect", "cull_mask", "environment", "attributes", "h_offset", "v_offset"]:
 		eye.set(key, cam.get(key))
+	eye.transform = cam.global_transform  # the SubViewport is no Node3D: in it the local transform is the global one
+	eye.current = true
 	sub.add_child(eye)
 	bot.add_child(sub)
 	eye.global_transform = cam.global_transform
-	eye.current = true
+	eye.force_update_transform()
 	RenderingServer.force_draw()
 	await RenderingServer.frame_post_draw
 	var img := sub.get_texture().get_image()
@@ -220,7 +238,26 @@ func _wrist_grab(bot: Node) -> Image:
 	sub.queue_free()
 	var w := int(img.get_height() * WRIST_CROP)
 	var rect := Rect2i(int(p.x) - w / 2, int(p.y) - w / 2, w, w).intersection(Rect2i(Vector2i.ZERO, img.get_size()))
-	return img.get_region(rect) if rect.has_area() else null
+	if not rect.has_area():
+		return [null, 1.0]
+	var cut := img.get_region(rect)
+	var diff := 1.0
+	if seen == null or seen.is_empty():
+		return [cut, diff]
+	var f := Vector2(seen.get_size()) / Vector2(img.get_size())  # the window's pixels to the render's, about 1 / WRIST_SCALE
+	var small := Rect2i(Vector2i(Vector2(rect.position) * f), Vector2i(Vector2(rect.size) * f)).intersection(Rect2i(Vector2i.ZERO, seen.get_size()))
+	if small.has_area():
+		var down := cut.duplicate() as Image
+		down.resize(small.size.x, small.size.y, Image.INTERPOLATE_BILINEAR)
+		var win := seen.get_region(small)
+		var total := 0.0
+		for y in small.size.y:
+			for x in small.size.x:
+				var a := down.get_pixel(x, y)
+				var b := win.get_pixel(x, y)
+				total += absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b)
+		diff = total / (3.0 * small.size.x * small.size.y)
+	return [cut, diff]
 
 
 func _save(bot: Node, img: Image, name: String) -> bool:
@@ -577,7 +614,9 @@ func _swing_run(bot: Node, row: Array, weapon: String, carry: bool) -> void:
 		TAG, name, struck, ",".join(bases.keys()), clip.size(), camera, from, at_click, str(end) if end.x >= 0 else "gone"])
 	_cameras[name] = camera
 	_foe_at[name] = from
-	bot.expect(at_click == from and (end == from or end.x < 0), "%s: the goblin held on its cell (the console's root)" % name,
+	# Held to the click: after it the blow may knock the goblin back (at e05f0de48 the rot hammer's did), so its end cell
+	# is logged, not checked.
+	bot.expect(at_click == from, "%s: the goblin held on its cell to the click (the console's root)" % name,
 		"at %s, at the click %s, at the end %s" % [from, at_click, end])
 	if carry:
 		var was_at: Variant = _foe_at.get(name.replace("_after", "_before"))
@@ -607,7 +646,7 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	_yaw(bot, side)
 	await bot.frames(3)
 	var camera := await _settle(bot, name)
-	var all := SIDE_AT.size() + OTHER_AT.size() + FRONT_AT.size()
+	var all := 0 if _quiet else SIDE_AT.size() + OTHER_AT.size() + FRONT_AT.size()
 	var rig := _rig(bot)
 	var lines: PackedStringArray = []
 	var clip: Array[Image] = []
@@ -619,12 +658,13 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	var taken := 0
 	var last_click := -1000
 	var last_grab := -1000
-	var clips := weapon == CLIP_WEAPON or gait == "walk"
+	var clips := _only == "" and (weapon == CLIP_WEAPON or gait == "walk")
 	var clip_at: PackedStringArray = []  # each clip frame's time
 	var moved := -1.0
 	var at_two := -1.0  # the times the runner's cell is 2 and 7 cells on: the steady pace between
 	var at_seven := -1.0
 	var stopped := -1.0
+	var ready_in := -1.0  # after the stop, the first frame the carry is out and the ready in (upper_share READY_SHARE)
 	var buff_at_step := "none"  # the client's speed buff at the first moving frame
 	var shift := 0.0  # s the other side's first still waited for the body in view: the later stills follow by as much
 	var facing := side
@@ -635,7 +675,8 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	while Time.get_ticks_msec() - t0 < (16000 if gait == "walk" else 8000):
 		var ms := Time.get_ticks_msec() - t0
 		var s := ms / 1000.0
-		if stopped >= 0.0 and s > stopped + (SWING_TAIL if clips else 0.3) and taken >= all:
+		var settled := ready_in >= 0.0 and s > ready_in + READY_TAIL or s > stopped + STOP_MOST
+		if stopped >= 0.0 and s > stopped + (SWING_TAIL if clips else 0.3) and taken >= all and settled:
 			break
 		if s >= 0.0 and stopped < 0.0 and ms - last_click >= 300:
 			last_click = ms
@@ -661,7 +702,8 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 				var said := "%.2f s, %s%s" % [(Time.get_ticks_msec() - t0) / 1000.0, _state(bot), "; the body HIDDEN from the camera" if hidden else ""]
 				stills.append([still, img, _crop_of(bot, img), said])
 				if wrist and (taken == 1 or taken == others):
-					wrists.append([still + "_wrist", await _wrist_grab(bot), said])
+					var got: Array = await _wrist_grab(bot, img)
+					wrists.append([still + "_wrist", got[0], said, got[1]])
 				taken += 1
 				if taken == all:
 					_yaw(bot, side)  # the clip goes on side on
@@ -684,6 +726,8 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 			at_seven = now
 		if moved >= 0.0 and stopped < 0.0 and rig.base_clip() == Client3D.CLIP_IDLE:
 			stopped = now
+		if stopped >= 0.0 and ready_in < 0.0 and rig.carry_amount() <= 0.01 and rig.upper_share() >= READY_SHARE:
+			ready_in = now
 		bases[rig.base_clip()] = true
 		if rig.base_clip() in [Client3D.CLIP_WALK, "Jog_Short", "Sprint_Short"] and moved >= 0.0 and stopped < 0.0:
 			most = maxf(most, rig.carry_amount())
@@ -695,8 +739,8 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 		cells, stopped - moved, cells / maxf(stopped - moved, 0.001), steady, _sprint_from(bot)]
 	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
 	if file != null:
-		file.store_line("# %s: %s; worn: %s; buffs %s; the speed buff at the first step %s (set %+.2f); camera %.2f m from the runner at the start; first step at %.2f s, the stop at %.2f s (%s); the other side's stills %.2f s late (the body hidden); seconds after the first click%s, base clip, carry clip and amount, upper clip and its share (the ready's ease-in, upper_in), bow_state, camera distance and zoom, cell" % [
-			name, _hands(bot), _worn(bot), str(bot.me().get("buffs")), buff_at_step, share, camera, moved, stopped, pace, shift, " (negative: standing before it)" if clips else ""])
+		file.store_line("# %s: %s; worn: %s; buffs %s; the speed buff at the first step %s (set %+.2f); camera %.2f m from the runner at the start; first step at %.2f s, the stop at %.2f s, the ready in at %.2f s (%s); the other side's stills %.2f s late (the body hidden); seconds after the first click%s, base clip, carry clip and amount, upper clip and its share (the ready's ease-in, upper_in), bow_state, camera distance and zoom, cell" % [
+			name, _hands(bot), _worn(bot), str(bot.me().get("buffs")), buff_at_step, share, camera, moved, stopped, ready_in, pace, shift, " (negative: standing before it)" if clips else ""])
 		file.store_string("\n".join(lines) + "\n")
 		file.close()
 	for still: Array in stills:
@@ -705,8 +749,8 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 		await bot.frames(1)
 	for still: Array in wrists:
 		var ok: bool = _save(bot, still[1], still[0])
-		bot.log_line("%s still %s %s (%dx the window's pixels, cut %s): %s" % [TAG, still[0], "saved" if ok else "FAILED", WRIST_SCALE,
-			str((still[1] as Image).get_size()) if still[1] != null else "none", still[2]])
+		bot.log_line("%s still %s %s (%dx the window's pixels, cut %s; %.3f from the window's own pixels): %s" % [TAG, still[0], "saved" if ok else "FAILED",
+			WRIST_SCALE, str((still[1] as Image).get_size()) if still[1] != null else "none", float(still[3]), still[2]])
 		await bot.frames(1)
 	for i in clip.size():
 		_save(bot, clip[i], "clip_%s/%03d" % [name, i])
@@ -722,8 +766,9 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	else:
 		bot.expect(absf(buff - share) < 0.005, "%s: the speed buff %+.2f at the first step (the console's quick)" % [name, share], buff_at_step)
 	if wrist:
-		bot.expect(wrists.size() == 2 and wrists.all(func(w: Array) -> bool: return w[1] != null), "%s: the wrists rendered side on and from the front quarter" % name,
-			"%d of 2" % wrists.size())
+		bot.expect(wrists.size() == 2 and wrists.all(func(w: Array) -> bool: return w[1] != null and float(w[3]) <= WRIST_SAME),
+			"%s: the wrists rendered side on and from the front quarter, each the window's still at %dx (within %.2f of its pixels)" % [name, WRIST_SCALE, WRIST_SAME],
+			", ".join(wrists.map(func(w: Array) -> String: return "%s %.3f" % [w[0], float(w[3])])) + " (%d of 2)" % wrists.size())
 	if gait == "sprint":
 		bot.expect("Sprint_Short" in bases, "%s: Sprint_Short reached (the console's quick, +%.2f)" % [name, QUICK_SHARE], pace)
 	if carry:
@@ -733,11 +778,13 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	if gait == "walk":
 		bot.expect(Client3D.CLIP_WALK in bases and not "Jog_Short" in bases, "%s walked, never jogged (the console's quick, %+.2f)" % [name, Main.QUICK_LEAST],
 			",".join(bases.keys()) + "; " + pace)
-	else:
+	elif gait == "jog":
 		bot.expect("Jog_Short" in bases, "%s ran in Jog_Short" % name, ",".join(bases.keys()))
 	if gait == "jog":
 		bot.expect(steady >= PLAIN_PACE[0] and steady <= PLAIN_PACE[1], "%s: a plain jog's steady pace %.1f to %.1f tiles a second" % [name, PLAIN_PACE[0], PLAIN_PACE[1]], pace)
 	bot.expect(stopped >= 0.0, "%s: stood at the run's end" % name, "at %s" % bot.cell())
+	if carry:
+		bot.expect(ready_in >= 0.0, "%s: the ready eased in after the stop, logged" % name, "the stop %.2f s, frames to %.2f s" % [stopped, (Time.get_ticks_msec() - t0) / 1000.0])
 	if carry:
 		bot.expect(most > 0.9, "%s: the carry on while moving" % name, "most %.2f" % most)
 	else:
@@ -745,6 +792,34 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 
 
 var _cameras := {}  # run name: the camera's settled distance (m), for its after's check
+
+
+## The section run (TOUR_ONLY, tour.sh's and remote_shot.sh's --tour-only; "" the whole tour), and whether a run takes no
+## stills (the pace section's).
+var _only := ""
+var _quiet := false
+
+
+## The coordinator's 11-25 sections, each minutes, not the whole tour's 25: TOUR_ONLY "wrists", the man's and the woman's
+## giant axe at the jog, before and after, with their stills and the two wrist stills (side2_wrist, front1_wrist), no
+## clip; "pace", the woman's giant axe and the man's battle axe at the sprint, before and after, no still and no clip,
+## each run's steady pace in its log line (at e05f0de48 those after runs paced under their befores, 3.95 against 6.23 and
+## 5.54 against 6.20, the latest other-side stills on the slowest). A name holding both (wrists_pace) runs both.
+func _sections(bot: Node) -> void:
+	for row: Array in ROWS:
+		if not await _join(bot, row):
+			return
+		if _only.contains("wrists") and await _hold(bot, CLIP_WEAPON):
+			await _clear(bot)
+			for carry: bool in [false, true]:
+				await _run(bot, row, CLIP_WEAPON, "jog", carry)
+		var paced := "giant_axe" if row[0] == "woman" else "battle_axe"
+		if _only.contains("pace") and await _hold(bot, paced):
+			await _clear(bot)
+			_quiet = true
+			for carry: bool in [false, true]:
+				await _run(bot, row, paced, "sprint", carry)
+			_quiet = false
 
 
 var _foe_at := {}  # swing run name: the goblin's cell, for its after's check
@@ -798,6 +873,13 @@ func run(bot: Node) -> void:
 		return
 	await bot.admin("day_minutes 100000")
 	bot.log_line("%s console: %s" % [TAG, str(await bot.admin("hour 11")).strip_edges()])
+	_only = OS.get_environment("TOUR_ONLY")
+	if _only != "":
+		bot.log_line("%s section %s" % [TAG, _only])
+		if bot.expect(_only.contains("wrists") or _only.contains("pace"), "a section this tour has (wrists, pace)", _only):
+			await _sections(bot)
+		bot.log_line("%s done: server script errors %d" % [TAG, bot.server_lines("SCRIPT ERROR").size()])
+		return
 	var joined := ""
 	var order: Array[Array] = ROWS.duplicate()
 	for gait: String in ["walk", "jog", "sprint"]:
