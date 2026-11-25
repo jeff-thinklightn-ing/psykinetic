@@ -1447,7 +1447,7 @@ const HUMANOID_MOVES := {
 	# The same aimed at the sky, for a lob (677, pc-character's side; _sync_bow mixes them in).
 	"bow_draw_sky": "Bow_Draw_Sky", "bow_aim_sky": "Bow_Hold_Sky", "bow_shoot_sky": "Bow_Loose_Sky",
 	"bow_renock": "Bow_Renock", "bow_renock_sky": "Bow_Renock_Sky",
-	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle", "ready": "Axe_Ready",
+	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle", "ready": "Axe_Ready", "carry_two": "Axe_Carry",
 }
 ## Attach points (decision 451): where a humanoid holds and hangs things, on
 ## its skeleton's bones (the retargeted SkeletonProfileHumanoid's names, so
@@ -26802,6 +26802,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 				rig.upper(str(rest["upper"]))
 			"", "carry", "stowed", "sheathed":
 				rig.upper_off()
+	_carry_two(puppet, rig, moves, want)
 	puppet.set_meta("bow_state", want)
 	if want == "stowed" or state == "stowed":
 		_stow_bow(sockets, want == "stowed")
@@ -26814,6 +26815,27 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if bow != "":
 		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
+
+
+## A reached two-hander carried at a run (451 amended (13), TASK 16; Jeff's v0.1.213 report, "running with axe, chars
+## left arm clips into head, and wrist bends at non anatomic angle"): on a person's body (people_stance: the man and
+## the woman, whoever wears them) in its jog or sprint (gaits 1 and 2), the left hand reaching grip_2 (HandReach) and
+## the upper layer free ([param want] ""), the arms are carried at port arms (moves "carry_two", Axe_Carry, on AnimRig's
+## carry layer: the arms alone, the trunk's lean and twist and the vary left to the run); else eased out. The gait's
+## one-handed swing carried the haft across the face with the left hand pinned to it. The walk, the stop, one-handers
+## and every other body (the draugr, the dead, the knight, goblins) are as they were. Eased over CARRY_TWO_FADE (s): at
+## the clips' blend the arms' change outran the gait change's own (the left hand 0.10 m in a 20 ms frame, walk to jog).
+const CARRY_TWO_FADE := 0.3
+func _carry_two(puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String) -> void:
+	var clip := str(moves.get("carry_two", ""))
+	if clip == "" or rig.stood_as != PEOPLE_PREFIX:
+		return
+	var gaits: Array = puppet.get_meta("gaits", GAITS)
+	var running := gaits.size() > 2 and rig.base_clip() in [str(gaits[1][0]), str(gaits[2][0])]
+	var reach := puppet.get_meta("reach") as HandReach if puppet.has_meta("reach") else null
+	var on := want == "" and running and reach != null and reach.active
+	if on or rig.carry_clip() != "":
+		rig.carry(clip if on else "", CARRY_TWO_FADE)
 
 
 ## The bow aimed at the sky for a lob (677, pc-character's side): drawn or

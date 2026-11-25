@@ -182,6 +182,11 @@ var _settle_stood := 0.0
 var _settle_skeleton: Skeleton3D
 ## How much of the head a purposeful turn holds (0 to 1; Client3D's addressing look): "look" yields so much.
 var look_held := 0.0
+## The carry layer (carry; 451 amended (13)): its clip (as played), its share now and the share it eases to.
+var _carry_clip := ""
+var _carry := 0.0
+var _carry_to := 0.0
+var _carry_fade := 0.15
 
 
 ## A rig for [param scene] (its root node holds the skeleton) playing
@@ -256,6 +261,16 @@ func _build(upper: bool) -> void:
 		_root.connect_node("upper", 0, under)
 		_root.connect_node("upper", 1, "sky")
 		under = "upper"
+		# The carry (carry): the arms alone (POSTURE_ARM_BONES) held as its clip holds them, over the upper layer.
+		var carried := AnimationNodeBlend2.new()
+		carried.filter_enabled = true
+		for bone in POSTURE_ARM_BONES:
+			carried.set_filter_path(NodePath("%GeneralSkeleton:" + bone), true)
+		_root.add_node("carry_clip", AnimationNodeAnimation.new())
+		_root.add_node("carry", carried)
+		_root.connect_node("carry", 0, under)
+		_root.connect_node("carry", 1, "carry_clip")
+		under = "carry"
 	# The posture in two: its arms (POSTURE_ARM_BONES, at the gait's share) and the rest of it, each a filter of the
 	# other's bones (set by posture()); a node's output feeds one input, so each has its own copy of the pose.
 	_root.add_node("pose", AnimationNodeAnimation.new())
@@ -586,6 +601,47 @@ func sky_amount() -> float:
 func base_at(clip: String, seconds: float) -> void:
 	clip = _name(clip)
 	_to_base(clip, 0.0, 0.0, seconds, true)
+
+
+## The carry layer (451 amended (13), TASK 16): [param clip]'s arms (the clavicles down, POSTURE_ARM_BONES) over the
+## upper layer and the base, the trunk, the legs and the run's lean and twist left to them: a two-hander carried at a run
+## (Client3D's "carry_two", Axe_Carry) where the gait's own arm swing would carry the haft across the face. Eased in
+## from where the arms are over [param fade] seconds (-1: the rig's blend; 0 at once), and out again with "" (its clip
+## kept till it is out). (Nothing on a rig made without the upper layer.)
+func carry(clip: String, fade := -1.0) -> void:
+	if not _has_upper:
+		return
+	_carry_fade = blend if fade < 0.0 else fade
+	clip = _name(clip) if clip != "" else ""
+	if clip == "" or not player.has_animation(clip):
+		_carry_to = 0.0
+	else:
+		if clip != _carry_clip:
+			(_root.get_node("carry_clip") as AnimationNodeAnimation).animation = clip
+			_carry_clip = clip
+		_carry_to = 1.0
+	if _carry_fade <= 0.0:
+		_carry = _carry_to
+		tree.set("parameters/carry/blend_amount", _carry)
+		_apply()
+
+
+## The carry layer's clip (named plain; "" once eased out or never) and its share now.
+func carry_clip() -> String:
+	if _carry_to <= 0.0 and _carry <= 0.0:
+		return ""
+	return _carry_clip.trim_prefix(stood_as) if stood_as != "" else _carry_clip
+
+
+func carry_amount() -> float:
+	return _carry
+
+
+func _carry_ease(delta: float) -> void:
+	if _carry == _carry_to:
+		return
+	_carry = move_toward(_carry, _carry_to, delta / maxf(_carry_fade, 0.001))
+	tree.set("parameters/carry/blend_amount", _carry)
 
 
 ## The upper layer's clip ("" for none) and its speed.
@@ -947,6 +1003,7 @@ func _process(delta: float) -> void:
 	_since += delta
 	_frames += 1
 	_ease_posture_arms(delta)
+	_carry_ease(delta)
 	_vary_ease(delta)
 	_settle_ease(delta)
 	var falls := every < _every_was

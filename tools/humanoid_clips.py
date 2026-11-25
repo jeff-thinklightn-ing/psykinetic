@@ -743,6 +743,24 @@ CLIPS["Axe_Ready_Loop"] = {"loop": True, "keys": [
 	(1.25, P("Idle_Loop", 1.25, AXE_READY + [("spine_02", LIFT, -2.0)])),
 	(2.5, P("Idle_Loop", 0.0, AXE_READY)),
 ]}
+# Running with a two-hander (TASK 16; Jeff's v0.1.213 report, "running with axe, chars left arm clips into head, and
+# wrist bends at non anatomic angle"): the run's own arm swing carried the haft across the face with the left hand
+# pinned to it (grip_2 2.2 to 3.4 cm from the face; C:/dev/review/animation/axe_run/table.md). Carried at port arms,
+# low: the right hand ahead of the right hip and a little out, the haft across the body up to the left and ahead, the
+# left hand on it GREAT_GRIP up, below the chest, the head out past the left shoulder, its edge (the fingers' way,
+# Client3D's HELD_EDGE_TURN) ahead. Only the arms are taken (AnimRig's carry layer: the clavicles down), so it is posed
+# without SQUARED, the trunk left to the run. Of four placings measured on both bodies with the five two-handers (the
+# table's), this one kept the butt off the right thigh at the sprint's knee lift (3.8 cm at the nearest; the hand 0.1 m
+# farther back and lower put it 0.3 cm in on 38 of 48 frames) and the left wrist's bend under 50 degrees.
+CARRY_HAFT = (0.35, -0.8, 0.5)
+CARRY_RIGHT = (0.3, 0.06, -0.3)
+_carry_length = Vector((-CARRY_HAFT[1], -CARRY_HAFT[0], CARRY_HAFT[2])).normalized()
+AXE_CARRY = chop(CARRY_RIGHT, CARRY_HAFT, tuple(_carry_length.cross(Vector((0.0, -1.0, 0.0)))),
+	((-0.6, 0.6, -0.5), (1.0, -0.3, -0.6)), grip=GREAT_GRIP)[len(SQUARED):]
+CLIPS["Axe_Carry_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, AXE_CARRY)),
+	(1.0, P("Idle_Loop", 0.0, AXE_CARRY)),
+]}
 # The war hammer's blow, one-handed (the coordinator, on 451 amended (2)'s cut: Axe_Overhead put
 # the left hand up beside a one-handed haft, holding nothing): the right arm alone raises it over
 # the right shoulder and brings it down ahead, its face (an item's +x, turned to the fingers,
