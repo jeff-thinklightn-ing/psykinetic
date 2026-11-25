@@ -30224,10 +30224,15 @@ func _relic_command(words: PackedStringArray) -> String:
 
 
 ## quick <player> <share> <seconds> (451 amended (13), test-only, the "hp"
-## verb's gate): that online player's speed buff set to share (0 to 2) for
-## that long (World.add_buff, so a larger one already on is kept), for a
-## tour's true sprint: a stamina potion's +0.25 makes a plain 4.0 tiles a
-## second 5.0, under the man's Sprint_Short change (5.13).
+## verb's gate): that online player's speed buff set to share (QUICK_LEAST
+## to 2) for that long, for a tour's true sprint and true walk. Over 0 by
+## World.add_buff (a larger one already on is kept): a stamina potion's
+## +0.25 makes a plain 4.0 tiles a second 5.0, under the man's Sprint_Short
+## change (5.13). Under 0 a slowing set in place, whatever was on (add_buff
+## takes none under 0; nothing in the game slows a player to the walk's own
+## pace for long): -0.75 makes 4.0 one tile a second, the walk's. 0 takes
+## the speed buff off.
+const QUICK_LEAST := -0.75
 func _quick_command(words: PackedStringArray) -> String:
 	if words.size() < 4 or not words[2].is_valid_float() or not words[3].is_valid_float():
 		return "quick <player> <share> <seconds>: that player's speed buff (test-only)"
@@ -30235,9 +30240,19 @@ func _quick_command(words: PackedStringArray) -> String:
 	var player := _player_of_id(id) if not id.is_empty() else null
 	if player == null:
 		return "no player %s in the game" % words[1]
-	var share := clampf(float(words[2]), 0.0, 2.0)
-	World.add_buff(player, "speed", share, maxi(int(float(words[3]) * World.TICK_RATE), 1))
-	return "quick: %s's speed +%.2f for %s s, buffs %s" % [words[1], share, words[3], str(player.buffs.get("speed", []))]
+	var share := clampf(float(words[2]), QUICK_LEAST, 2.0)
+	var ticks := maxi(int(float(words[3]) * World.TICK_RATE), 1)
+	if share > 0.0:
+		World.add_buff(player, "speed", share, ticks)
+	else:
+		var now: Dictionary = player.buffs.duplicate(true)
+		if share < 0.0:
+			now["speed"] = [share, World.tick + ticks]
+			World._buffed[player] = true  # So it wears off as a potion's does.
+		else:
+			now.erase("speed")
+		player.buffs = now
+	return "quick: %s's speed %+.2f for %s s, buffs %s" % [words[1], share, words[3], str(player.buffs.get("speed", []))]
 
 
 ## strike <player> <monster> (896's switch-on, test-only, the "hp" verb's

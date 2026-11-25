@@ -216,6 +216,11 @@ func _test_console() -> void:
 	var hp_was: int = host.hp
 	reply = _main.admin_command("hp %s 3" % host.name)
 	_check(reply.begins_with("unknown command") and host.hp == hp_was, "'hp' without --test-hp is an unknown command (%s)" % reply)
+	# 451 amended (13): the tour's quick (a speed buff) stands behind the same gate.
+	var speed_was: Variant = host.buffs.get("speed", null)
+	reply = _main.admin_command("quick %s 0.6 5" % host.name)
+	_check(reply.begins_with("unknown command") and host.buffs.get("speed", null) == speed_was,
+			"'quick' without --test-hp is an unknown command, no speed given (%s)" % reply)
 	_check(not Main.hp_verb_allowed(true, ["--map=test_room"]), "--test-hp without a --run-marker is refused")
 	_check(not Main.hp_verb_allowed(false, ["--run-marker=7"]), "a --run-marker without --test-hp is refused")
 	_check(Main.hp_verb_allowed(true, ["--run-marker=7"]), "--test-hp beside a --run-marker is honoured")
@@ -225,6 +230,15 @@ func _test_console() -> void:
 	_check(not marked or host.hp == 3 and reply.begins_with("hp "), "'hp' with --test-hp and the marker sets it (%s)" % reply)
 	reply = _main.admin_command("hp %s 999" % host.name)
 	_check(not marked or host.hp == host.max_hp, "'hp' holds it to max_hp at most (%s)" % reply)
+	reply = _main.admin_command("quick %s 0.6 5" % host.name)
+	_check(not marked or reply.begins_with("quick: ") and World.buff(host, "speed") == 0.6, "'quick' with --test-hp and the marker gives the speed buff (%s)" % reply)
+	reply = _main.admin_command("quick %s -0.9 5" % host.name)
+	_check(not marked or World.buff(host, "speed") == Main.QUICK_LEAST, "'quick' under 0 slows, set in place and held to QUICK_LEAST (%s)" % reply)
+	reply = _main.admin_command("quick %s 0 5" % host.name)
+	_check(not marked or not host.buffs.has("speed"), "'quick' at 0 takes the speed buff off (%s)" % reply)
+	host.buffs.erase("speed")
+	if speed_was != null:
+		host.buffs["speed"] = speed_was
 	Net.test_hp = false
 	host.hp = hp_was
 	World.damage(_slot_entity(5), 999)

@@ -3406,6 +3406,9 @@ const CARRY_VIEW_RUNS := [["Jog_Short", 1.0, 0.0], ["Sprint_Short", 1.0, 0.0], [
 	["Idle", 0.75, 0.0], ["Idle", 0.5, 0.0], ["Idle", 0.25, 0.0], ["Idle", 0.0, 0.25], ["Idle", 0.0, 0.5], ["Idle", 0.0, 0.75]]
 const CARRY_VIEW_CHIN := 0.08
 const CARRY_VIEW_SHOULDER := 0.0
+## The carried piece's least gap to the lantern's box at belt_r (the haft runs before the right hip): read 0.174 m at its least
+## (the woman's giant axe at the sprint, beside a satchel), main's jog touching it (-0.013 m).
+const CARRY_LAMP_CLEAR := 0.15
 const CARRY_VIEW_PART := ["L", "R", "FL", "FR", "BL", "BR"]
 const CarryView := preload("res://tests/carry_view.gd")
 func _test_carry_view() -> void:
@@ -3420,6 +3423,9 @@ func _test_carry_view() -> void:
 	var main_breaks := 0
 	var main_count := 0
 	var count := 0
+	var lamp_lines: Array[String] = []
+	var lamp_least := INF
+	var lamp_main := INF
 	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
 		for kind: String in REACHED_TWO:
 			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
@@ -3445,6 +3451,12 @@ func _test_carry_view() -> void:
 			await _frames(2)
 			var head := CarryView.head_skin(model, sk)
 			var pm := CarryView.piece_mesh(piece)
+			# Every player and companion wears a lantern at belt_r (Client3D, at the puppet's making), the right hip the haft
+			# runs before: the piece's least gap to its box, hung plain and beside a satchel (LANTERN_BY_BAG).
+			var lamp := Client3D._hanging_lantern(true)
+			(sockets["belt_r"] as Node3D).add_child(lamp)
+			await _frames(1)
+			var lamp_box := _lamp_box(lamp)
 			# The stand as shipped first (the ready's own, the bound of its in-between), main's jog last.
 			var runs: Array = [["Idle", 0.0, 1.0]]
 			runs.append_array(CARRY_VIEW_RUNS)
@@ -3465,6 +3477,8 @@ func _test_carry_view() -> void:
 				var seen := {}
 				for v: String in views:
 					seen[v] = Vector3.ZERO
+				var lamp_read := (share >= 1.0 or share == 0.0 and ready == 0.0 and clip == "Jog_Short") and clip != "Idle"
+				var lamp_gap := Vector2(INF, INF)
 				for i in CARRY_VIEW_STEPS:
 					rig.base_at(clip, length * float(i) / CARRY_VIEW_STEPS)
 					rig.tree.set("parameters/carry/blend_amount", share)
@@ -3473,10 +3487,21 @@ func _test_carry_view() -> void:
 					rig.tree.advance(0.0)
 					await _frames(3)
 					var got := CarryView.read(model, sk, at, piece, head, pm, views)
+					if lamp_read:
+						var belt := (sockets["belt_r"] as Node3D).global_transform
+						lamp_gap.x = minf(lamp_gap.x, _box_gap(lamp_box, (belt * Transform3D.IDENTITY).affine_inverse(), piece, pm))
+						lamp_gap.y = minf(lamp_gap.y, _box_gap(lamp_box, (belt * Transform3D(Basis.IDENTITY, Client3D.LANTERN_BY_BAG)).affine_inverse(), piece, pm))
 					most["top_chin"] = maxf(most["top_chin"], got["top_chin"])
 					most["head_top_shoulders"] = maxf(most["head_top_shoulders"], got["head_top_shoulders"])
 					for v: String in views:
 						seen[v] = (seen[v] as Vector3).max(got[v])
+				if lamp_read:
+					lamp_lines.append("%s %s %s %s: the piece %+.3f m off the lantern's box (beside a satchel %+.3f m)" % [
+						"carried" if share > 0.0 else "main's", build[0], kind, clip, lamp_gap.x, lamp_gap.y])
+					if share > 0.0:
+						lamp_least = minf(lamp_least, minf(lamp_gap.x, lamp_gap.y))
+					else:
+						lamp_main = minf(lamp_main, minf(lamp_gap.x, lamp_gap.y))
 				var full := (share >= 1.0 or share == 0.0) and ready == 0.0
 				var over: Array[String] = []
 				var all: Array[String] = []
@@ -3511,11 +3536,39 @@ func _test_carry_view() -> void:
 		print("  carried ", line)
 	for line in main_reads:
 		print("  main's  ", line)
+	for line in lamp_lines:
+		print("  lantern ", line)
+	print("  lantern: carried least %+.3f m, main's jog least %+.3f m" % [lamp_least, lamp_main])
+	_check(lamp_least >= CARRY_LAMP_CLEAR, "each two-hander carried at the walk, jog and sprint, both bodies: the piece %.2f m or more off the lantern worn at belt_r, hung plain or beside a satchel (least %.3f m; main's jog %.3f m)" % [CARRY_LAMP_CLEAR, lamp_least, lamp_main])
 	_check(off.is_empty() and count == 2 * REACHED_TWO.size() * CARRY_VIEW_RUNS.size(),
 		"each two-hander carried, both bodies, %s: no overlap with the head at the low camera (in full from any side, quarter, the front or the back, the top %.2f m or more under the chin, its head %.2f m or more under the shoulders; part way from either side or quarter, the ready's in-between no more than its own) (%s)" % [
 		", ".join(CARRY_VIEW_RUNS.map(func(r: Array) -> String: return "%s %.2f/%.2f" % [r[0], r[1], r[2]])), CARRY_VIEW_CHIN, CARRY_VIEW_SHOULDER, "; ".join(off)])
 	# A watch only if main's jog, the carried weapon's head before the face, breaks it.
 	_check(main_breaks == main_count and main_breaks > 0, "main's jog (no carry) breaks the bounds on every body and two-hander: %d of %d" % [main_breaks, main_count])
+
+
+## The lantern's box in its own space (its meshes' vertices, ring and all), for the piece's gap to it.
+static func _lamp_box(lamp: Node3D) -> AABB:
+	var verts: PackedVector3Array = CarryView.piece_mesh(lamp)["verts"]
+	var box := AABB(verts[0], Vector3.ZERO)
+	for q in verts:
+		box = box.expand(q)
+	return box
+
+
+## The least distance (m) from the piece's vertices, as posed, to [param box] in the lantern's space ([param into]: the
+## world into it); under 0 the deepest inside it.
+static func _box_gap(box: AABB, into: Transform3D, piece: Node3D, pm: Dictionary) -> float:
+	var least := INF
+	var to := into * piece.global_transform
+	for v: Vector3 in pm["verts"]:
+		var q := to * v
+		var d := (q - q.clamp(box.position, box.end)).length()
+		if d == 0.0:
+			d = -minf(minf(minf(q.x - box.position.x, box.end.x - q.x), minf(q.y - box.position.y, box.end.y - q.y)),
+				minf(q.z - box.position.z, box.end.z - q.z))
+		least = minf(least, d)
+	return least
 
 
 ## The least distance from the head's centre (CARRY_HEAD_UP along the Head bone from its root) to the left forearm

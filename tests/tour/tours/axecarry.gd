@@ -8,7 +8,11 @@ extends RefCounted
 ## Rows: the man with the battle axe, the giant axe and the tomb sledge; the woman with the battle axe, the giant axe and the
 ## pick (seed 11, middling; the look set by a reconnect, the settings pointed at the run's own folder). Each weapon: a still
 ## standing beside the goblin, the goblin struck down (the console's strike: at 1d3acca3f it came on and struck the plain
-## runs), then a run west from RUN_FROM (205, 211) to (196, 211), before and after, at the jog (both rows), then
+## runs), then a run west from RUN_FROM (205, 211) to (196, 211), before and after. First the walk, as a player walks (each
+## row with WALK_RUNS, the battle axe and the giant axe; the player slowed to the walk's pace by the console's quick at
+## Main.QUICK_LEAST, test-only, logged), each also a clip from standing to standing, its start and its stop
+## (clip_<run>/times.txt gives each frame's time, the first step's and the stop's); then the jog (both rows; a plain
+## jog's steady pace expected within PLAIN_PACE), then
 ## the same runs at the sprint, the speed admin-set before each by the console's quick (test-only, QUICK_SHARE: a stamina potion's
 ## +0.25 stays under the man's sprint change) and Sprint_Short checked. Before each run the camera's distance settles and is
 ## logged, and an after's is checked against its before's. Each run: four stills side on a stride's quarter apart, two from
@@ -41,6 +45,16 @@ const FRONT_AT: Array[float] = [1.75, 1.95]  # from the front quarter
 ## 4.0 tiles a second 5.0, under the man's sprint change (5.13): at 1d3acca3f no run reached Sprint_Short.
 const QUICK_SHARE := 0.6
 const QUICK_SECONDS := 60
+## The walk (the coordinator's 11-25 (1): the carry is on at the walk too, and no look had shown it): nothing in the game
+## slows a player to the walk's own pace for long (a winded, loaded body still jogs), so the console's quick slows it,
+## Main.QUICK_LEAST (-0.75: a plain 4.0 tiles a second one, the walk's own pace 0.94), admin-set and logged, then off.
+## The man and the woman, these weapons, before and after, each a clip from standing to standing: the first step (the
+## ready gone and the carry on in one frame) and the stop (the carry held, eased out, the ready eased in).
+const WALK_RUNS: Array[String] = ["battle_axe", "giant_axe"]
+const WALK_CLIP_START := 1.6  # s after the first click the walk's clip runs to; then again from the cell before RUN_TO
+## A plain jog's steady pace (tiles a second, from the second cell to the seventh), expected: the coordinator's 11-25
+## (6), a run read about 2 at 1d3acca3f, put down to the stills saved mid-run; this run settles it.
+const PLAIN_PACE: Array[float] = [3.6, 4.4]
 ## The swing runs (the coordinator's (2)): at the jog, before and after, one clip from standing to standing. A swing
 ## "where you stand" (Shift and a click) is not a player's mid-run: a free body's walk drops a swing order at once
 ## (World._free_drop_order, any intent of WIND_UP_LEAVE_INTENT; at a426bca29 the Shift click came 1.4 s in and never
@@ -538,12 +552,15 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	var taken := 0
 	var last_click := -1000
 	var last_grab := -1000
-	var clips := weapon == CLIP_WEAPON
+	var clips := weapon == CLIP_WEAPON or gait == "walk"
+	var clip_at: PackedStringArray = []  # each clip frame's time
 	var moved := -1.0
+	var at_two := -1.0  # the times the runner's cell is 2 and 7 cells on: the steady pace between
+	var at_seven := -1.0
 	var stopped := -1.0
 	var start: Vector2i = bot.cell()
 	var t0 := Time.get_ticks_msec() + (int(SWING_LEAD * 1000.0) if clips else 0)  # the first click's time
-	while Time.get_ticks_msec() - t0 < 8000:
+	while Time.get_ticks_msec() - t0 < (16000 if gait == "walk" else 8000):
 		var ms := Time.get_ticks_msec() - t0
 		var s := ms / 1000.0
 		if stopped >= 0.0 and s > stopped + (SWING_TAIL if clips else 0.3) and taken >= all:
@@ -566,23 +583,32 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 				taken += 1
 				if taken == all:
 					_yaw(bot, side)  # the clip goes on side on
-		if clips and Time.get_ticks_msec() - t0 - last_grab >= 40 and (taken == 0 or taken >= all or taken < SIDE_AT.size()):
+		# The walk's clip: its start (to WALK_CLIP_START) and its end (from the cell before RUN_TO), not its 8 s between.
+		var in_clip := gait != "walk" or s < WALK_CLIP_START or absi(bot.cell().x - RUN_TO.x) <= 1 or stopped >= 0.0
+		if clips and in_clip and Time.get_ticks_msec() - t0 - last_grab >= 40 and (taken == 0 or taken >= all or taken < SIDE_AT.size()):
 			last_grab = Time.get_ticks_msec() - t0
+			clip_at.append("%03d %.3f" % [clip.size(), last_grab / 1000.0])
 			clip.append(await _clip_frame(bot))
 		else:
 			await bot.get_tree().process_frame
 		var now := (Time.get_ticks_msec() - t0) / 1000.0
 		if moved < 0.0 and bot.cell() != start:
 			moved = now
+		if at_two < 0.0 and absi(bot.cell().x - start.x) >= 2:
+			at_two = now
+		if at_seven < 0.0 and absi(bot.cell().x - start.x) >= 7:
+			at_seven = now
 		if moved >= 0.0 and stopped < 0.0 and rig.base_clip() == Client3D.CLIP_IDLE:
 			stopped = now
 		bases[rig.base_clip()] = true
-		if rig.base_clip() in ["Jog_Short", "Sprint_Short"]:
+		if rig.base_clip() in [Client3D.CLIP_WALK, "Jog_Short", "Sprint_Short"] and moved >= 0.0 and stopped < 0.0:
 			most = maxf(most, rig.carry_amount())
 			least = minf(least, rig.carry_amount())
 		lines.append("%.3f %s" % [now, _state(bot)])
 	var cells := absi(bot.cell().x - start.x)
-	var pace := "%d cells %.2f s: %.2f tiles/s; the sprint takes over above %.2f" % [cells, stopped - moved, cells / maxf(stopped - moved, 0.001), _sprint_from(bot)]
+	var steady := 5.0 / maxf(at_seven - at_two, 0.001) if at_two >= 0.0 and at_seven > at_two else 0.0
+	var pace := "%d cells %.2f s: %.2f tiles/s; steady (the 2nd cell to the 7th) %.2f tiles/s; the sprint takes over above %.2f" % [
+		cells, stopped - moved, cells / maxf(stopped - moved, 0.001), steady, _sprint_from(bot)]
 	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
 	if file != null:
 		file.store_line("# %s: %s; worn: %s; buffs %s; camera %.2f m from the runner at the start; first step at %.2f s, the stop at %.2f s (%s); seconds after the first click%s, base clip, carry clip and amount, upper clip, bow_state, cell" % [
@@ -597,6 +623,12 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 		_save(bot, clip[i], "clip_%s/%03d" % [name, i])
 		if i % 4 == 3:
 			await bot.frames(1)
+	if not clip_at.is_empty():
+		var times := FileAccess.open((bot.own_dir() as String).path_join("clip_%s/times.txt" % name), FileAccess.WRITE)
+		if times != null:
+			times.store_string("# frame, seconds after the first click (frames.txt has every frame's state); first step %.2f s, the stop %.2f s" % [moved, stopped]
+				+ "\n" + "\n".join(clip_at) + "\n")
+			times.close()
 	bot.log_line("%s run %s: %.1f s to %s, the stop at %.2f s; %s; clips %s; carry while running %.2f..%.2f; %d stills, %d clip frames; camera %.2f m" % [TAG, name,
 		(Time.get_ticks_msec() - t0) / 1000.0, bot.cell(), stopped, pace, ",".join(bases.keys()), least if most > 0.0 or least < 1.0 else 0.0, most, taken, clip.size(), camera])
 	_cameras[name] = camera
@@ -606,10 +638,16 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 		var was := name.replace("_after", "_before")
 		bot.expect(_cameras.has(was) and absf(float(_cameras[was]) - camera) <= 0.1, "%s: the camera as far as its before's" % name,
 			"before %s m, after %.2f m" % [str(_cameras.get(was, "none")), camera])
-	bot.expect("Jog_Short" in bases, "%s ran in Jog_Short" % name, ",".join(bases.keys()))
+	if gait == "walk":
+		bot.expect(Client3D.CLIP_WALK in bases and not "Jog_Short" in bases, "%s walked, never jogged (the console's quick, %+.2f)" % [name, Main.QUICK_LEAST],
+			",".join(bases.keys()) + "; " + pace)
+	else:
+		bot.expect("Jog_Short" in bases, "%s ran in Jog_Short" % name, ",".join(bases.keys()))
+	if gait == "jog":
+		bot.expect(steady >= PLAIN_PACE[0] and steady <= PLAIN_PACE[1], "%s: a plain jog's steady pace %.1f to %.1f tiles a second" % [name, PLAIN_PACE[0], PLAIN_PACE[1]], pace)
 	bot.expect(stopped >= 0.0, "%s: stood at the run's end" % name, "at %s" % bot.cell())
 	if carry:
-		bot.expect(most > 0.9, "%s: the carry on while running" % name, "most %.2f" % most)
+		bot.expect(most > 0.9, "%s: the carry on while moving" % name, "most %.2f" % most)
 	else:
 		bot.expect(most == 0.0, "%s: no carry (main's arms)" % name, "most %.2f" % most)
 
@@ -626,6 +664,14 @@ func _quick(bot: Node, row: Array) -> void:
 	bot.log_line("%s %s sprint: the speed admin-set (console quick, test-only): %s; buffs %s" % [TAG, row[0], said, str(bot.me().get("buffs"))])
 
 
+## Before the walk runs: the console's quick slows the player to the walk's pace (Main.QUICK_LEAST), admin-set and logged
+## with the buffs the client then shows; after them, quick 0 takes it off.
+func _slow(bot: Node, row: Array, on: bool) -> void:
+	var said := str(await bot.admin("quick Tourbot %.2f %d" % [Main.QUICK_LEAST if on else 0.0, QUICK_SECONDS * 5])).strip_edges()
+	await bot.until(func() -> bool: return (float((bot.me().get("buffs") as Dictionary).get("speed", [0.0])[0]) < 0.0) == on, 3.0)
+	bot.log_line("%s %s walk: the speed admin-set %s (console quick, test-only): %s; buffs %s" % [TAG, row[0], "on" if on else "off", said, str(bot.me().get("buffs"))])
+
+
 func run(bot: Node) -> void:
 	if not bot.expect(_view(bot) != null, "a 3D view (the tour needs tour.sh's --offscreen window: headless has no Client3D)"):
 		return
@@ -638,12 +684,22 @@ func run(bot: Node) -> void:
 	bot.log_line("%s console: %s" % [TAG, str(await bot.admin("hour 11")).strip_edges()])
 	var joined := ""
 	var order: Array[Array] = ROWS.duplicate()
-	for gait: String in ["jog", "sprint"]:
+	for gait: String in ["walk", "jog", "sprint"]:
 		for row: Array in order:
 			if joined != row[0]:
 				if not await _join(bot, row):
 					return
 				joined = row[0]
+			if gait == "walk":
+				for weapon: String in WALK_RUNS:
+					if not await _hold(bot, weapon):
+						continue
+					await _clear(bot)
+					await _slow(bot, row, true)
+					for carry: bool in [false, true]:
+						await _run(bot, row, weapon, gait, carry)
+					await _slow(bot, row, false)
+				continue
 			for weapon: String in ((row[3] + row[4]) if gait == "jog" else row[3]):
 				if not await _hold(bot, weapon):
 					continue

@@ -26759,7 +26759,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		_slide_held(sockets, 0.0)
 		if puppet.has_meta("reach"):
 			_sync_reach(puppet.get_meta("reach") as HandReach, sockets, ids)
-	if want == "" and puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE 			and rig.carry_clip() == "":
+	if want == "" and puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE and rig.carry_clip() == "":
 		want = "ready"  # Standing only: not over a gait, a lying body or a kneel; once a carry (_carry_two) is out.
 	if (want == "rest") != (state == "rest"):
 		_rest_sound(puppet, str(ids[0]), want != "rest")
