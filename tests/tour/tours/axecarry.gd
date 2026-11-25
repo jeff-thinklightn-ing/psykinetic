@@ -7,10 +7,12 @@ extends RefCounted
 ##   TOUR_SERVER_ARGS="--test-hp --no-companions --test-foe=imp,,1,held" sh tools/tour.sh axecarry --offscreen
 ## Rows: the man with the battle axe, the giant axe and the tomb sledge; the woman with the battle axe, the giant axe and the
 ## pick (seed 11, middling; the look set by a reconnect, the settings pointed at the run's own folder). Each weapon: a still
-## standing beside the goblin, then a run west from RUN_FROM (205, 211) to (196, 211), before and after, at the jog (both rows), then a stamina potion
-## (speed +0.25) drunk by a right click on its pack square, and the same runs at the sprint (Sprint_Short reached or not is
+## standing beside the goblin, the goblin struck down (the console's strike: at 1d3acca3f it came on and struck the plain
+## runs), then a run west from RUN_FROM (205, 211) to (196, 211), before and after, at the jog (both rows), then a stamina potion
+## (speed +0.25) drunk by a right click on its pack square before each sprint run its buff is gone from, and the same runs at the sprint (Sprint_Short reached or not is
 ## logged with the run's tiles a second and the sprint's change, not checked: at a426bca29 no run went over 4.0 tiles a second). Each run: four stills side on a
-## stride's quarter apart and two from the front quarter; the giant axe's runs also a clip, one frame each 40 ms cropped round
+## stride's quarter apart and two from the front quarter (kept in memory and saved after the run: saved mid-run they
+## stalled the frames, and the body, about a second a cell at 1d3acca3f); the giant axe's runs also a clip, one frame each 40 ms cropped round
 ## the runner (clip_<run>/NNN.png), from 0.4 s standing to 1.2 s after the stop. The rot hammer is run on the man at the jog only (all five shot). The man's rot
 ## hammer and giant axe also run once more at the jog, before and after, as one side-on clip of the whole run from
 ## standing: the start, the jog at the goblin (a click on it from RUN_FROM) and the blow on arrival, 2.4 s after it
@@ -107,8 +109,8 @@ func _state(bot: Node) -> String:
 	var rig := _rig(bot)
 	if rig == null:
 		return "no rig"
-	return "%s carry '%s' %.2f upper '%s'%s bow_state '%s' at %s" % [rig.base_clip(), rig.carry_clip(), rig.carry_amount(), rig.upper_clip(),
-		" striking" if rig.striking() else "", str(pup.get_meta("bow_state", "")), bot.cell()]
+	return "%s carry '%s' %.2f upper '%s'%s bow_state '%s' cam %.2f m at %s" % [rig.base_clip(), rig.carry_clip(), rig.carry_amount(), rig.upper_clip(),
+		" striking" if rig.striking() else "", str(pup.get_meta("bow_state", "")), _cam(bot).global_position.distance_to(pup.global_position), bot.cell()]
 
 
 func _grab(bot: Node) -> Image:
@@ -275,6 +277,35 @@ func _home(bot: Node, at := HOME) -> void:
 	await bot.seconds(0.5)
 
 
+## The goblin laid beside HOME (the console's foes) when none is there. A held foe only waits for "foes"; once laid it
+## sees the player and comes on (at 1d3acca3f it reached the plain runs 8 cells off: Hit_ clips), so it is laid for the
+## stills beside it and the swing runs only.
+func _lay(bot: Node) -> void:
+	if _goblin(bot) != null:
+		return
+	await _home(bot)
+	bot.log_line("%s goblin laid: %s" % [TAG, str(await bot.admin("foes Tourbot")).strip_edges().left(80)])
+	await bot.seconds(1.0)
+
+
+## Every foe within 30 cells of HOME struck down (the console's strike, test-only) before the plain runs.
+func _clear(bot: Node) -> void:
+	for i in 4:
+		var any := false
+		for x: GridEntity in World.get_entities():
+			if x is Monster and is_instance_valid(x) and World.distance(x.tile, HOME) <= 30:
+				any = true
+		if not any:
+			return
+		var said := ""
+		for called: String in ["imp", "the imp", "Foe"]:
+			said = str(await bot.admin("strike Tourbot %s" % called)).strip_edges()
+			if said.begins_with("strike: Tourbot struck"):
+				break
+		bot.log_line("%s goblin cleared for the runs: %s" % [TAG, said.left(80)])
+		await bot.seconds(0.5)
+
+
 func _goblin(_bot: Node, within := 8) -> GridEntity:
 	for x: GridEntity in World.get_entities():
 		if x is Monster and is_instance_valid(x) and World.distance(x.tile, HOME) <= within:
@@ -353,15 +384,12 @@ func _sprint_from(bot: Node) -> float:
 
 
 ## A swing run at the jog, side on, before or after (the coordinator's (2)): from RUN_FROM, standing, a click on the held
-## goblin each 300 ms (the bot's click on its cell: an attack, far off a walk to it; a click toward it while it is off
-## the screen) till the first blow, the jog at it and
+## goblin, once (the bot's click on its cell: an attack, far off a walk to it; a click toward it each 300 ms while it is
+## off the screen), the jog at it and
 ## the blow on arrival; one clip (each 40 ms) from SWING_LEAD s standing before the first click to SWING_TAIL s twice after
 ## the first blow.
 func _swing_run(bot: Node, row: Array, weapon: String, carry: bool) -> void:
-	if _goblin(bot) == null:
-		await _home(bot)
-		bot.log_line("%s goblin laid again: %s" % [TAG, str(await bot.admin("foes Tourbot")).strip_edges().left(80)])
-		await bot.seconds(1.0)
+	await _lay(bot)
 	await _home(bot, RUN_FROM)
 	var gob := _goblin(bot)
 	var name := "%s_%s_jog_swing_%s" % [row[0], weapon, "after" if carry else "before"]
@@ -379,6 +407,8 @@ func _swing_run(bot: Node, row: Array, weapon: String, carry: bool) -> void:
 	var struck := -1.0
 	var last_click := -1000
 	var last_grab := -1000
+	var aimed := false
+	var again := 0  # the second click's time, ms, when one was needed
 	var from := gob.tile
 	var t0 := Time.get_ticks_msec() + int(SWING_LEAD * 1000.0)  # the first click's time
 	while Time.get_ticks_msec() - t0 < 9000:
@@ -386,12 +416,22 @@ func _swing_run(bot: Node, row: Array, weapon: String, carry: bool) -> void:
 		var s := ms / 1000.0
 		if struck >= 0.0 and s > struck + SWING_TAIL * 2.0:
 			break
-		if s >= 0.0 and struck < 0.0 and ms - last_click >= 300 and is_instance_valid(gob):
+		if s >= 0.0 and not aimed and ms - last_click >= 300 and is_instance_valid(gob):
+			# One click on the goblin, as a player's: at 1d3acca3f a click each 300 ms till the blow began the giant axe's
+			# attack again each time, and it never struck. Off the screen at the nearest zoom: a click toward it first.
 			last_click = ms
 			if not is_nan((bot.screen_point(gob.tile) as Vector2).x):
+				aimed = true
 				await bot.click(gob.tile)
-			else:  # off the screen at the nearest zoom: a click toward it, as a player's
+				bot.log_line("%s %s: clicked the goblin at %s from %s, %.2f s" % [TAG, name, gob.tile, bot.cell(), (Time.get_ticks_msec() - t0) / 1000.0])
+			else:
 				await _click_on(bot, dir, gob.tile - dir)
+		elif aimed and again == 0 and struck < 0.0 and ms - last_click >= 2500 and rig.base_clip() == Client3D.CLIP_IDLE and is_instance_valid(gob):
+			# Stood 2.5 s after the click with no blow: one click more, as a player's, and logged.
+			again = ms
+			last_click = ms
+			await bot.click(gob.tile)
+			bot.log_line("%s %s: no blow 2.5 s after the click, standing at %s: clicked the goblin at %s again, %.2f s" % [TAG, name, bot.cell(), gob.tile, s])
 		if Time.get_ticks_msec() - t0 - last_grab >= 40:
 			last_grab = Time.get_ticks_msec() - t0
 			clip.append(await _clip_frame(bot))
@@ -403,8 +443,9 @@ func _swing_run(bot: Node, row: Array, weapon: String, carry: bool) -> void:
 		lines.append("%.3f %s" % [(Time.get_ticks_msec() - t0) / 1000.0, _state(bot)])
 	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
 	if file != null:
-		file.store_line("# %s: %s; worn: %s; the goblin at %s (then %s), clicked from %s; seconds after the first click (negative: standing before it), base clip, carry clip and amount, upper clip (striking), bow_state, cell; the first blow at %.2f s" % [
-			name, _hands(bot), _worn(bot), from, gob.tile if is_instance_valid(gob) else "gone", RUN_FROM, struck])
+		file.store_line("# %s: %s; worn: %s; the goblin at %s (then %s), clicked from %s; seconds after the first click (negative: standing before it), base clip, carry clip and amount, upper clip (striking), bow_state, cell; the first blow at %.2f s%s" % [
+			name, _hands(bot), _worn(bot), from, gob.tile if is_instance_valid(gob) else "gone", RUN_FROM, struck,
+			"; clicked again at %.2f s" % (again / 1000.0) if again > 0 else ""])
 		file.store_string("\n".join(lines) + "\n")
 		file.close()
 	for i in clip.size():
@@ -433,6 +474,8 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	var rig := _rig(bot)
 	var lines: PackedStringArray = []
 	var clip: Array[Image] = []
+	var stills: Array[Array] = []  # [name, image, the state for its log line], saved after the run: a 1600 x 900 png saved
+	# mid-run stalled the frames, and the free body with them (at 1d3acca3f about a second a cell from 0.7 to 2.6 s)
 	var bases := {}
 	var most := 0.0
 	var least := 1.0
@@ -459,8 +502,7 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 				if taken == SIDE_AT.size():
 					_yaw(bot, front)
 					await bot.frames(2)
-				var ok := _save(bot, await _grab(bot), still)
-				bot.log_line("%s still %s %s: %.2f s, %s" % [TAG, still, "saved" if ok else "FAILED", (Time.get_ticks_msec() - t0) / 1000.0, _state(bot)])
+				stills.append([still, await _grab(bot), "%.2f s, %s" % [(Time.get_ticks_msec() - t0) / 1000.0, _state(bot)]])
 				taken += 1
 				if taken == SIDE_AT.size() + FRONT_AT.size():
 					_yaw(bot, side)  # the clip goes on side on
@@ -487,6 +529,10 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 			name, _hands(bot), _worn(bot), str(bot.me().get("buffs")), moved, stopped, pace, " (negative: standing before it)" if clips else ""])
 		file.store_string("\n".join(lines) + "\n")
 		file.close()
+	for still: Array in stills:
+		var ok := _save(bot, still[1], still[0])
+		bot.log_line("%s still %s %s: %s" % [TAG, still[0], "saved" if ok else "FAILED", still[2]])
+		await bot.frames(1)
 	for i in clip.size():
 		_save(bot, clip[i], "clip_%s/%03d" % [name, i])
 		if i % 4 == 3:
@@ -502,6 +548,15 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 		bot.expect(most > 0.9, "%s: the carry on while running" % name, "most %.2f" % most)
 	else:
 		bot.expect(most == 0.0, "%s: no carry (main's arms)" % name, "most %.2f" % most)
+
+
+## The potion drunk before a sprint run when the client's own body shows no speed buff (at 1d3acca3f it showed one after
+## the drink and none by the row's first sprint run, with no "wore off" line on the server): drunk again, and logged.
+func _quick(bot: Node, row: Array) -> void:
+	var buffs: Dictionary = bot.me().get("buffs")
+	if not buffs.has("speed"):
+		await _drink(bot)
+		bot.log_line("%s %s sprint: drunk, buffs %s" % [TAG, row[0], str(bot.me().get("buffs"))])
 
 
 func run(bot: Node) -> void:
@@ -522,20 +577,16 @@ func run(bot: Node) -> void:
 				if not await _join(bot, row):
 					return
 				joined = row[0]
-			if _goblin(bot) == null:
-				await _home(bot)
-				bot.log_line("%s goblin laid: %s" % [TAG, str(await bot.admin("foes Tourbot")).strip_edges().left(80)])
-				await bot.seconds(1.0)
-			var buffs: Dictionary = bot.me().get("buffs")
-			if gait == "sprint" and not buffs.has("speed"):
-				await _drink(bot)
-			bot.log_line("%s %s %s: buffs %s" % [TAG, row[0], gait, str(bot.me().get("buffs"))])
 			for weapon: String in ((row[3] + row[4]) if gait == "jog" else row[3]):
 				if not await _hold(bot, weapon):
 					continue
 				if gait == "jog":
+					await _lay(bot)
 					await _stand(bot, row, weapon)
+				await _clear(bot)
 				for carry: bool in [false, true]:
+					if gait == "sprint":
+						await _quick(bot, row)
 					await _run(bot, row, weapon, gait, carry)
 				if gait == "jog" and weapon in (SWING_RUNS.get(row[0], []) as Array):
 					for carry: bool in [false, true]:
@@ -544,12 +595,12 @@ func run(bot: Node) -> void:
 	for row: Array in ARMOURED:
 		if not await _join(bot, row):
 			return
-		var buffs: Dictionary = bot.me().get("buffs")
-		if not buffs.has("speed"):
-			await _drink(bot)
 		if not await _wear(bot, str(row[3])) or not await _hold(bot, "giant_axe"):
 			continue
+		await _lay(bot)
 		await _stand(bot, row, "giant_axe")
+		await _clear(bot)
 		for carry: bool in [false, true]:
+			await _quick(bot, row)
 			await _run(bot, row, "giant_axe", "sprint", carry)
 	bot.log_line("%s done: server script errors %d" % [TAG, bot.server_lines("SCRIPT ERROR").size()])
