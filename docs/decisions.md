@@ -19985,6 +19985,14 @@ gate code with this test's boot, as 61's do: main's own read the machine's, and 
 minutes of a boot dropped the rows' takes, made up as 15 minutes old, as from before it (try 2
 at 23:45, after the 23:35 boot: seven rows read "()"). Tests only; protocol unchanged.
 
+450 amended (4) (2026-11-25, perf, the coordinator's call after (3) landed): the join's PASS
+line is kept. land.sh keeps a passing part's log only in its own temp folder, which its trap
+removes, so (3)'s landing showed "PASS server_boot_test 36s" and no seconds. The test now also
+appends its "a client joined it (...)" line, after the date, time and tested sha, to
+`build/logs/server_boot_joins.log`, one line a run, never removed by its trap; land.sh is
+unchanged. The first loaded figure is the next cut's local suite. Tests only; protocol
+unchanged.
+
 ## 518. A level-placed captive: a camp's holds, taken as a raid takes
 
 Builder's deferred ask: "a goblin camp holding a captive" placeable from

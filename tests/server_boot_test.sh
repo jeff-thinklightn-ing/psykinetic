@@ -146,7 +146,11 @@ quit="quit on its stop at $client_s s"
 # the options Net reads, and the box never answered a status query).
 grep -q "answering status on UDP $STATUS" "$DIR/server.log" || fail "the server did not answer status on UDP $STATUS (--status-port)"
 grep -q "127.0.0.1:$STATUS" "$DIR/bound.txt" || fail "the server's status port UDP $STATUS was not bound on 127.0.0.1"
-echo "PASS  a client joined it (its first script line at ${first:-?} s, joined at $joined s, $quit)"
+joined_line="PASS  a client joined it (its first script line at ${first:-?} s, joined at $joined s, $quit)"
+echo "$joined_line"
+# Kept past the trap and the landing's own logs (450 amended (4)): the client's margin read on
+# a loaded pass (a landing or a cut's local suite), one line a run, its date, time and tested sha.
+echo "$(date '+%Y-%m-%d %H:%M:%S') $(git rev-parse HEAD 2>/dev/null || echo no-sha) $joined_line" >>build/logs/server_boot_joins.log
 grep -q "127.0.0.1:$PORT" "$DIR/bound.txt" || fail "the server's UDP $PORT was not seen on 127.0.0.1 ($(tr -s ' ' <"$DIR/bound.txt" | head -2))"
 grep -q "0.0.0.0:\($PORT\|$STATUS\)\|\*:\($PORT\|$STATUS\)\|\[::\]:\($PORT\|$STATUS\)" "$DIR/bound.txt" && fail "the server listens on every address on UDP $PORT or $STATUS, not 127.0.0.1 alone"
 echo "PASS  it listened on 127.0.0.1 alone"
