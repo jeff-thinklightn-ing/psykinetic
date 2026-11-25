@@ -3086,6 +3086,14 @@ func try_equip(by: GridEntity, carrier: GridEntity, slot: int) -> String:
 			targets = [Items.RIGHT_HAND, Items.LEFT_HAND]
 		elif int(Items.def(id).get("hands", 0)) == 1:
 			targets = [Items.RIGHT_HAND]
+			# 619 amended (6): arrows never unseat a bow; they go to the
+			# bow's other hand, joining arrows they stack onto there.
+			var nock := _nocking_hand(carrier) if not Items.ammo_of(id).is_empty() else -1
+			if nock >= 0:
+				if stacks_onto(uids[nock], uids[slot], 1, false):
+					_move_units(by, carrier, slot, carrier, nock, slot_count(carrier, slot))
+					return ""  # What doesn't fit stays on its square.
+				targets = [nock]
 		else:
 			why = "the %s can't be held or worn" % Items.name_of(id)
 		if why.is_empty():
@@ -3125,6 +3133,18 @@ func try_equip(by: GridEntity, carrier: GridEntity, slot: int) -> String:
 	_log("slots: %s equipped %s on %s from %d" % [by.name, id, carrier.name, slot])
 	_slots_changed(carrier)
 	return ""
+
+
+## The hand arrows equipped from [param entity]'s pack go to (619 amended
+## (6), the coordinator's rule): the other of a hand holding a bow (the left
+## first, as drawn_slot reads), so equipping arrows never moves a bow out of
+## a hand; -1 with no bow held.
+func _nocking_hand(entity: GridEntity) -> int:
+	for hand in [Items.LEFT_HAND, Items.RIGHT_HAND]:
+		var held := entity.slots[hand]
+		if not held.is_empty() and Items.verb_of(held).get("kind") == "ranged":
+			return Items.RIGHT_HAND if hand == Items.LEFT_HAND else Items.LEFT_HAND
+	return -1
 
 
 func _refused(by: GridEntity, entity: GridEntity, slots: PackedStringArray) -> bool:

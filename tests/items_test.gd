@@ -69,6 +69,7 @@ func _ready() -> void:
 	_test_cache()
 	_test_stacks()
 	_test_arrow_stacks()
+	_test_arrows_beside_bow()
 	_test_armour()
 	_test_worn()
 	_test_pack_twelve()
@@ -2715,6 +2716,79 @@ func _test_arrow_stacks() -> void:
 		World.items.end(uid, "gone")
 	World.set_slots(host, had_slots, had_uids)
 	World._relocate(host, had_tile)
+	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
+
+
+## 619 amended (6), the coordinator's rule: equipping arrows from the pack
+## (the double-click, "equip") never moves a bow out of a hand. With a bow in
+## one hand the arrows go to the other: whole into an empty one, joining
+## arrows of their kind up to five (the rest kept on the pack square), and
+## anything else there swapped to the square they came from. No bow: as
+## before, the right hand.
+func _test_arrows_beside_bow() -> void:
+	print("\n== equipping arrows never unseats the bow (619 amended (6)) ==")
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	var square: int = Items.PACK_SLOTS[0]
+	var three := func(id: String) -> void:
+		for i in 3:
+			World.put_item(host, host, square, World.items.mint(id, "built"))
+	var put_back := func() -> void:
+		for uid in _units_of(host):
+			World.take_units(host, [uid])
+			World.items.end(uid, "gone")
+		World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	# The other hand empty: the arrows go there whole, the square empties.
+	var bow := _give(host, "bow", Items.RIGHT_HAND)
+	three.call("arrows")
+	_check(World.try_equip(host, host, square) == "" and host.slot_items[Items.RIGHT_HAND] == bow
+			and host.slots[Items.LEFT_HAND] == "arrows" and World.slot_count(host, Items.LEFT_HAND) == 3 and host.slots[square] == "",
+			"bow in the right, the left empty: the three arrows to the left, the bow kept (right %s, left %s x%d, square %s)"
+			% [host.slots[Items.RIGHT_HAND], host.slots[Items.LEFT_HAND], World.slot_count(host, Items.LEFT_HAND), host.slots[square]])
+	# The other hand holding arrows of their kind: they join up to five.
+	three.call("arrows")
+	_check(World.try_equip(host, host, square) == "" and host.slot_items[Items.RIGHT_HAND] == bow
+			and World.slot_count(host, Items.LEFT_HAND) == 5 and host.slots[square] == "arrows" and World.slot_count(host, square) == 1,
+			"three in hand, three more equipped: the hand's five, one left on the square, the bow kept (right %s, left %s x%d, square %s x%d)"
+			% [host.slots[Items.RIGHT_HAND], host.slots[Items.LEFT_HAND], World.slot_count(host, Items.LEFT_HAND), host.slots[square], World.slot_count(host, square)])
+	_check(World.try_equip(host, host, square) == "" and host.slot_items[Items.RIGHT_HAND] == bow
+			and World.slot_count(host, Items.LEFT_HAND) == 5 and World.slot_count(host, square) == 1,
+			"the hand's five full: the last stays on its square, nothing swapped")
+	put_back.call()
+	# The other hand holding anything else: it goes to the square the arrows left.
+	bow = _give(host, "bow", Items.RIGHT_HAND)
+	var dagger := _give(host, "dagger", Items.LEFT_HAND)
+	three.call("arrows")
+	_check(World.try_equip(host, host, square) == "" and host.slot_items[Items.RIGHT_HAND] == bow
+			and host.slots[Items.LEFT_HAND] == "arrows" and World.slot_count(host, Items.LEFT_HAND) == 3 and host.slot_items[square] == dagger,
+			"a dagger in the other hand: the arrows there, the dagger to their square, the bow kept (right %s, left %s, square %s)"
+			% [host.slots[Items.RIGHT_HAND], host.slots[Items.LEFT_HAND], host.slots[square]])
+	put_back.call()
+	bow = _give(host, "bow", Items.RIGHT_HAND)
+	_give(host, "flame_arrows", Items.LEFT_HAND)
+	three.call("arrows")
+	_check(World.try_equip(host, host, square) == "" and host.slot_items[Items.RIGHT_HAND] == bow
+			and host.slots[Items.LEFT_HAND] == "arrows" and World.slot_count(host, Items.LEFT_HAND) == 3 and host.slots[square] == "flame_arrows",
+			"flame arrows in the other hand: another kind, swapped to the square whole, the bow kept")
+	put_back.call()
+	# The bow in the left hand: the arrows to the right, as before.
+	bow = _give(host, "bow", Items.LEFT_HAND)
+	var knife := _give(host, "knife", Items.RIGHT_HAND)
+	three.call("arrows")
+	_check(World.try_equip(host, host, square) == "" and host.slot_items[Items.LEFT_HAND] == bow
+			and host.slots[Items.RIGHT_HAND] == "arrows" and World.slot_count(host, Items.RIGHT_HAND) == 3 and host.slot_items[square] == knife,
+			"bow in the left, a knife in the right: the arrows to the right, the knife to their square")
+	put_back.call()
+	# No bow: the right hand, as before.
+	_give(host, "dagger", Items.RIGHT_HAND)
+	three.call("arrows")
+	_check(World.try_equip(host, host, square) == "" and host.slots[Items.RIGHT_HAND] == "arrows" and World.slot_count(host, Items.RIGHT_HAND) == 3
+			and host.slots[square] == "dagger" and host.slots[Items.LEFT_HAND] == "",
+			"no bow: the arrows to the right hand, the dagger to their square, as before")
+	put_back.call()
+	World.set_slots(host, had_slots, had_uids)
 	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
 
 

@@ -30534,6 +30534,24 @@ knocks the record names the new first, and a body rebuilt from the record by set
 three in order with count 3 and the bow draws (both rows fail without the mend). Server only;
 protocol unchanged; no new class_name; the held 619 amended (4) bullet carries it (voice's words).
 
+619 amended (6): equipping arrows never unseats the bow (items, the script's label; the
+coordinator's design, TASK 15, from items' arrowrec tour, whose row 2 double-clicked the pack's
+arrows with the bow in the right hand and got the arrows in the right hand and the bow on their
+pack square). World.try_equip gave any one-handed thing the right hand, so arrows took the bow's
+place. Now arrows equipped from the pack (an "ammo" kind) with a bow in a hand (a "ranged" verb;
+World._nocking_hand, the left read first as drawn_slot does) go to the other hand. An empty hand
+takes the whole stack and the square empties. Arrows there that the bundles stack onto (stacks_onto:
+the same kind, both plain alike) are joined, unit by unit up to five, by _move_units, try_transfer's
+join; what doesn't fit stays on the square, and a hand already holding five moves nothing and is no
+refusal. Anything else there (a dagger, another kind of arrows) goes to the square the arrows came
+from, the ordinary equip's swap. No bow: the right hand, as before. The mend sits at the server's
+equip, which every way in reaches: Main's "equip" command, sent by the pack's double-click on a
+player's own or a companion's pack (main.gd's three senders); a drag onto a hand is "transfer",
+which already puts the arrows where they are dropped. A bow in each hand has no free hand, and the
+right one's bow is swapped as before. items_test _test_arrows_beside_bow: the five cases with the bow
+in the right hand fail on 4e2357ebe; the bow in the left and no bow already did as asked. Server
+only; protocol unchanged; no new class_name; the held arrows bullet carries it (its words unchanged).
+
 ## 620. The cone of flight
 
 Jeff, on v0.1.168: "I'm wondering if we can have an cone of flight that narrows the longer the
