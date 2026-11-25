@@ -39,6 +39,10 @@ mkdir -p "$BIN"
 
 fail() {
 	echo "FAIL  $1"
+	# The client's and server's own output kept past the trap (450 amended (3)): try 2 of
+	# v0.1.241's cut had a client error loop no file held after it.
+	[ -f "$DIR/client.log" ] && cp "$DIR/client.log" build/logs/server_boot_client_stdout.log
+	[ -f "$DIR/server.log" ] && cp "$DIR/server.log" build/logs/server_boot_server.log
 	for log in "$DIR"/*.log; do
 		[ -f "$log" ] && { echo "--- $(basename "$log")"; grep -v "savepack\|^\[test\] \(tiles\|slots\)" "$log" | tail -40; }
 	done
@@ -84,22 +88,65 @@ for _ in $(seq 1 480); do
 done
 # Where it listens, while it runs: 127.0.0.1, not every address.
 netstat -an -p UDP 2>/dev/null | grep -E "[:.]($PORT|$STATUS)[[:space:]]" >"$DIR/bound.txt"
-APPDATA="$(cygpath -w "$DIR/appdata")" timeout 60 "$GODOT" --log-file "$(godot_log server_boot_client)" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=boottest \
-	--name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 --test-exit-after=25 </dev/null >"$DIR/client.log" 2>&1 &
+# The client stops once the server has it joined, not on a clock (450 amended (3)): its
+# --test-exit-after timer starts only at its Main's ready (main.gd), so the old 60 s cap held
+# its whole start and 25 s more, and beside the suite's launch burst a start past 35 s was
+# cut by the cap (v0.1.241's cut, twice; animation's 20:07 landing on the same sha joined
+# and was cut by it as well). --test-exit-on is the flag net_test's clients and this server
+# already take (main.gd's _exit_on_file, armed at the client's ready, before it connects):
+# its file and the file's ".quit" are this test's own, in its temp folder; the box's
+# command line never carries it. --test-exit-after stays as the backstop, the cap inside
+# the server's 150.
+CSTOP="$DIR/client_stop"
+CAP=120
+client_started=$(date +%s)
+APPDATA="$(cygpath -w "$DIR/appdata")" timeout $CAP "$GODOT" --log-file "$(godot_log server_boot_client)" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=boottest \
+	--name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 "--test-exit-on=$(cygpath -w "$CSTOP")" --test-exit-after=90 </dev/null >"$DIR/client.log" 2>&1 &
 client=$!
+first=""   # Seconds from the client's start to its first script line ("[level] ...").
+joined=""  # ... to the server's "joined as" line, when its stop file is made.
+while kill -0 "$client" 2>/dev/null; do
+	[ -z "$first" ] && grep -q "^\[" "$DIR/client.log" 2>/dev/null && first=$(( $(date +%s) - client_started ))
+	if [ -z "$joined" ] && grep -q "joined as" "$DIR/server.log" 2>/dev/null; then
+		touch "$CSTOP" "$CSTOP.quit"
+		joined=$(( $(date +%s) - client_started ))
+	fi
+	sleep 0.25
+done
 wait "$client"
+client_code=$?
+client_s=$(( $(date +%s) - client_started ))
+[ -z "$first" ] && grep -q "^\[" "$DIR/client.log" 2>/dev/null && first=$client_s
+[ -z "$joined" ] && grep -q "joined as" "$DIR/server.log" 2>/dev/null && joined=$client_s
 touch "$STOP"
 wait "$server"
 code=$?
 [ "$code" -eq 0 ] || fail "the exported server exited $code"
 echo "PASS  the exported server booted and quit cleanly ($(( $(date +%s) - started )) s)"
 grep -q "server listening on port $PORT" "$DIR/server.log" || fail "the server never listened"
-grep -q "joined as" "$DIR/server.log" || fail "no client joined the exported server"
+if ! grep -q "joined as" "$DIR/server.log"; then
+	if [ "$client_code" = 124 ] && [ -z "$first" ]; then
+		fail "no client joined: the client was cut by its $CAP s cap before its first script line"
+	elif grep -q "connected as peer" "$DIR/client.log"; then
+		fail "no client joined: the client connected, never joined (first line at $first s, ended at $client_s s, exit $client_code)"
+	elif [ "$client_code" != 124 ]; then
+		fail "no client joined: the client exited on its own before joining (exit $client_code at $client_s s, first line at ${first:-none} s)"
+	else
+		fail "no client joined: the client was cut by its $CAP s cap, never connected (first line at $first s)"
+	fi
+fi
+# Its stop honoured: it quits within the settle (10 s at most) and its report of being
+# told to, never on the backstop's 90 s or the cap. A join in the cap's last 40 s is let be.
+if [ $(( client_s - joined )) -gt 40 ]; then
+	fail "the client joined at $joined s but did not quit on its stop file (ended at $client_s s, exit $client_code)"
+fi
+quit="quit on its stop at $client_s s"
+[ "$client_code" = 124 ] && quit="cut by its $CAP s cap at $client_s s, $(( client_s - joined )) s after its stop"
 # --status-port taken from the command line (431 amended: it was left out of
 # the options Net reads, and the box never answered a status query).
 grep -q "answering status on UDP $STATUS" "$DIR/server.log" || fail "the server did not answer status on UDP $STATUS (--status-port)"
 grep -q "127.0.0.1:$STATUS" "$DIR/bound.txt" || fail "the server's status port UDP $STATUS was not bound on 127.0.0.1"
-echo "PASS  a client joined it"
+echo "PASS  a client joined it (its first script line at ${first:-?} s, joined at $joined s, $quit)"
 grep -q "127.0.0.1:$PORT" "$DIR/bound.txt" || fail "the server's UDP $PORT was not seen on 127.0.0.1 ($(tr -s ' ' <"$DIR/bound.txt" | head -2))"
 grep -q "0.0.0.0:\($PORT\|$STATUS\)\|\*:\($PORT\|$STATUS\)\|\[::\]:\($PORT\|$STATUS\)" "$DIR/bound.txt" && fail "the server listens on every address on UDP $PORT or $STATUS, not 127.0.0.1 alone"
 echo "PASS  it listened on 127.0.0.1 alone"

@@ -19963,6 +19963,28 @@ had built up. Two changes, either of which is enough:
 Two runs added no firewall rule (62 temp-path rules before and after, none
 for `build\server_boot`). Protocol unchanged.
 
+450 amended (3) (2026-11-25, perf, the coordinator's call after v0.1.241's cut): the client
+stops on its join, not on a clock. v0.1.241's LAND_LOCAL suite failed server_boot_test twice
+on this PC after the evening's reboots: each client ran through the suite's launch burst (54
+Godots at 00:12:54 in try 3) and was cut by `timeout 60` before its first script line. Its
+`--test-exit-after=25` timer starts only at its Main's ready (main.gd), so the 60 s cap held
+its whole start and 25 s more; a start past about 35 s was cut. Animation's 20:07 landing on
+the same sha had joined and was cut by the cap too, the only one of 39 kept client logs to end
+so. Now the client takes `--test-exit-on` (the flag net_test's clients and this server already
+take; the box's command line never carries it) at a file in the test's temp folder, made with
+its `.quit` once the server's "joined as" line is in; `--test-exit-after=90` stays as the
+backstop and the cap is 120 s, inside the server's 150. Every PASS prints the client's first
+script line, its join and its quit in seconds from its start, so a thin margin shows on a
+pass. A client that joined and did not quit within 40 s of its stop fails. No join fails by
+how: cut by its cap before its first script line; connected, never joined; exited on its own
+before joining; cut by its cap, never connected. On a FAIL the client's and server's own
+output is kept as `build/logs/server_boot_client_stdout.log` and `server_boot_server.log`
+(try 2's client looped "PCRE2 Error: no more memory" and no file held it after). The `.ps1`
+runs the `.sh`, so it is the same. With it, heavy_job_test's 394 amended (63) rows load main's
+gate code with this test's boot, as 61's do: main's own read the machine's, and within 16
+minutes of a boot dropped the rows' takes, made up as 15 minutes old, as from before it (try 2
+at 23:45, after the 23:35 boot: seven rows read "()"). Tests only; protocol unchanged.
+
 ## 518. A level-placed captive: a camp's holds, taken as a raid takes
 
 Builder's deferred ask: "a goblin camp holding a captive" placeable from

@@ -2777,6 +2777,10 @@ spec63 = importlib63.spec_from_file_location("heavy_job_main63", os.path.join(ma
 old63 = importlib63.module_from_spec(spec63)
 spec63.loader.exec_module(old63)
 old63._memory = gate._memory
+# This test's boot as well, as old61's (450 amended (3)): main's own read the real one, and
+# dropped as from before it the takes below made up as 15 minutes old, within 16 minutes of a
+# boot (v0.1.241's cut, try 2 at 23:45 after the 23:35 boot: seven rows read "()").
+old63.boot_time = gate.boot_time
 print("  main's gate code: revision %s beside this one's %d" % (old63.GATE_REVISION, gate.GATE_REVISION))
 for folder in ("queue", "running"):
     for name in os.listdir(gate._path(folder)):
