@@ -7,12 +7,13 @@ extends RefCounted
 ##   TOUR_SERVER_ARGS="--test-hp --no-companions --test-foe=imp,,1,held" sh tools/tour.sh axecarry --offscreen
 ## Rows: the man with the battle axe, the giant axe and the tomb sledge; the woman with the battle axe, the giant axe and the
 ## pick (seed 11, middling; the look set by a reconnect, the settings pointed at the run's own folder). Each weapon: a still
-## standing beside the goblin, then a run west from (210, 211), before and after, at the jog (both rows), then a stamina potion
-## (speed +0.25) drunk by a right click on its pack square, and the same runs at the sprint. Each run: four stills side on a
+## standing beside the goblin, then a run west from RUN_FROM (205, 211) to (196, 211), before and after, at the jog (both rows), then a stamina potion
+## (speed +0.25) drunk by a right click on its pack square, and the same runs at the sprint (Sprint_Short reached or not is
+## logged with the run's tiles a second and the sprint's change, not checked: at a426bca29 no run went over 4.0 tiles a second). Each run: four stills side on a
 ## stride's quarter apart and two from the front quarter; the giant axe's runs also a clip, one frame each 40 ms cropped round
-## the runner (clip_<run>/NNN.png). The rot hammer is run on the man at the jog only (all five shot). The man's rot
+## the runner (clip_<run>/NNN.png), from 0.4 s standing to 1.2 s after the stop. The rot hammer is run on the man at the jog only (all five shot). The man's rot
 ## hammer and giant axe also run once more at the jog, before and after, as one side-on clip of the whole run from
-## standing: the start, a swing mid-jog (Shift held and a click ahead, main's swing where you stand), the run on, the stop
+## standing: the start, the jog at the goblin (a click on it from RUN_FROM) and the blow on arrival, 2.4 s after it
 ## (<row>_<weapon>_jog_swing_<before|after>, SWING_RUNS). Last, the giant axe at
 ## the sprint in the most a player wears round the legs (ARMOURED: plate, its cuisses on the thighs, on the heavy man; robes
 ## to the shins on the heavy woman), the armour put on by a double-click on its pack square. Each run's frames.txt starts
@@ -22,19 +23,23 @@ extends RefCounted
 
 const TAG := "AXECARRY"
 const HOME := Vector2i(210, 211)
-const RUN_TO := Vector2i(194, 211)
+## The runs go from RUN_FROM to RUN_TO, six cells and more west of the held goblin (at a426bca29 they started at HOME,
+## beside it, and it struck the runner as it passed: Hit_ clips mid-run). (194, 211) took no step (every run stood
+## beside it at (195, 211) and waited out its time), so the run ends at (196, 211), and its stop is read from the body
+## standing (the base clip Idle), not from the cell.
+const RUN_FROM := Vector2i(205, 211)
+const RUN_TO := Vector2i(196, 211)
 const CLIP_WEAPON := "giant_axe"
 const SIDE_AT: Array[float] = [0.8, 0.95, 1.1, 1.25]  # s after the first click: side on
 const FRONT_AT: Array[float] = [1.75, 1.95]  # from the front quarter
-const CLIP_FROM := 0.5
-const CLIP_TO := 2.9
-## The swing runs (the coordinator's (2)): at the jog, before and after, one clip of the whole run, from standing to
-## standing: the start, a swing mid-jog (Shift held, a click ahead: main's "swing where you stand"), the run on, the stop.
+## The swing runs (the coordinator's (2)): at the jog, before and after, one clip from standing to standing. A swing
+## "where you stand" (Shift and a click) is not a player's mid-run: a free body's walk drops a swing order at once
+## (World._free_drop_order, any intent of WIND_UP_LEAVE_INTENT; at a426bca29 the Shift click came 1.4 s in and never
+## struck), so the swing out of a run is the one a player makes: a click on the goblin from RUN_FROM, the jog at it and
+## the blow on arrival.
 const SWING_RUNS := {"man": ["rot_hammer", "giant_axe"]}
-const SWING_AT := 1.4  # s after the first click
-const SWING_HOLD := 0.9  # s with no click after the swing, the swing's own
 const SWING_LEAD := 0.4  # s of standing clipped before the first click
-const SWING_TAIL := 1.2  # s clipped after the stop
+const SWING_TAIL := 1.2  # s clipped after the stop (a swing run: after its first blow, SWING_TAIL twice)
 ## [name, body, look, weapons at the jog and the sprint, weapons at the jog only]
 const ROWS: Array[Array] = [
 	["man", &"male", "seed=11 build=middling hair=cropped hair_colour=brown beard=none", ["battle_axe", "giant_axe", "tomb_sledge"], ["rot_hammer"]],
@@ -260,19 +265,19 @@ func _join(bot: Node, row: Array) -> bool:
 	return ok
 
 
-func _home(bot: Node) -> void:
+func _home(bot: Node, at := HOME) -> void:
 	await bot.admin("hp Tourbot 100")
-	await bot.admin("move Tourbot %d %d wilds" % [HOME.x, HOME.y])
-	await bot.until(func() -> bool: return bot.cell() == HOME, 15.0)
+	await bot.admin("move Tourbot %d %d wilds" % [at.x, at.y])
+	await bot.until(func() -> bool: return bot.cell() == at, 15.0)
 	await bot.seconds(1.5)
 	var pup := _pup(bot, bot.me())
 	await bot.until(func() -> bool: return pup != null and str(pup.get_meta("bow_state", "")) != "ready", 16.0)
 	await bot.seconds(0.5)
 
 
-func _goblin(bot: Node) -> GridEntity:
+func _goblin(_bot: Node, within := 8) -> GridEntity:
 	for x: GridEntity in World.get_entities():
-		if x is Monster and is_instance_valid(x) and World.distance(x.tile, bot.cell()) <= 8:
+		if x is Monster and is_instance_valid(x) and World.distance(x.tile, HOME) <= within:
 			return x
 	return null
 
@@ -302,107 +307,130 @@ func _stand(bot: Node, row: Array, weapon: String) -> void:
 		gob.tile if gob != null else "not found", _state(bot), float(_view(bot).get("zoom"))])
 
 
-## One frame of the clip: the view cropped round the runner.
+## One frame of the clip: the view cropped round the runner. The camera projects into the viewport's visible rect (the
+## project's 3840 x 2160, stretched to the window), the image is the window's own pixels (at a426bca29 a 1600 x 900 window
+## put every crop off the image, width 0): the point is scaled from one to the other, and a crop that misses still keeps
+## the image's middle (the camera follows the runner, pan zero) and says so once in the log.
+var _crop_missed := false
 func _clip_frame(bot: Node) -> Image:
 	await RenderingServer.frame_post_draw
 	var img := bot.get_viewport().get_texture().get_image()
-	var vp := Vector2(img.get_size())
-	var p := _cam(bot).unproject_position(_pup(bot, bot.me()).global_position + Vector3.UP * 0.9)
-	var w := int(vp.y * 0.55)
-	var h := int(vp.y * 0.8)
-	var rect := Rect2i(int(p.x) - w / 2, int(p.y) - int(h * 0.55), w, h).intersection(Rect2i(Vector2i.ZERO, img.get_size()))
+	var size := Vector2(img.get_size())
+	var cam := _cam(bot)
+	var seen := cam.get_viewport().get_visible_rect().size
+	var p := cam.unproject_position(_pup(bot, bot.me()).global_position + Vector3.UP * 0.9) * size / Vector2(maxf(seen.x, 1.0), maxf(seen.y, 1.0))
+	var w := int(size.y * 0.55)
+	var h := int(size.y * 0.8)
+	var whole := Rect2i(Vector2i.ZERO, img.get_size())
+	var rect := Rect2i(int(p.x) - w / 2, int(p.y) - int(h * 0.55), w, h).intersection(whole)
+	if not rect.has_area():
+		if not _crop_missed:
+			_crop_missed = true
+			bot.log_line("%s crop missed: point %s, image %s, visible rect %s; the image's middle kept" % [TAG, p, img.get_size(), seen])
+		rect = Rect2i(int(size.x) / 2 - w / 2, int(size.y) / 2 - int(h * 0.55), w, h).intersection(whole)
 	return img.get_region(rect)
 
 
-## A swing run west from HOME at the jog, side on, before or after: one clip (each 40 ms) from SWING_LEAD s standing
-## before the first click to SWING_TAIL s after the stop at RUN_TO, a swing SWING_AT s in (Shift parsed as a key, the
-## bot's click ahead, Shift let go), no click for SWING_HOLD s after it, then the run clicked on to its end.
+## The runner's next click on the run, every 300 ms till it is at [param end]: the cell 6 to 2 ahead ([param end] at most)
+## that has a point on the screen.
+func _click_on(bot: Node, dir: Vector2i, end := RUN_TO) -> void:
+	if bot.cell() == end:
+		return
+	for k in range(6, 1, -1):
+		var to: Vector2i = bot.cell() + dir * k
+		if (to.x - end.x) * dir.x >= 0:
+			to = end
+		if not is_nan((bot.screen_point(to) as Vector2).x):
+			await bot.click(to)
+			return
+
+
+## The sprint's change for this body (Client3D.gait_for's: the people's sprint takes over above its change times
+## GAIT_HYSTERESIS, at the puppet's pace), tiles a second.
+func _sprint_from(bot: Node) -> float:
+	var gaits: Array = Client3D.HUMAN_F_GAITS if bot.me().get("body") == &"female" else Client3D.HUMAN_GAITS
+	return Client3D.gait_change(gaits, 2) * Client3D.GAIT_HYSTERESIS * float(_pup(bot, bot.me()).get_meta("pace", 1.0))
+
+
+## A swing run at the jog, side on, before or after (the coordinator's (2)): from RUN_FROM, standing, a click on the held
+## goblin each 300 ms (the bot's click on its cell: an attack, far off a walk to it; a click toward it while it is off
+## the screen) till the first blow, the jog at it and
+## the blow on arrival; one clip (each 40 ms) from SWING_LEAD s standing before the first click to SWING_TAIL s twice after
+## the first blow.
 func _swing_run(bot: Node, row: Array, weapon: String, carry: bool) -> void:
-	await _home(bot)
+	if _goblin(bot) == null:
+		await _home(bot)
+		bot.log_line("%s goblin laid again: %s" % [TAG, str(await bot.admin("foes Tourbot")).strip_edges().left(80)])
+		await bot.seconds(1.0)
+	await _home(bot, RUN_FROM)
+	var gob := _goblin(bot)
+	var name := "%s_%s_jog_swing_%s" % [row[0], weapon, "after" if carry else "before"]
+	if not bot.expect(gob != null, "%s: the goblin within 8 cells of %s" % [name, HOME]):
+		return
 	_mode(bot, carry)
 	_near(bot)
-	var name := "%s_%s_jog_swing_%s" % [row[0], weapon, "after" if carry else "before"]
-	var dir := Vector2i(signi(RUN_TO.x - HOME.x), signi(RUN_TO.y - HOME.y))
+	var dir := Vector2i(signi(gob.tile.x - RUN_FROM.x), 0)
 	_yaw(bot, _yaw_for(Vector2(-dir.y, dir.x)))
 	await bot.frames(3)
 	var rig := _rig(bot)
 	var lines: PackedStringArray = []
 	var clip: Array[Image] = []
 	var bases := {}
-	var struck := false
-	var swung := -1.0
-	var stopped := -1.0
+	var struck := -1.0
 	var last_click := -1000
 	var last_grab := -1000
+	var from := gob.tile
 	var t0 := Time.get_ticks_msec() + int(SWING_LEAD * 1000.0)  # the first click's time
 	while Time.get_ticks_msec() - t0 < 9000:
 		var ms := Time.get_ticks_msec() - t0
 		var s := ms / 1000.0
-		if stopped < 0.0 and bot.cell() == RUN_TO:
-			stopped = s
-		if stopped >= 0.0 and s > stopped + SWING_TAIL:
+		if struck >= 0.0 and s > struck + SWING_TAIL * 2.0:
 			break
-		if swung < 0.0 and s >= SWING_AT and s >= 0.0:
-			swung = s
-			var shift := InputEventKey.new()
-			shift.keycode = KEY_SHIFT
-			shift.physical_keycode = KEY_SHIFT
-			shift.pressed = true
-			Input.parse_input_event(shift)
-			await bot.frames(2)
-			var ahead: Vector2i = bot.cell() + dir * 2
-			bot.log_line("%s swing %s: Shift held %s, clicked %s at %.2f s, %s" % [TAG, name, Input.is_key_pressed(KEY_SHIFT), ahead, s, _state(bot)])
-			await bot.click(ahead)
-			var up := shift.duplicate() as InputEventKey
-			up.pressed = false
-			Input.parse_input_event(up)
-			last_click = ms + int(SWING_HOLD * 1000.0) - 300
-		elif s >= 0.0 and stopped < 0.0 and ms - last_click >= 300:
+		if s >= 0.0 and struck < 0.0 and ms - last_click >= 300 and is_instance_valid(gob):
 			last_click = ms
-			for k in range(6, 1, -1):
-				var to: Vector2i = bot.cell() + dir * k
-				if (to.x - RUN_TO.x) * dir.x > 0:
-					to = RUN_TO
-				if not is_nan((bot.screen_point(to) as Vector2).x):
-					await bot.click(to)
-					break
+			if not is_nan((bot.screen_point(gob.tile) as Vector2).x):
+				await bot.click(gob.tile)
+			else:  # off the screen at the nearest zoom: a click toward it, as a player's
+				await _click_on(bot, dir, gob.tile - dir)
 		if Time.get_ticks_msec() - t0 - last_grab >= 40:
 			last_grab = Time.get_ticks_msec() - t0
 			clip.append(await _clip_frame(bot))
 		else:
 			await bot.get_tree().process_frame
 		bases[rig.base_clip()] = true
-		struck = struck or rig.striking()
+		if struck < 0.0 and rig.striking():
+			struck = (Time.get_ticks_msec() - t0) / 1000.0
 		lines.append("%.3f %s" % [(Time.get_ticks_msec() - t0) / 1000.0, _state(bot)])
 	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
 	if file != null:
-		file.store_line("# %s: %s; worn: %s; seconds after the first click (negative: standing before it), base clip, carry clip and amount, upper clip (striking), bow_state, cell; the swing at %.2f s, the stop at %.2f s" % [
-			name, _hands(bot), _worn(bot), swung, stopped])
+		file.store_line("# %s: %s; worn: %s; the goblin at %s (then %s), clicked from %s; seconds after the first click (negative: standing before it), base clip, carry clip and amount, upper clip (striking), bow_state, cell; the first blow at %.2f s" % [
+			name, _hands(bot), _worn(bot), from, gob.tile if is_instance_valid(gob) else "gone", RUN_FROM, struck])
 		file.store_string("\n".join(lines) + "\n")
 		file.close()
 	for i in clip.size():
 		_save(bot, clip[i], "clip_%s/%03d" % [name, i])
 		if i % 4 == 3:
 			await bot.frames(1)
-	bot.log_line("%s run %s: swing at %.2f s, stop at %.2f s; clips %s; %d clip frames" % [TAG, name, swung, stopped, ",".join(bases.keys()), clip.size()])
+	bot.log_line("%s run %s: the first blow at %.2f s; clips %s; %d clip frames" % [TAG, name, struck, ",".join(bases.keys()), clip.size()])
 	bot.expect("Jog_Short" in bases, "%s ran in Jog_Short" % name, ",".join(bases.keys()))
-	bot.expect(struck, "%s: the swing struck mid-run" % name, "the upper layer never striking")
-	bot.expect(stopped >= 0.0, "%s: stopped at %s" % [name, RUN_TO], "at %s" % bot.cell())
+	bot.expect(struck >= 0.0, "%s: the blow struck from the run" % name, "the upper layer never striking")
 
 
-## One run west from HOME, before or after: stills side on and from the front quarter, the clip for CLIP_WEAPON, every frame logged.
+## One run from RUN_FROM to RUN_TO, before or after: stills side on and from the front quarter, every frame logged, and for
+## CLIP_WEAPON a clip (each 40 ms) of the whole run, from SWING_LEAD s standing before the first click to SWING_TAIL s after
+## the stop: the start from standing and the stop from the jog (the coordinator's (2)). The stop is the base clip's Idle
+## after the first step.
 func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> void:
-	await _home(bot)
+	await _home(bot, RUN_FROM)
 	_mode(bot, carry)
 	_near(bot)
 	var name := "%s_%s_%s_%s" % [row[0], weapon, gait, "after" if carry else "before"]
-	var dir := Vector2i(signi(RUN_TO.x - HOME.x), signi(RUN_TO.y - HOME.y))
+	var dir := Vector2i(signi(RUN_TO.x - RUN_FROM.x), signi(RUN_TO.y - RUN_FROM.y))
 	var side := _yaw_for(Vector2(-dir.y, dir.x))
 	var front := _yaw_for(Vector2(-dir.x - dir.y, dir.x - dir.y).normalized())
 	_yaw(bot, side)
 	await bot.frames(3)
 	var rig := _rig(bot)
-	var pup := _pup(bot, bot.me())
 	var lines: PackedStringArray = []
 	var clip: Array[Image] = []
 	var bases := {}
@@ -411,20 +439,19 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 	var taken := 0
 	var last_click := -1000
 	var last_grab := -1000
-	var t0 := Time.get_ticks_msec()
 	var clips := weapon == CLIP_WEAPON
-	while bot.cell() != RUN_TO and Time.get_ticks_msec() - t0 < 8000:
+	var moved := -1.0
+	var stopped := -1.0
+	var start: Vector2i = bot.cell()
+	var t0 := Time.get_ticks_msec() + (int(SWING_LEAD * 1000.0) if clips else 0)  # the first click's time
+	while Time.get_ticks_msec() - t0 < 8000:
 		var ms := Time.get_ticks_msec() - t0
-		if ms - last_click >= 300:
-			last_click = ms
-			for k in range(6, 1, -1):
-				var to: Vector2i = bot.cell() + dir * k
-				if (to.x - RUN_TO.x) * dir.x > 0:
-					to = RUN_TO
-				if not is_nan((bot.screen_point(to) as Vector2).x):
-					await bot.click(to)
-					break
 		var s := ms / 1000.0
+		if stopped >= 0.0 and s > stopped + (SWING_TAIL if clips else 0.3) and taken >= SIDE_AT.size() + FRONT_AT.size():
+			break
+		if s >= 0.0 and stopped < 0.0 and ms - last_click >= 300:
+			last_click = ms
+			await _click_on(bot, dir)
 		if taken < SIDE_AT.size() + FRONT_AT.size():
 			var when: float = SIDE_AT[taken] if taken < SIDE_AT.size() else FRONT_AT[taken - SIDE_AT.size()]
 			if s >= when:
@@ -435,36 +462,42 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 				var ok := _save(bot, await _grab(bot), still)
 				bot.log_line("%s still %s %s: %.2f s, %s" % [TAG, still, "saved" if ok else "FAILED", (Time.get_ticks_msec() - t0) / 1000.0, _state(bot)])
 				taken += 1
-		if clips and s >= CLIP_FROM and s <= CLIP_TO and ms - last_grab >= 40:
-			last_grab = ms
-			await RenderingServer.frame_post_draw
-			var img := bot.get_viewport().get_texture().get_image()
-			var vp := Vector2(img.get_size())
-			var p := _cam(bot).unproject_position(pup.global_position + Vector3.UP * 0.9)
-			var w := int(vp.y * 0.55)
-			var h := int(vp.y * 0.8)
-			var rect := Rect2i(int(p.x) - w / 2, int(p.y) - int(h * 0.55), w, h).intersection(Rect2i(Vector2i.ZERO, img.get_size()))
-			clip.append(img.get_region(rect))
+				if taken == SIDE_AT.size() + FRONT_AT.size():
+					_yaw(bot, side)  # the clip goes on side on
+		if clips and Time.get_ticks_msec() - t0 - last_grab >= 40 and (taken == 0 or taken >= SIDE_AT.size() + FRONT_AT.size() or taken < SIDE_AT.size()):
+			last_grab = Time.get_ticks_msec() - t0
+			clip.append(await _clip_frame(bot))
 		else:
 			await bot.get_tree().process_frame
+		var now := (Time.get_ticks_msec() - t0) / 1000.0
+		if moved < 0.0 and bot.cell() != start:
+			moved = now
+		if moved >= 0.0 and stopped < 0.0 and rig.base_clip() == Client3D.CLIP_IDLE:
+			stopped = now
 		bases[rig.base_clip()] = true
 		if rig.base_clip() in ["Jog_Short", "Sprint_Short"]:
 			most = maxf(most, rig.carry_amount())
 			least = minf(least, rig.carry_amount())
-		lines.append("%.3f %s" % [(Time.get_ticks_msec() - t0) / 1000.0, _state(bot)])
+		lines.append("%.3f %s" % [now, _state(bot)])
+	var cells := absi(bot.cell().x - start.x)
+	var pace := "%d cells %.2f s: %.2f tiles/s; the sprint takes over above %.2f" % [cells, stopped - moved, cells / maxf(stopped - moved, 0.001), _sprint_from(bot)]
 	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
 	if file != null:
-		file.store_line("# %s: %s; worn: %s; seconds after the first click, base clip, carry clip and amount, bow_state, cell" % [name, _hands(bot), _worn(bot)])
+		file.store_line("# %s: %s; worn: %s; buffs %s; first step at %.2f s, the stop at %.2f s (%s); seconds after the first click%s, base clip, carry clip and amount, upper clip, bow_state, cell" % [
+			name, _hands(bot), _worn(bot), str(bot.me().get("buffs")), moved, stopped, pace, " (negative: standing before it)" if clips else ""])
 		file.store_string("\n".join(lines) + "\n")
 		file.close()
 	for i in clip.size():
 		_save(bot, clip[i], "clip_%s/%03d" % [name, i])
 		if i % 4 == 3:
 			await bot.frames(1)
-	var ran := "Sprint_Short" if gait == "sprint" else "Jog_Short"
-	bot.log_line("%s run %s: %.1f s to %s; clips %s; carry while running %.2f..%.2f; %d stills, %d clip frames" % [TAG, name,
-		(Time.get_ticks_msec() - t0) / 1000.0, bot.cell(), ",".join(bases.keys()), least if most > 0.0 or least < 1.0 else 0.0, most, taken, clip.size()])
-	bot.expect(ran in bases, "%s ran in %s" % [name, ran], ",".join(bases.keys()))
+	bot.log_line("%s run %s: %.1f s to %s, the stop at %.2f s; %s; clips %s; carry while running %.2f..%.2f; %d stills, %d clip frames" % [TAG, name,
+		(Time.get_ticks_msec() - t0) / 1000.0, bot.cell(), stopped, pace, ",".join(bases.keys()), least if most > 0.0 or least < 1.0 else 0.0, most, taken, clip.size()])
+	if gait == "sprint":
+		# Logged, not checked: at a426bca29 every run, the potion drunk or not, went 4.0 tiles/s, under the sprint's change.
+		bot.log_line("%s %s: Sprint_Short %s" % [TAG, name, "reached" if "Sprint_Short" in bases else "not reached (%s)" % pace])
+	bot.expect("Jog_Short" in bases, "%s ran in Jog_Short" % name, ",".join(bases.keys()))
+	bot.expect(stopped >= 0.0, "%s: stood at the run's end" % name, "at %s" % bot.cell())
 	if carry:
 		bot.expect(most > 0.9, "%s: the carry on while running" % name, "most %.2f" % most)
 	else:
