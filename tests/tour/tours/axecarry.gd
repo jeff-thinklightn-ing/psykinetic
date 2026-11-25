@@ -10,8 +10,11 @@ extends RefCounted
 ## standing beside the goblin, then a run west from (210, 211), before and after, at the jog (both rows), then a stamina potion
 ## (speed +0.25) drunk by a right click on its pack square, and the same runs at the sprint. Each run: four stills side on a
 ## stride's quarter apart and two from the front quarter; the giant axe's runs also a clip, one frame each 40 ms cropped round
-## the runner (clip_<run>/NNN.png). Each run's frames.txt logs every frame: time, base clip, carry clip and amount, the
-## upper layer's state (bow_state), the cell. The moves are the bot's click on the cell (bot.click); the pack's key and squares
+## the runner (clip_<run>/NNN.png). The rot hammer is run on the man at the jog only (all five shot). Last, the giant axe at
+## the sprint in the most a player wears round the legs (ARMOURED: plate, its cuisses on the thighs, on the heavy man; robes
+## to the shins on the heavy woman), the armour put on by a double-click on its pack square. Each run's frames.txt starts
+## with a "#" line naming the hands and what is worn (the armour slot, the body, the look), then logs every frame: time,
+## base clip, carry clip and amount, the upper layer's state (bow_state), the cell. The moves are the bot's click on the cell (bot.click); the pack's key and squares
 ## are input events (Input.parse_input_event) at the square's own point. Headless it stops at once: no Client3D, no bodies.
 
 const TAG := "AXECARRY"
@@ -22,9 +25,18 @@ const SIDE_AT: Array[float] = [0.8, 0.95, 1.1, 1.25]  # s after the first click:
 const FRONT_AT: Array[float] = [1.75, 1.95]  # from the front quarter
 const CLIP_FROM := 0.5
 const CLIP_TO := 2.9
+## [name, body, look, weapons at the jog and the sprint, weapons at the jog only]
 const ROWS: Array[Array] = [
-	["man", &"male", "seed=11 build=middling hair=cropped hair_colour=brown beard=none", ["battle_axe", "giant_axe", "tomb_sledge"]],
-	["woman", &"female", "seed=11 build=middling hair=bound hair_colour=brown", ["battle_axe", "giant_axe", "pick"]],
+	["man", &"male", "seed=11 build=middling hair=cropped hair_colour=brown beard=none", ["battle_axe", "giant_axe", "tomb_sledge"], ["rot_hammer"]],
+	["woman", &"female", "seed=11 build=middling hair=bound hair_colour=brown", ["battle_axe", "giant_axe", "pick"], []],
+]
+## Last, the sprint with the giant axe in the most a player wears round the legs (the coordinator's (1b)): there is no leg
+## armour; plate's cuisses cover the thighs (body_gen's plate_armour), on the heavy man; robes flare past the knees to the
+## shins (the nearest a player wears to a long hem: a woman's hem is her tunic's, the body's own), on the heavy woman.
+## [name, body, look, armour]
+const ARMOURED: Array[Array] = [
+	["man_heavy_plate", &"male", "seed=11 build=heavy hair=cropped hair_colour=brown beard=none", "plate_armour"],
+	["woman_heavy_robes", &"female", "seed=11 build=heavy hair=bound hair_colour=brown", "robes"],
 ]
 
 
@@ -162,6 +174,40 @@ func _hold(bot: Node, id: String) -> bool:
 	bot.log_line("%s give %s: %s" % [TAG, id, str(await bot.admin("give Tourbot %s" % id)).strip_edges()])
 	var ok: bool = await bot.until(func() -> bool: return str(bot.me().get("slots")[Items.RIGHT_HAND]) == id, 4.0)
 	bot.expect(ok, "%s in the right hand" % id, _hands(bot))
+	return ok
+
+
+## What the body wears: the armour slot and the look the body was joined with.
+func _worn(bot: Node) -> String:
+	var armour := str(bot.me().get("slots")[Items.ARMOUR])
+	return "armour '%s', body %s, look '%s'" % [armour, str(bot.me().get("body")), Net.player_look]
+
+
+## [param id] worn in the armour slot: what is there put away by a double-click on its square, [param id] given by the
+## console, and put on by a double-click on its pack square if it went to the pack.
+func _wear(bot: Node, id: String) -> bool:
+	await _pack_open(bot, true)
+	var now := str(bot.me().get("slots")[Items.ARMOUR])
+	if now != "" and now != id:
+		var pressed := await _press_box(bot, Items.ARMOUR, MOUSE_BUTTON_LEFT, true)
+		if not await bot.until(func() -> bool: return str(bot.me().get("slots")[Items.ARMOUR]) == "", 3.0):
+			bot.log_line("%s armour: the double-click %s; taken off by the equip command (not a press)" % [TAG, "missed" if pressed else "found no square"])
+			World.command(bot.me(), "equip", {"slot": Items.ARMOUR})
+			await bot.until(func() -> bool: return str(bot.me().get("slots")[Items.ARMOUR]) == "", 3.0)
+	if str(bot.me().get("slots")[Items.ARMOUR]) != id:
+		bot.log_line("%s give %s: %s" % [TAG, id, str(await bot.admin("give Tourbot %s" % id)).strip_edges()])
+		if not await bot.until(func() -> bool: return str(bot.me().get("slots")[Items.ARMOUR]) == id, 3.0):
+			await bot.until(func() -> bool: return _pack_slot(bot, id) >= 0, 3.0)
+			var slot := _pack_slot(bot, id)
+			var pressed := await _press_box(bot, slot, MOUSE_BUTTON_LEFT, true)
+			if not await bot.until(func() -> bool: return str(bot.me().get("slots")[Items.ARMOUR]) == id, 3.0):
+				bot.log_line("%s armour: the double-click %s; worn by the equip command (not a press)" % [TAG, "missed" if pressed else "found no square"])
+				World.command(bot.me(), "equip", {"slot": slot})
+				await bot.until(func() -> bool: return str(bot.me().get("slots")[Items.ARMOUR]) == id, 3.0)
+	await _pack_open(bot, false)
+	var ok := str(bot.me().get("slots")[Items.ARMOUR]) == id
+	bot.expect(ok, "%s worn" % id, _worn(bot))
+	await bot.seconds(1.0)
 	return ok
 
 
@@ -309,6 +355,7 @@ func _run(bot: Node, row: Array, weapon: String, gait: String, carry: bool) -> v
 		lines.append("%.3f %s" % [(Time.get_ticks_msec() - t0) / 1000.0, _state(bot)])
 	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
 	if file != null:
+		file.store_line("# %s: %s; worn: %s; seconds after the first click, base clip, carry clip and amount, bow_state, cell" % [name, _hands(bot), _worn(bot)])
 		file.store_string("\n".join(lines) + "\n")
 		file.close()
 	for i in clip.size():
@@ -351,7 +398,7 @@ func run(bot: Node) -> void:
 			if gait == "sprint" and not buffs.has("speed"):
 				await _drink(bot)
 			bot.log_line("%s %s %s: buffs %s" % [TAG, row[0], gait, str(bot.me().get("buffs"))])
-			for weapon: String in row[3]:
+			for weapon: String in ((row[3] + row[4]) if gait == "jog" else row[3]):
 				if not await _hold(bot, weapon):
 					continue
 				if gait == "jog":
@@ -359,4 +406,15 @@ func run(bot: Node) -> void:
 				for carry: bool in [false, true]:
 					await _run(bot, row, weapon, gait, carry)
 		order.reverse()
+	for row: Array in ARMOURED:
+		if not await _join(bot, row):
+			return
+		var buffs: Dictionary = bot.me().get("buffs")
+		if not buffs.has("speed"):
+			await _drink(bot)
+		if not await _wear(bot, str(row[3])) or not await _hold(bot, "giant_axe"):
+			continue
+		await _stand(bot, row, "giant_axe")
+		for carry: bool in [false, true]:
+			await _run(bot, row, "giant_axe", "sprint", carry)
 	bot.log_line("%s done: server script errors %d" % [TAG, bot.server_lines("SCRIPT ERROR").size()])
