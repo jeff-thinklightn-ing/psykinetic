@@ -21106,24 +21106,34 @@ func _toes_ahead(puppet: Node3D) -> Vector2:
 ## A two-hander carried at the run, in the player's own frame (451 amended (13), TASK 16): the player as drawn by
 ## Client3D (_animate, _sync_bow, the rig's own _process, CARRY_RUN_DT frames on the rigs' clock) holding a reached
 ## two-hander, driven from standing: a walk, a jog, a sprint, a jog and a stop, CARRY_RUN_LEG each. The carry
-## (Axe_Carry on the carry layer) is off at the walk and the stop and full at the jog and the sprint, and never on with
-## a one-hander (the sword). Each change's largest step in one frame, in the body's frame (the hands as the clip lays
-## them, before the reach; the piece's head as drawn), is held under CARRY_RUN_STEPS, from
-## C:/dev/review/animation/axe_run/carry_table.md's transitions (11-25; all ten body and weapon pairs, carry against
-## main, L hand / R hand / head in m): walk to jog .070/.079/.313 (main .056/.074/.307), jog to sprint .046/.040/.098
-## (main .069/.080/.223), sprint to jog .035/.033/.045 (main .063/.062/.195), jog to a stop .197/.148/.478 (main
-## .488/.211/.819: the ready comes in on the upper layer in one frame, a row for later; the carry eased out halves it).
-## Main's own run (the carry's key taken out of the puppet's moves), the man with the battle axe, steps past the stop's
-## bound, so the bound tells the two apart. The walk to jog bound at the left hand is this row's own reading, not the
-## table's: from this row's shorter walk (1.5 s against the table's 2.5) the carry's ease-in steps it 0.090 (man) and
-## 0.101 m (woman) where main's steps 0.059 (11-25); the table's phase read 0.070 against 0.056.
+## (Axe_Carry on the carry layer) is full at the walk, the jog and the sprint and out at the stand and the stop, and
+## never on with a one-hander (the sword). At the stop it is held while the legs settle (the base's blend), eased out
+## over CARRY_TWO_FADE onto the stand's bare arms, and only then the stand's ready eased in on the upper layer
+## (READY_IN_FADE), so no frame of the stop holds the arms part way between the carry and the ready. Each change's
+## largest step in one frame, in the body's frame (the hands as the clip lays them, before the reach; the piece's head
+## as drawn), is held under CARRY_RUN_STEPS, the reworked carry's own readings in this row (11-25, the man's battle
+## axe and the woman's giant axe, L hand / R hand / head in m, C:/dev/review/animation/axe_run/carry_view_table.md):
+## the start from standing .227/.150/.697 (main's walk .577/.298/.596: the carry goes on at once with the first step),
+## walk to jog .031/.020/.061, jog to sprint .042/.041/.084, sprint to jog .033/.032/.047, jog to a stop .048/.035/.060
+## (main's .547/.235/1.395, the ready coming in on the upper layer in one frame). Main's own run (the carry's key taken
+## out of the puppet's moves), the man with the battle axe, steps past the stop's bound, so the bound tells the two
+## apart.
+## The start and the stop as the low camera sees them (the coordinator's (5) on the Lenovo strip of 1d3acca3f: half
+## way, the arms straight ahead with the weapon upright before the face): each frame of the walk from standing and of
+## the stop while the carry is on is read by tests/carry_view.gd, the piece's whole mesh against the head's, no overlap
+## from either side or quarter (CARRY_RUN_CLEAR). The ready's frames after the carry is out are read too: while it
+## eases in, no more over the head from the sides and quarters than once it is in (the stand as shipped). Main's (no
+## carry) start and stop, read every frame in every view, overlap the head (its walk holds the weapon's head before the
+## face from the front and the back), so the reading sees the head in this frame.
+const CARRY_RUN_CLEAR := ["L", "R", "FL", "FR", "BL", "BR"]
+const CarryView := preload("res://tests/carry_view.gd")
 const CARRY_RUN_DT := 0.02
 const CARRY_RUN_LEG := 1.5
 ## change: [L hand, R hand, the piece's head], m in one frame.
-const CARRY_RUN_STEPS := {"walk>jog": [0.12, 0.10, 0.36], "jog>sprint": [0.06, 0.06, 0.13], "sprint>jog": [0.05, 0.05, 0.08],
-	"jog>stop": [0.25, 0.18, 0.55]}
+const CARRY_RUN_STEPS := {"walk": [0.30, 0.20, 0.80], "walk>jog": [0.05, 0.04, 0.09], "jog>sprint": [0.06, 0.06, 0.12],
+	"sprint>jog": [0.05, 0.05, 0.07], "jog>stop": [0.07, 0.05, 0.09]}
 func _test_carry_run() -> void:
-	print("\n== a two-hander carried at the run: on at the jog and the sprint, off at the walk and the stop, each change's step bounded ==")
+	print("\n== a two-hander carried on the move: on at the walk, the jog and the sprint, off at the stop, the ready eased in after, each change's step bounded ==")
 	var player := _player()
 	if player == null:
 		_check(false, "a player to run")
@@ -21140,21 +21150,42 @@ func _test_carry_run() -> void:
 	_rig._process(0.0)
 	var was_at: Vector3 = (_rig._puppets[player.get_instance_id()] as Node3D).position
 	var main_stop := 0.0
+	var main_seen := 0.0
 	for run: Array in [[&"male", "battle_axe", true], [&"female", "giant_axe", true], [&"male", "battle_axe", false], [&"male", "sword", true]]:
 		var out: Dictionary = await _carry_run(player, run[0], run[1], run[2])
 		var steps: Dictionary = out["steps"]
 		var amounts: Dictionary = out["amounts"]
+		var seen: Dictionary = out["seen"]
 		var named := "%s %s%s" % [run[0], run[1], "" if run[2] else " (main's)"]
 		var reads: Array[String] = []
 		for leg: String in steps:
 			reads.append("%s %.3f/%.3f/%.3f carry %.2f" % [leg, steps[leg][0], steps[leg][1], steps[leg][2], amounts[leg]])
 		print("  %s: %s" % [named, "; ".join(reads)])
+		var near: Array[String] = []
+		var clear := true
+		for leg: String in seen:
+			var w: Array = seen[leg]
+			if leg.begins_with("ready"):
+				near.append("(%s: %d frames, %.0f cm2 at the sides and quarters%s, %.0f in any view%s)" % [
+					"the ready easing in" if leg == "ready in" else "the ready in full, the stand as shipped", w[4], w[0],
+					" (%s)" % w[1] if w[1] != "" else "", w[2], " (%s)" % w[3] if w[3] != "" else ""])
+				continue
+			near.append("%s %d frames: %.0f cm2 at the sides and quarters%s, %.0f in any view%s" % [leg, w[4], w[0],
+				" (%s)" % w[1] if w[1] != "" else "", w[2], " (%s)" % w[3] if w[3] != "" else ""])
+			clear = clear and float(w[0]) == 0.0
+		print("    against the head: %s" % "; ".join(near))
 		if not run[2]:
 			main_stop = float(steps["jog>stop"][0])
+			for leg: String in seen:
+				main_seen = maxf(main_seen, float(seen[leg][2]))
 			continue
 		if run[1] == "sword":
 			_check(amounts.values().max() == 0.0, "a one-hander at the run takes no carry (%s)" % named)
 			continue
+		_check(clear and seen.has("walk") and seen.has("jog>stop"),
+				"%s: the start and the stop clear of the head from each side and quarter while the carry is on (%s)" % [named, "; ".join(near)])
+		_check(seen.has("ready in") and seen.has("ready") and float(seen["ready in"][0]) <= float(seen["ready"][0]),
+				"%s: the ready eased in after the carry, no more over the head from the sides and quarters than the ready itself (%s)" % [named, "; ".join(near)])
 		var over: Array[String] = []
 		for leg: String in CARRY_RUN_STEPS:
 			for k in 3:
@@ -21162,11 +21193,13 @@ func _test_carry_run() -> void:
 					over.append("%s %s %.3f over %.2f" % [leg, ["L hand", "R hand", "head"][k], steps[leg][k], CARRY_RUN_STEPS[leg][k]])
 		var gone: Array[String] = []
 		for leg: String in amounts:
-			var want := 1.0 if leg in ["walk>jog", "jog>sprint", "sprint>jog"] else 0.0
+			var want := 0.0 if leg in ["stand", "jog>stop"] else 1.0
 			if absf(float(amounts[leg]) - want) > 0.001:
 				gone.append("%s %.2f, not %.0f" % [leg, amounts[leg], want])
-		_check(gone.is_empty(), "%s: the carry full at each leg's end at the jog and the sprint, out at the walk and the stop (%s)" % [named, "; ".join(gone)])
+		_check(int(out["part"]) == 0, "%s: on the move no frame holds the carry part way (%d frames)" % [named, int(out["part"])])
+		_check(gone.is_empty(), "%s: the carry full at each leg's end at the walk, the jog and the sprint, out at the stand and the stop (%s)" % [named, "; ".join(gone)])
 		_check(over.is_empty(), "%s: each change's step within carry_table's bounds (%s)" % [named, "; ".join(over)])
+	_check(main_seen > 0.0, "main's start and stop (no carry) overlap the head in some view: %.0f cm2" % main_seen)
 	_check(main_stop > float(CARRY_RUN_STEPS["jog>stop"][0]),
 			"main's stop (no carry) steps past the stop's bound at the left hand: %.3f against %.2f" % [main_stop, CARRY_RUN_STEPS["jog>stop"][0]])
 	AnimRig.vary_on = vary_was
@@ -21236,7 +21269,16 @@ func _carry_run(player: Player, body: StringName, weapon: String, carry_on: bool
 	var steps := {}
 	var amounts := {}
 	var was := []
-	for leg: Array in [["walk", 1.0], ["walk>jog", 4.0], ["jog>sprint", 6.5], ["sprint>jog", 4.0], ["jog>stop", 0.0]]:
+	# The start's and the stop's frames against the head (tests/carry_view.gd): with the carry, each frame it is on (the
+	# in-between); without it (main's), every frame.
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	var views := CarryView.views()
+	var at := CarryView.attach(sk)
+	var head := CarryView.head_skin(model, sk) if model != null else {}
+	var pm := CarryView.piece_mesh(held) if held != null else {}
+	var seen := {}
+	var part := 0  # Frames on the move with the carry part way (it comes and goes at once there).
+	for leg: Array in [["stand", 0.0], ["walk", 1.0], ["walk>jog", 4.0], ["jog>sprint", 6.5], ["sprint>jog", 4.0], ["jog>stop", 0.0]]:
 		player.step_pace = float(leg[1]) * pace
 		var most := [0.0, 0.0, 0.0]
 		for i in int(roundf(CARRY_RUN_LEG / CARRY_RUN_DT)):
@@ -21254,6 +21296,23 @@ func _carry_run(player: Player, body: StringName, weapon: String, carry_on: bool
 				for k in 3:
 					most[k] = maxf(most[k], ((now[k] as Vector3) - (was[k] as Vector3)).length())
 			was = now
+			if leg[0] not in ["stand", "jog>stop"] and rig.carry_amount() > 0.0 and rig.carry_amount() < 1.0:
+				part += 1
+			var readied: bool = leg[0] == "jog>stop" and carry_on and rig.carry_amount() <= 0.0 and rig.upper_clip() != ""
+			if leg[0] in ["walk", "jog>stop"] and held != null and model != null and (rig.carry_amount() > 0.0 or not carry_on or readied):
+				var got := CarryView.read(model, sk, at, held, head, pm, views)
+				var key := ("ready in" if rig.upper_share() < 1.0 else "ready") if readied else str(leg[0])
+				var worst: Array = seen.get(key, [0.0, "", 0.0, "", 0])
+				for v: String in views:
+					var cm2 := (got[v] as Vector3).x
+					if v in CARRY_RUN_CLEAR and cm2 > float(worst[0]):
+						worst[0] = cm2
+						worst[1] = v
+					if cm2 > float(worst[2]):
+						worst[2] = cm2
+						worst[3] = v
+				worst[4] = int(worst[4]) + 1
+				seen[key] = worst
 		steps[leg[0]] = most
 		amounts[leg[0]] = rig.carry_amount()
 	AnimRig._clock_movie = -1
@@ -21265,7 +21324,9 @@ func _carry_run(player: Player, body: StringName, weapon: String, carry_on: bool
 		puppet.set_meta("moves", moves_was)
 	rig.carry("", 0.0)
 	rig.set_process(true)
-	return {"steps": steps, "amounts": amounts}
+	for node: Node in at.values():
+		node.queue_free()
+	return {"steps": steps, "amounts": amounts, "seen": seen, "part": part}
 
 
 ## The run's arms on the player as drawn (the coordinator's terms for Jeff's report on v0.1.226, "the arms swinging

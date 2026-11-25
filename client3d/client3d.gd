@@ -26759,8 +26759,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		_slide_held(sockets, 0.0)
 		if puppet.has_meta("reach"):
 			_sync_reach(puppet.get_meta("reach") as HandReach, sockets, ids)
-	if want == "" and puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE:
-		want = "ready"  # Standing only: not over a gait, a lying body or a kneel.
+	if want == "" and puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE 			and rig.carry_clip() == "":
+		want = "ready"  # Standing only: not over a gait, a lying body or a kneel; once a carry (_carry_two) is out.
 	if (want == "rest") != (state == "rest"):
 		_rest_sound(puppet, str(ids[0]), want != "rest")
 	if (want == "stowed") != (state == "stowed"):
@@ -26797,7 +26797,11 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 			"block":
 				rig.upper(str(moves.get("block", "")))
 			"ready":
-				rig.upper(str(moves.get("ready", "")))
+				if state == "" and puppet.get_meta("carried", false):  # After a carry: eased in over the bare arms.
+					rig.upper_in(str(moves.get("ready", "")), READY_IN_FADE)
+				else:
+					rig.upper(str(moves.get("ready", "")))
+				puppet.set_meta("carried", false)
 			"rest":
 				rig.upper(str(rest["upper"]))
 			"", "carry", "stowed", "sheathed":
@@ -26817,25 +26821,36 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
 
 
-## A reached two-hander carried at a run (451 amended (13), TASK 16; Jeff's v0.1.213 report, "running with axe, chars
-## left arm clips into head, and wrist bends at non anatomic angle"): on a person's body (people_stance: the man and
-## the woman, whoever wears them) in its jog or sprint (gaits 1 and 2), the left hand reaching grip_2 (HandReach) and
-## the upper layer free ([param want] ""), the arms are carried at port arms (moves "carry_two", Axe_Carry, on AnimRig's
-## carry layer: the arms alone, the trunk's lean and twist and the vary left to the run); else eased out. The gait's
-## one-handed swing carried the haft across the face with the left hand pinned to it. The walk, the stop, one-handers
-## and every other body (the draugr, the dead, the knight, goblins) are as they were. Eased over CARRY_TWO_FADE (s): at
-## the clips' blend the arms' change outran the gait change's own (the left hand 0.10 m in a 20 ms frame, walk to jog).
+## A reached two-hander carried on the move (451 amended (13), TASK 16; Jeff's v0.1.213 report, "running with axe,
+## chars left arm clips into head, and wrist bends at non anatomic angle"): on a person's body (people_stance: the man
+## and the woman, whoever wears them) in any gait (the walk, the jog, the sprint), the left hand reaching grip_2
+## (HandReach) and the upper layer free ([param want] ""), the arms are carried low across the body (moves "carry_two",
+## Axe_Carry, on AnimRig's carry layer: the arms alone, the trunk's lean and twist and the vary left to the gait); else
+## eased out. The gaits' own arm swing carried the haft across the face with the left hand pinned to it (the walk's
+## too: its weapon's head 0.16 to 0.51 m over the shoulders, the coordinator's f4). One-handers and every other body
+## (the draugr, the dead, the knight, goblins) are as they were. No gait change changes the carry, so it fades only at
+## a stand and a start, and no frame between holds the arms half way (C:/dev/review/animation/axe_run/
+## carry_view_table.md: half way to the ready, or to the walk's own arms, the weapon's head comes up before the face
+## from the front quarters): on the move it comes and goes at once (from the stand, as the ready goes off at once; after
+## a swing, as the swing goes; at a swing, as it comes, as main's gait arms gave way to it);
+## at a stop it is held while the legs settle into the stand (the rig's blend), then eases out over CARRY_TWO_FADE (s)
+## to the stand's bare arms, which keep it clear of the head, and the ready (_sync_bow) eases in over READY_IN_FADE
+## only once it is out, so the stop holds no snap and no in-between across the face.
 const CARRY_TWO_FADE := 0.3
+const READY_IN_FADE := 0.3
 func _carry_two(puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String) -> void:
 	var clip := str(moves.get("carry_two", ""))
 	if clip == "" or rig.stood_as != PEOPLE_PREFIX:
 		return
 	var gaits: Array = puppet.get_meta("gaits", GAITS)
-	var running := gaits.size() > 2 and rig.base_clip() in [str(gaits[1][0]), str(gaits[2][0])]
+	var moving := gaits.size() > 2 and rig.base_clip() in [str(gaits[0][0]), str(gaits[1][0]), str(gaits[2][0])]
 	var reach := puppet.get_meta("reach") as HandReach if puppet.has_meta("reach") else null
-	var on := want == "" and running and reach != null and reach.active
+	var on := want == "" and moving and reach != null and reach.active
+	if on:
+		puppet.set_meta("carried", true)
 	if on or rig.carry_clip() != "":
-		rig.carry(clip if on else "", CARRY_TWO_FADE)
+		var fade := CARRY_TWO_FADE if not on and not moving and want == "" else 0.0
+		rig.carry(clip if on else "", fade, rig.blend if fade > 0.0 else 0.0)
 
 
 ## The bow aimed at the sky for a lob (677, pc-character's side): drawn or

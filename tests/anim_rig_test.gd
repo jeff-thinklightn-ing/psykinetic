@@ -53,6 +53,7 @@ func _ready() -> void:
 	await _test_gait_switch_feet()
 	await _test_run_arms()
 	await _test_carry_two()
+	await _test_carry_view()
 	await _test_posture_arms()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
@@ -3385,6 +3386,136 @@ func _test_carry_two() -> void:
 		HELD_WRIST_BEND, HELD_WRIST_TWIST, CARRY_HEAD_CLEAR, "; ".join(off)])
 	# The clearance is a watch only if main's arm, which went into the face, reads inside it.
 	_check(least_main < CARRY_HEAD_CLEAR, "main's run (no carry) reads the left arm inside the bound: %.3f m against %.2f" % [least_main, CARRY_HEAD_CLEAR])
+
+
+## The carried two-hander as the low camera sees it (451 amended (13), TASK 16; the coordinator's Lenovo strip of
+## 1d3acca3f: side on, the weapon's head level with the face): the man's and the woman's rig in the people's stance,
+## each of REACHED_TWO in hand and its left hand reaching grip_2, each of CARRY_VIEW_RUNS (a clip, the carry's share,
+## the stand's ready's share on the upper layer) at CARRY_VIEW_STEPS times a loop, read by tests/carry_view.gd: the
+## piece's whole mesh against the head's skinned mesh drawn through the low camera at the nearest zoom from each side,
+## each quarter, the front and the back, their outlines' overlap (cm2). Carried in full (the walk, the jog, the
+## sprint): none in any view, the piece's top CARRY_VIEW_CHIN or more under the chin and its head part's top
+## CARRY_VIEW_SHOULDER or more under the shoulder line. Part way, the stop as Client3D plays it (the carry held while
+## the legs settle, eased out over the stand's bare arms, then the ready eased in over them): none from either side or
+## quarter (CARRY_VIEW_PART), the coordinator's (3), the ready's in-between no more than the ready's own in full (read
+## too, the stand as shipped). The bounds are the reworked pose's own readings
+## (C:/dev/review/animation/axe_run/carry_view_table.md); main's jog (no carry) is read as a full carry and must break
+## them, so the row tells the two apart.
+const CARRY_VIEW_STEPS := 8
+const CARRY_VIEW_RUNS := [["Jog_Short", 1.0, 0.0], ["Sprint_Short", 1.0, 0.0], ["Walk", 1.0, 0.0],
+	["Idle", 0.75, 0.0], ["Idle", 0.5, 0.0], ["Idle", 0.25, 0.0], ["Idle", 0.0, 0.25], ["Idle", 0.0, 0.5], ["Idle", 0.0, 0.75]]
+const CARRY_VIEW_CHIN := 0.08
+const CARRY_VIEW_SHOULDER := 0.0
+const CARRY_VIEW_PART := ["L", "R", "FL", "FR", "BL", "BR"]
+const CarryView := preload("res://tests/carry_view.gd")
+func _test_carry_view() -> void:
+	print("== a two-hander carried: clear of the head from every side at the low camera, under the chin and the shoulders ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var vary_was := AnimRig.vary_on
+	AnimRig.vary_on = false
+	var views := CarryView.views()
+	var off: Array[String] = []
+	var read: Array[String] = []
+	var main_reads: Array[String] = []
+	var main_breaks := 0
+	var main_count := 0
+	var count := 0
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		for kind: String in REACHED_TWO:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			var holder := Node3D.new()
+			add_child(holder)
+			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+			var sockets: Dictionary = holder.get_meta("sockets")
+			var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+			var art := str(Items.def(kind).get("art", "item." + kind))
+			var piece := ArtKit.instance(art)
+			piece.name = "Held"
+			if Client3D._edge_first(kind):
+				piece.basis = Client3D.HELD_EDGE_TURN
+			Client3D._grip_at(piece, art)
+			(sockets["hand_r"] as Node3D).add_child(piece)
+			var reach := HandReach.make(sk, (sockets["hand_r"] as Node3D).transform, (sockets["hand_l"] as Node3D).transform)
+			Client3D._sync_reach(reach, sockets, [kind, ""])
+			var at := CarryView.attach(sk)
+			var rig := AnimRig.make(model, lib, 0.0, true, null)
+			rig.stood_as = Client3D.PEOPLE_PREFIX
+			rig.set_process(false)
+			await _frames(2)
+			var head := CarryView.head_skin(model, sk)
+			var pm := CarryView.piece_mesh(piece)
+			# The stand as shipped first (the ready's own, the bound of its in-between), main's jog last.
+			var runs: Array = [["Idle", 0.0, 1.0]]
+			runs.append_array(CARRY_VIEW_RUNS)
+			runs.append(["Jog_Short", 0.0, 0.0])
+			var ready_own := {}
+			for r: Array in runs:
+				var clip := str(r[0])
+				var share := float(r[1])
+				var ready := float(r[2])
+				if ready > 0.0:
+					rig.upper(str(Client3D.HUMANOID_MOVES["ready"]))
+				else:
+					rig.upper_off()  # Client3D's _sync_bow plays the stand's ready only once the carry is out.
+				rig.carry(str(Client3D.HUMANOID_MOVES["carry_two"]) if share > 0.0 else "", 0.0)
+				rig._carry = share
+				var length := rig.length(clip)
+				var most := {"top_chin": -INF, "head_top_shoulders": -INF}
+				var seen := {}
+				for v: String in views:
+					seen[v] = Vector3.ZERO
+				for i in CARRY_VIEW_STEPS:
+					rig.base_at(clip, length * float(i) / CARRY_VIEW_STEPS)
+					rig.tree.set("parameters/carry/blend_amount", share)
+					if ready > 0.0:
+						rig.tree.set("parameters/upper/blend_amount", ready)
+					rig.tree.advance(0.0)
+					await _frames(3)
+					var got := CarryView.read(model, sk, at, piece, head, pm, views)
+					most["top_chin"] = maxf(most["top_chin"], got["top_chin"])
+					most["head_top_shoulders"] = maxf(most["head_top_shoulders"], got["head_top_shoulders"])
+					for v: String in views:
+						seen[v] = (seen[v] as Vector3).max(got[v])
+				var full := (share >= 1.0 or share == 0.0) and ready == 0.0
+				var over: Array[String] = []
+				var all: Array[String] = []
+				for v: String in views:
+					all.append("%s %.0f" % [v, seen[v].x])
+					var allowed := float(ready_own.get(v, 0.0)) if ready > 0.0 else 0.0
+					if (seen[v] as Vector3).x > allowed and (full or v in CARRY_VIEW_PART):
+						over.append("%s %.0f (%.0f before, %.0f behind)" % [v, seen[v].x, seen[v].y, seen[v].z])
+				var line := "%s %s %s carry %.2f ready %.2f: top %+.3f m on the chin, its head %+.3f m on the shoulders, overlapping the head %s [%s]" % [
+					build[0], kind, clip, share, ready, most["top_chin"], most["head_top_shoulders"],
+					", ".join(over) if not over.is_empty() else "in no view checked", " ".join(all)]
+				var clear: bool = reach.active and over.is_empty() and (not full or most["top_chin"] <= -CARRY_VIEW_CHIN and most["head_top_shoulders"] <= -CARRY_VIEW_SHOULDER)
+				if ready >= 1.0:
+					for v: String in views:
+						ready_own[v] = (seen[v] as Vector3).x
+					main_reads.append("(the stand's ready) " + line)
+				elif share > 0.0 or ready > 0.0:
+					read.append(line)
+					count += 1
+					if not clear:
+						off.append(line + ("" if reach.active else " (the left hand not reaching)"))
+				else:
+					main_reads.append(line)
+					main_count += 1
+					if not clear:
+						main_breaks += 1
+			model.queue_free()
+			holder.queue_free()
+			await _frames(1)
+	AnimRig.vary_on = vary_was
+	for line in read:
+		print("  carried ", line)
+	for line in main_reads:
+		print("  main's  ", line)
+	_check(off.is_empty() and count == 2 * REACHED_TWO.size() * CARRY_VIEW_RUNS.size(),
+		"each two-hander carried, both bodies, %s: no overlap with the head at the low camera (in full from any side, quarter, the front or the back, the top %.2f m or more under the chin, its head %.2f m or more under the shoulders; part way from either side or quarter, the ready's in-between no more than its own) (%s)" % [
+		", ".join(CARRY_VIEW_RUNS.map(func(r: Array) -> String: return "%s %.2f/%.2f" % [r[0], r[1], r[2]])), CARRY_VIEW_CHIN, CARRY_VIEW_SHOULDER, "; ".join(off)])
+	# A watch only if main's jog, the carried weapon's head before the face, breaks it.
+	_check(main_breaks == main_count and main_breaks > 0, "main's jog (no carry) breaks the bounds on every body and two-hander: %d of %d" % [main_breaks, main_count])
 
 
 ## The least distance from the head's centre (CARRY_HEAD_UP along the Head bone from its root) to the left forearm

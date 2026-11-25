@@ -187,6 +187,9 @@ var _carry_clip := ""
 var _carry := 0.0
 var _carry_to := 0.0
 var _carry_fade := 0.15
+var _carry_wait := 0.0
+var _upper_share := 1.0
+var _upper_fade := 0.0
 
 
 ## A rig for [param scene] (its root node holds the skeleton) playing
@@ -529,6 +532,7 @@ func cancel_strike() -> void:
 func upper(clip: String, speed := 1.0, from_start := false) -> void:
 	if not _has_upper:
 		return
+	_upper_share = 1.0
 	clip = _name(clip)
 	if clip == "" or not player.has_animation(clip):
 		_upper_clip = ""
@@ -546,6 +550,31 @@ func upper(clip: String, speed := 1.0, from_start := false) -> void:
 		_apply()
 		return
 	tree.set("parameters/upper/blend_amount", 1.0)
+
+
+## As upper, but a clip put on an upper layer that held none eases in over [param fade] seconds from the arms under it
+## (451 amended (13): the stand's ready after a two-hander's carry has eased out, so the stop holds no snap). Any other
+## upper call sets the share at once again.
+func upper_in(clip: String, fade: float) -> void:
+	var was := _upper_clip
+	upper(clip)
+	if was == "" and _upper_clip != "" and fade > 0.0:
+		_upper_share = 0.0
+		_upper_fade = fade
+		tree.set("parameters/upper/blend_amount", 0.0)
+
+
+func _upper_ease(delta: float) -> void:
+	if _upper_share >= 1.0:
+		return
+	_upper_share = 1.0 if _upper_clip == "" else move_toward(_upper_share, 1.0, delta / maxf(_upper_fade, 0.001))
+	if _upper_clip != "":
+		tree.set("parameters/upper/blend_amount", _upper_share)
+
+
+## The upper layer's share now (1 but while upper_in eases a clip in).
+func upper_share() -> float:
+	return _upper_share if _upper_clip != "" else 0.0
 
 
 ## The upper layer held still on [param clip] at [param seconds] into it:
@@ -607,20 +636,24 @@ func base_at(clip: String, seconds: float) -> void:
 ## upper layer and the base, the trunk, the legs and the run's lean and twist left to them: a two-hander carried at a run
 ## (Client3D's "carry_two", Axe_Carry) where the gait's own arm swing would carry the haft across the face. Eased in
 ## from where the arms are over [param fade] seconds (-1: the rig's blend; 0 at once), and out again with "" (its clip
-## kept till it is out). (Nothing on a rig made without the upper layer.)
-func carry(clip: String, fade := -1.0) -> void:
+## kept till it is out), the easing out begun [param hold] seconds after the call that first lets it go (the stop's
+## base settled first). (Nothing on a rig made without the upper layer.)
+func carry(clip: String, fade := -1.0, hold := 0.0) -> void:
 	if not _has_upper:
 		return
 	_carry_fade = blend if fade < 0.0 else fade
 	clip = _name(clip) if clip != "" else ""
 	if clip == "" or not player.has_animation(clip):
+		if _carry_to > 0.0:
+			_carry_wait = hold
 		_carry_to = 0.0
 	else:
+		_carry_wait = 0.0
 		if clip != _carry_clip:
 			(_root.get_node("carry_clip") as AnimationNodeAnimation).animation = clip
 			_carry_clip = clip
 		_carry_to = 1.0
-	if _carry_fade <= 0.0:
+	if _carry_fade <= 0.0 and _carry_wait <= 0.0:
 		_carry = _carry_to
 		tree.set("parameters/carry/blend_amount", _carry)
 		_apply()
@@ -639,6 +672,9 @@ func carry_amount() -> float:
 
 func _carry_ease(delta: float) -> void:
 	if _carry == _carry_to:
+		return
+	if _carry_wait > 0.0:
+		_carry_wait -= delta
 		return
 	_carry = move_toward(_carry, _carry_to, delta / maxf(_carry_fade, 0.001))
 	tree.set("parameters/carry/blend_amount", _carry)
@@ -1004,6 +1040,7 @@ func _process(delta: float) -> void:
 	_frames += 1
 	_ease_posture_arms(delta)
 	_carry_ease(delta)
+	_upper_ease(delta)
 	_vary_ease(delta)
 	_settle_ease(delta)
 	var falls := every < _every_was

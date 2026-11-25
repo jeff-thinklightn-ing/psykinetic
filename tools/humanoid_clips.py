@@ -745,17 +745,25 @@ CLIPS["Axe_Ready_Loop"] = {"loop": True, "keys": [
 ]}
 # Running with a two-hander (TASK 16; Jeff's v0.1.213 report, "running with axe, chars left arm clips into head, and
 # wrist bends at non anatomic angle"): the run's own arm swing carried the haft across the face with the left hand
-# pinned to it (grip_2 2.2 to 3.4 cm from the face; C:/dev/review/animation/axe_run/table.md). Carried at port arms,
-# low: the right hand ahead of the right hip and a little out, the haft across the body up to the left and ahead, the
-# left hand on it GREAT_GRIP up, below the chest, the head out past the left shoulder, its edge (the fingers' way,
-# Client3D's HELD_EDGE_TURN) ahead. Only the arms are taken (AnimRig's carry layer: the clavicles down), so it is posed
-# without SQUARED, the trunk left to the run. Of four placings measured on both bodies with the five two-handers (the
-# table's), this one kept the butt off the right thigh at the sprint's knee lift (3.8 cm at the nearest; the hand 0.1 m
-# farther back and lower put it 0.3 cm in on 38 of 48 frames) and the left wrist's bend under 50 degrees.
-CARRY_HAFT = (0.35, -0.8, 0.5)
-CARRY_RIGHT = (0.3, 0.06, -0.3)
+# pinned to it (grip_2 2.2 to 3.4 cm from the face; C:/dev/review/animation/axe_run/table.md). Carried low across the
+# body (the coordinator, 11-25 04:23, and its rework call on the Lenovo strip of 1d3acca3f, where the first carry's
+# head stood level with the face side on): the right hand ahead of the right hip, the haft across the body nearly
+# level (0.91 of it to the left), the left hand on it GREAT_GRIP up, the weapon's head out past the left hip and under
+# the shoulder line. Its edge between the haft's rule (the length crossed with ahead) and the body's left,
+# CARRY_EDGE_LEFT parts left to one of the rule: the rule alone turned the right wrist 63 to 68 degrees, the left alone
+# bent it 73 to 84. Only the arms are taken (AnimRig's carry layer: the clavicles down), so it is posed without
+# SQUARED, the trunk left to the run. Of twenty placings measured on both bodies with the five two-handers
+# (C:/dev/review/animation/axe_run/carry_view_table.md: the whole piece against the head's mesh through the low
+# camera from each side, quarter, the front and the back), this one cleared the head in every view (13 cm or more
+# at the nearest zoom, 4.5 at the playing zoom's sides), kept the weapon's head 1 cm or more under the shoulder line
+# and the top 9.8 cm under the chin,
+# both wrists within 52 degrees (twist 44), and the haft off the thighs at the sprint's knee lift (4.8 cm).
+CARRY_HAFT = (0.58, -0.77, 0.06)
+CARRY_RIGHT = (0.33, 0.06, -0.28)
+CARRY_EDGE_LEFT = 1.5
 _carry_length = Vector((-CARRY_HAFT[1], -CARRY_HAFT[0], CARRY_HAFT[2])).normalized()
-AXE_CARRY = chop(CARRY_RIGHT, CARRY_HAFT, tuple(_carry_length.cross(Vector((0.0, -1.0, 0.0)))),
+AXE_CARRY = chop(CARRY_RIGHT, CARRY_HAFT,
+	tuple((_carry_length.cross(Vector((0.0, -1.0, 0.0))).normalized() + Vector((CARRY_EDGE_LEFT, 0.0, 0.0))).normalized()),
 	((-0.6, 0.6, -0.5), (1.0, -0.3, -0.6)), grip=GREAT_GRIP)[len(SQUARED):]
 CLIPS["Axe_Carry_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_CARRY)),

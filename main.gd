@@ -30117,6 +30117,9 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"strike":
 			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _strike_command(words)
+		"quick":  # 451 amended (13), test-only: never in the help, unknown without --test-hp beside --run-marker.
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _quick_command(words)
 		"foes":
 			if hp_verb_allowed(not Net.test_foe.is_empty(), Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _foes_command(words)
@@ -30218,6 +30221,23 @@ func _relic_command(words: PackedStringArray) -> String:
 	var where := "pack" if World.into_pack(player, uid) >= 0 else "feet (the pack all bound)"
 	print("[test] relic: the remains of %s to %s (896)" % [knight, player.name])
 	return "relic: the remains of %s at %s's %s" % [knight, words[1], where]
+
+
+## quick <player> <share> <seconds> (451 amended (13), test-only, the "hp"
+## verb's gate): that online player's speed buff set to share (0 to 2) for
+## that long (World.add_buff, so a larger one already on is kept), for a
+## tour's true sprint: a stamina potion's +0.25 makes a plain 4.0 tiles a
+## second 5.0, under the man's Sprint_Short change (5.13).
+func _quick_command(words: PackedStringArray) -> String:
+	if words.size() < 4 or not words[2].is_valid_float() or not words[3].is_valid_float():
+		return "quick <player> <share> <seconds>: that player's speed buff (test-only)"
+	var id := str(_admin_player(words[1]).get("id", ""))
+	var player := _player_of_id(id) if not id.is_empty() else null
+	if player == null:
+		return "no player %s in the game" % words[1]
+	var share := clampf(float(words[2]), 0.0, 2.0)
+	World.add_buff(player, "speed", share, maxi(int(float(words[3]) * World.TICK_RATE), 1))
+	return "quick: %s's speed +%.2f for %s s, buffs %s" % [words[1], share, words[3], str(player.buffs.get("speed", []))]
 
 
 ## strike <player> <monster> (896's switch-on, test-only, the "hp" verb's
