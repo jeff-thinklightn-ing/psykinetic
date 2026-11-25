@@ -52,6 +52,7 @@ func _ready() -> void:
 	await _test_gait_phases()
 	await _test_gait_switch_feet()
 	await _test_run_arms()
+	await _test_carry_two()
 	await _test_posture_arms()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
@@ -3282,6 +3283,135 @@ const RUN_HANDS_R := -0.9
 const RUN_FOOT_R := -0.8
 const RUN_TWIST := 30.0
 const RUN_HEAD := 3.0
+## A reached two-hander carried at the run (451 amended (13), TASK 16; Jeff's v0.1.213 report, "running with axe, chars
+## left arm clips into head, and wrist bends at non anatomic angle"): the man's and the woman's rig in the people's stance,
+## each of REACHED_TWO in hand and its left hand reaching grip_2, Jog_Short and Sprint_Short each at HELD_STEPS times a
+## loop, read with Axe_Carry on the carry layer and with it off (main's arms). Carried: both wrists within
+## HELD_WRIST_BEND (twist HELD_WRIST_TWIST) on every sample, the left hand's root and the left elbow at least
+## CARRY_HEAD_CLEAR from the Head bone's root, and every bone but the arms' (POSTURE_ARM_BONES) where it is without the
+## carry (CARRY_BODY_SAME): the legs, the trunk's lean and twist and the head are the run's. The bounds are
+## C:/dev/review/animation/axe_run/carry_table.md's (measured on the skinned mesh, 11-25): the carried left wrist 44 to
+## 50 degrees, twist 39 to 44 (main 99 to 113, over 60 on 35 to 48 frames of 48), the right 33, twist 31; every part
+## of the left arm 0.24 m or more off the head's mesh (main 1 to 7 mm); the lean the gait's to a tenth of a degree.
+## CARRY_HEAD_CLEAR is that clearance read at the bones as drawn (_carry_head_gap: the head's centre to the forearm's and
+## the hand's segments), set from this row's own first reading, 11-25: carried 0.391 to 0.466 m, main 0.054 to 0.148 (the
+## hand at the face); the row's second check holds main's under it, so the bound tells the two apart.
+const CARRY_HEAD_CLEAR := 0.30
+const CARRY_BODY_SAME := 0.001
+func _test_carry_two() -> void:
+	print("== a two-hander carried at the run: the wrists in range, the left arm off the head, the body the run's ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var vary_was := AnimRig.vary_on
+	AnimRig.vary_on = false
+	var off: Array[String] = []
+	var read: Array[String] = []
+	var main_reads: Array[String] = []
+	var least_main := INF
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		for kind: String in REACHED_TWO:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			var holder := Node3D.new()
+			add_child(holder)
+			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+			var sockets: Dictionary = holder.get_meta("sockets")
+			var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+			var art := str(Items.def(kind).get("art", "item." + kind))
+			var piece := ArtKit.instance(art)
+			piece.name = "Held"
+			if Client3D._edge_first(kind):
+				piece.basis = Client3D.HELD_EDGE_TURN
+			Client3D._grip_at(piece, art)
+			(sockets["hand_r"] as Node3D).add_child(piece)
+			var reach := HandReach.make(sk, (sockets["hand_r"] as Node3D).transform, (sockets["hand_l"] as Node3D).transform)
+			Client3D._sync_reach(reach, sockets, [kind, ""])
+			var at := {}
+			for bone: String in ["LeftLowerArm", "LeftHand", "RightLowerArm", "RightHand", "LeftMiddleProximal", "Head"]:
+				var on := BoneAttachment3D.new()
+				on.bone_name = bone
+				sk.add_child(on)
+				at[bone] = on
+			var rig := AnimRig.make(model, lib, 0.0, true, null)
+			rig.stood_as = Client3D.PEOPLE_PREFIX
+			rig.set_process(false)
+			var still: Array[int] = []
+			for b in sk.get_bone_count():
+				if sk.get_bone_name(b) not in AnimRig.POSTURE_ARM_BONES and not _carry_under(sk, b, "LeftHand") and not _carry_under(sk, b, "RightHand"):
+					still.append(b)
+			for gait: String in ["Jog_Short", "Sprint_Short"]:
+				var length := rig.length(gait)
+				# [carried, main]: right bend, right twist, left bend, left twist, least clearance, and the body's most moved
+				var most := [[0.0, 0.0, 0.0, 0.0, INF, 0.0], [0.0, 0.0, 0.0, 0.0, INF, 0.0]]
+				for i in HELD_STEPS:
+					var t := length * float(i) / HELD_STEPS
+					var bodies := []
+					for k in 2:
+						rig.carry(str(Client3D.HUMANOID_MOVES["carry_two"]) if k == 0 else "", 0.0)
+						rig.base_at(gait, t)
+						await _frames(3)
+						var m: Array = most[k]
+						var wr := _wrist_turn(sk, at, "Right")
+						var wl := _wrist_turn(sk, at, "Left")
+						m[0] = maxf(m[0], wr.x)
+						m[1] = maxf(m[1], absf(wr.y))
+						m[2] = maxf(m[2], wl.x)
+						m[3] = maxf(m[3], absf(wl.y))
+						m[4] = minf(m[4], _carry_head_gap(at))
+						var places := []
+						for b in still:
+							places.append(sk.get_bone_global_pose(b).origin)
+						bodies.append(places)
+					for j in still.size():
+						most[0][5] = maxf(most[0][5], (bodies[0][j] as Vector3).distance_to(bodies[1][j]))
+				var c: Array = most[0]
+				var o: Array = most[1]
+				read.append("%s %s %s: right %.0f/%.0f, left %.0f/%.0f, left forearm and hand %.3f m off the head's centre, body moved %.4f m" % [
+					build[0], kind, gait, c[0], c[1], c[2], c[3], c[4], c[5]])
+				main_reads.append("%s %s %s: right %.0f/%.0f, left %.0f/%.0f, left forearm and hand %.3f m" % [build[0], kind, gait, o[0], o[1], o[2], o[3], o[4]])
+				least_main = minf(least_main, o[4])
+				if not reach.active or c[0] > HELD_WRIST_BEND or c[1] > HELD_WRIST_TWIST or c[2] > HELD_WRIST_BEND or c[3] > HELD_WRIST_TWIST \
+						or c[4] < CARRY_HEAD_CLEAR or c[5] > CARRY_BODY_SAME:
+					off.append(read[-1] + ("" if reach.active else " (the left hand not reaching)"))
+			model.queue_free()
+			holder.queue_free()
+			await _frames(1)
+	AnimRig.vary_on = vary_was
+	for line in read:
+		print("  carried ", line)
+	for line in main_reads:
+		print("  main's  ", line)
+	_check(off.is_empty() and read.size() == 2 * REACHED_TWO.size() * 2,
+		"each two-hander carried at the jog and the sprint, both bodies: wrists within %.0f deg (twist %.0f), the left forearm and hand %.2f m or more off the head's centre, the body as without it (%s)" % [
+		HELD_WRIST_BEND, HELD_WRIST_TWIST, CARRY_HEAD_CLEAR, "; ".join(off)])
+	# The clearance is a watch only if main's arm, which went into the face, reads inside it.
+	_check(least_main < CARRY_HEAD_CLEAR, "main's run (no carry) reads the left arm inside the bound: %.3f m against %.2f" % [least_main, CARRY_HEAD_CLEAR])
+
+
+## The least distance from the head's centre (CARRY_HEAD_UP along the Head bone from its root) to the left forearm
+## (elbow to wrist) and the hand (wrist to the middle finger's root), read at [param at]'s BoneAttachment3Ds: the pose
+## as drawn, the reach's modifier in (get_bone_global_pose is the pose before it, the hand never at grip_2).
+const CARRY_HEAD_UP := 0.09
+static func _carry_head_gap(at: Dictionary) -> float:
+	var head := at["Head"] as Node3D
+	var centre := head.global_position + head.global_basis.y.normalized() * CARRY_HEAD_UP
+	var least := INF
+	for pair: Array in [["LeftLowerArm", "LeftHand"], ["LeftHand", "LeftMiddleProximal"]]:
+		var a := (at[pair[0]] as Node3D).global_position
+		var b := (at[pair[1]] as Node3D).global_position
+		least = minf(least, Geometry3D.get_closest_point_to_segment(centre, a, b).distance_to(centre))
+	return least
+
+
+static func _carry_under(sk: Skeleton3D, b: int, top: String) -> bool:
+	var t := sk.find_bone(top)
+	b = sk.get_bone_parent(b)
+	while b >= 0:
+		if b == t:
+			return true
+		b = sk.get_bone_parent(b)
+	return false
+
+
 func _test_run_arms() -> void:
 	print("== the people's run arms ==")
 	var lib := load(CLIPS) as AnimationLibrary

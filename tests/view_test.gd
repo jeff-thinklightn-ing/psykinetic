@@ -274,6 +274,7 @@ func _ready() -> void:
 		_test_pose_edge()  # 390 amended (5): its own camera, put back after.
 		_test_run_arms_held()
 		_test_vary_calm()  # 977 amended (2): after run_arms_held, its player bare-handed and still standing.
+		await _test_carry_run()  # 451 amended (13): after vary_calm; it puts the player's body, hands and metas back.
 		await _test_shield_seen()
 		await _test_reel_clock()
 		await _test_barrow_deaths()
@@ -21102,6 +21103,171 @@ func _toes_ahead(puppet: Node3D) -> Vector2:
 ## jogging within 0.5 s; a 0.25 s pause mid-jog keeps the jog, no clip change through it; speeds
 ## alternating across the walk's and the sprint's changes every 0.25 s change gait at most once each;
 ## a real stop stands, not before STOP_HOLD and by 0.4 s; a burst from a walk jogs within 0.1 s.
+## A two-hander carried at the run, in the player's own frame (451 amended (13), TASK 16): the player as drawn by
+## Client3D (_animate, _sync_bow, the rig's own _process, CARRY_RUN_DT frames on the rigs' clock) holding a reached
+## two-hander, driven from standing: a walk, a jog, a sprint, a jog and a stop, CARRY_RUN_LEG each. The carry
+## (Axe_Carry on the carry layer) is off at the walk and the stop and full at the jog and the sprint, and never on with
+## a one-hander (the sword). Each change's largest step in one frame, in the body's frame (the hands as the clip lays
+## them, before the reach; the piece's head as drawn), is held under CARRY_RUN_STEPS, from
+## C:/dev/review/animation/axe_run/carry_table.md's transitions (11-25; all ten body and weapon pairs, carry against
+## main, L hand / R hand / head in m): walk to jog .070/.079/.313 (main .056/.074/.307), jog to sprint .046/.040/.098
+## (main .069/.080/.223), sprint to jog .035/.033/.045 (main .063/.062/.195), jog to a stop .197/.148/.478 (main
+## .488/.211/.819: the ready comes in on the upper layer in one frame, a row for later; the carry eased out halves it).
+## Main's own run (the carry's key taken out of the puppet's moves), the man with the battle axe, steps past the stop's
+## bound, so the bound tells the two apart. The walk to jog bound at the left hand is this row's own reading, not the
+## table's: from this row's shorter walk (1.5 s against the table's 2.5) the carry's ease-in steps it 0.090 (man) and
+## 0.101 m (woman) where main's steps 0.059 (11-25); the table's phase read 0.070 against 0.056.
+const CARRY_RUN_DT := 0.02
+const CARRY_RUN_LEG := 1.5
+## change: [L hand, R hand, the piece's head], m in one frame.
+const CARRY_RUN_STEPS := {"walk>jog": [0.12, 0.10, 0.36], "jog>sprint": [0.06, 0.06, 0.13], "sprint>jog": [0.05, 0.05, 0.08],
+	"jog>stop": [0.25, 0.18, 0.55]}
+func _test_carry_run() -> void:
+	print("\n== a two-hander carried at the run: on at the jog and the sprint, off at the walk and the stop, each change's step bounded ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to run")
+		return
+	var vary_was := AnimRig.vary_on
+	AnimRig.vary_on = false
+	var processing := _rig.is_processing()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was_slots := slots.duplicate()
+	var was_body := player.body
+	var was_raised := player.raised
+	_rig._process(0.0)
+	var was_at: Vector3 = (_rig._puppets[player.get_instance_id()] as Node3D).position
+	var main_stop := 0.0
+	for run: Array in [[&"male", "battle_axe", true], [&"female", "giant_axe", true], [&"male", "battle_axe", false], [&"male", "sword", true]]:
+		var out: Dictionary = await _carry_run(player, run[0], run[1], run[2])
+		var steps: Dictionary = out["steps"]
+		var amounts: Dictionary = out["amounts"]
+		var named := "%s %s%s" % [run[0], run[1], "" if run[2] else " (main's)"]
+		var reads: Array[String] = []
+		for leg: String in steps:
+			reads.append("%s %.3f/%.3f/%.3f carry %.2f" % [leg, steps[leg][0], steps[leg][1], steps[leg][2], amounts[leg]])
+		print("  %s: %s" % [named, "; ".join(reads)])
+		if not run[2]:
+			main_stop = float(steps["jog>stop"][0])
+			continue
+		if run[1] == "sword":
+			_check(amounts.values().max() == 0.0, "a one-hander at the run takes no carry (%s)" % named)
+			continue
+		var over: Array[String] = []
+		for leg: String in CARRY_RUN_STEPS:
+			for k in 3:
+				if float(steps[leg][k]) > float(CARRY_RUN_STEPS[leg][k]):
+					over.append("%s %s %.3f over %.2f" % [leg, ["L hand", "R hand", "head"][k], steps[leg][k], CARRY_RUN_STEPS[leg][k]])
+		var gone: Array[String] = []
+		for leg: String in amounts:
+			var want := 1.0 if leg in ["walk>jog", "jog>sprint", "sprint>jog"] else 0.0
+			if absf(float(amounts[leg]) - want) > 0.001:
+				gone.append("%s %.2f, not %.0f" % [leg, amounts[leg], want])
+		_check(gone.is_empty(), "%s: the carry full at each leg's end at the jog and the sprint, out at the walk and the stop (%s)" % [named, "; ".join(gone)])
+		_check(over.is_empty(), "%s: each change's step within carry_table's bounds (%s)" % [named, "; ".join(over)])
+	_check(main_stop > float(CARRY_RUN_STEPS["jog>stop"][0]),
+			"main's stop (no carry) steps past the stop's bound at the left hand: %.3f against %.2f" % [main_stop, CARRY_RUN_STEPS["jog>stop"][0]])
+	AnimRig.vary_on = vary_was
+	player.body = was_body
+	player.slots = was_slots
+	player.raised = was_raised
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	puppet.position = was_at
+	(puppet.get_meta("rig") as AnimRig).loop(Client3D.CLIP_IDLE, 1.0)
+	_rig.set_process(processing)
+
+
+## One run of _test_carry_run: {"steps": {change: [L, R, head]}, "amounts": {change: the carry's share at its end}}.
+func _carry_run(player: Player, body: StringName, weapon: String, carry_on: bool) -> Dictionary:
+	_rig.set_process(true)
+	player.body = body
+	var slots := player.slots
+	slots[Items.RIGHT_HAND] = weapon
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	player.raised = ""
+	_rig._process(0.0)
+	await _frames(2)
+	_rig._process(0.0)
+	_rig.set_process(false)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	rig.set_process(false)
+	var moves: Dictionary = Client3D.HUMANOID_MOVES.duplicate()
+	if not carry_on:
+		moves.erase("carry_two")
+	var moves_was: Variant = puppet.get_meta("moves", null)
+	puppet.set_meta("moves", moves)
+	rig.carry("", 0.0)
+	var pace: float = puppet.get_meta("pace", 1.0)
+	var sk := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var held := ((puppet.get_meta("sockets") as Dictionary)["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	var top := Vector3.ZERO
+	if held != null:
+		var pts: Array[Vector3] = []
+		var high := -INF
+		for mesh: MeshInstance3D in held.find_children("*", "MeshInstance3D", true, false):
+			var into := held.global_transform.affine_inverse() * mesh.global_transform
+			for s in mesh.mesh.get_surface_count():
+				for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+					pts.append(into * v)
+					high = maxf(high, (into * v).y)
+		var n := 0
+		for q in pts:
+			if q.y >= high - 0.05:
+				top += q
+				n += 1
+		top /= maxf(n, 1)
+	for key: String in ["speed", "gait_speed", "still_since", "gait_want", "burst_since", "burst_gait", "bow_state", "roused_at"]:
+		puppet.remove_meta(key)
+	rig.upper_off()  # The setup's frames may leave the ready on: with bow_state wiped, _sync_bow never takes it off.
+	AnimRig._clock_movie = 1
+	AnimRig._clock_frame = Engine.get_process_frames()
+	AnimRig._clock_msec = Time.get_ticks_msec()
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("last_at", puppet.position)
+	puppet.set_meta("last_ms", AnimRig._clock_msec)
+	rig.loop(Client3D.CLIP_IDLE, 1.0)
+	var lh := sk.find_bone("LeftHand")
+	var rh := sk.find_bone("RightHand")
+	var steps := {}
+	var amounts := {}
+	var was := []
+	for leg: Array in [["walk", 1.0], ["walk>jog", 4.0], ["jog>sprint", 6.5], ["sprint>jog", 4.0], ["jog>stop", 0.0]]:
+		player.step_pace = float(leg[1]) * pace
+		var most := [0.0, 0.0, 0.0]
+		for i in int(roundf(CARRY_RUN_LEG / CARRY_RUN_DT)):
+			AnimRig._clock_frame = Engine.get_process_frames()
+			AnimRig._clock_msec += int(CARRY_RUN_DT * 1000.0)
+			puppet.position += Vector3(float(leg[1]) * pace * CARRY_RUN_DT, 0.0, 0.0)
+			_rig._animate(puppet)
+			_rig._sync_bow(player, puppet)
+			rig._process(CARRY_RUN_DT)
+			await get_tree().process_frame
+			var o := puppet.global_position
+			var now := [sk.global_transform * sk.get_bone_global_pose(lh).origin - o, sk.global_transform * sk.get_bone_global_pose(rh).origin - o,
+				(held.global_transform * top - o) if held != null else Vector3.ZERO]
+			if not was.is_empty():
+				for k in 3:
+					most[k] = maxf(most[k], ((now[k] as Vector3) - (was[k] as Vector3)).length())
+			was = now
+		steps[leg[0]] = most
+		amounts[leg[0]] = rig.carry_amount()
+	AnimRig._clock_movie = -1
+	AnimRig._clock_frame = -1
+	player.step_pace = 0.0
+	if moves_was == null:
+		puppet.remove_meta("moves")
+	else:
+		puppet.set_meta("moves", moves_was)
+	rig.carry("", 0.0)
+	rig.set_process(true)
+	return {"steps": steps, "amounts": amounts}
+
+
 ## The run's arms on the player as drawn (the coordinator's terms for Jeff's report on v0.1.226, "the arms swinging
 ## left to right together": the joined player's hand had swept 0.76 m across against the clip's 0.24). The player
 ## with the starting sword in hand and with nothing, run straight at 4 m/s through Client3D's own _animate (its gait,
