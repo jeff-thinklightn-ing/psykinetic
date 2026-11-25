@@ -30248,7 +30248,8 @@ func _quick_command(words: PackedStringArray) -> String:
 		var now: Dictionary = player.buffs.duplicate(true)
 		if share < 0.0:
 			now["speed"] = [share, World.tick + ticks]
-			World._buffed[player] = true  # So it wears off as a potion's does.
+			var buffed: GridEntity = player  # The typed dictionary's key type (a Player key fails the laptop runner's --check-only).
+			World._buffed[buffed] = true  # So it wears off as a potion's does.
 		else:
 			now.erase("speed")
 		player.buffs = now
