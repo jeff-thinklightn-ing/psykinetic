@@ -7,7 +7,6 @@ notes (decision 324).
 
 ## Unreleased
 
-- Walking, jogging or sprinting with a two-handed weapon in both hands, you carry it low across your body, clear of your face; when you stop, your arms ease off it and it comes up to the ready (451 amended (13)).
 - Ask your companion the way and they stay by you as they answer (960).
 - Builder mode: when the answer comes, its pane moves to the other side if it would cover a spot the change takes away or alters, the short answer reads its parts with "; " between them, and the status line at the top sits on a dark plate (885 amended (2)).
 - A quarrel you've laid before the lawspeaker no longer lapses as a broken promise while he has given no ruling since; the plea stays open until he rules (448 amended (1)).
@@ -15,9 +14,13 @@ notes (decision 324).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps their idle talk until a while after (917).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
-- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown; with your bow in hand, arrows you equip from your pack go to your other hand and join those of the same kind there up to five, the rest staying in your pack, and a bundle you pick up with your bow out joins those in your hand (619 amended (4), 619 amended (5), 619 amended (6)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.242
+
+- Walking, jogging or sprinting with a two-handed weapon in both hands, you carry it low across your body, clear of your face; when you stop, your arms ease off it and it comes up to the ready (451 amended (13)).
+- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown; with your bow in hand, arrows you equip from your pack go to your other hand and join those of the same kind there up to five, the rest staying in your pack, and a bundle you pick up with your bow out joins those in your hand (619 amended (4), 619 amended (5), 619 amended (6)).
 
 ## v0.1.241
 
