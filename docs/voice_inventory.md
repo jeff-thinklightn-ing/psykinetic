@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3158)
+## Lines in the code (3165)
 
 ### companions (Pip, Wren, Nix) (721)
 
@@ -2235,7 +2235,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (846)
+### server and windows (853)
 
 | | Line | Where |
 |---|---|---|
@@ -2969,10 +2969,17 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | relic: none made | `main.gd` _relic_command() |
 |  | feet (the pack all bound) | `main.gd` _relic_command() |
 |  | relic: the remains of %s at %s's %s | `main.gd` _relic_command() |
+|  | quick <player> <share> <seconds>: that player's speed buff (test-only) | `main.gd` _quick_command() |
+|  | no player %s in the game | `main.gd` _quick_command() |
+|  | quick: %s's speed %+.2f for %s s, buffs %s | `main.gd` _quick_command() |
 |  | strike <player> <monster>: a blow of all its hp from that player (test-only) | `main.gd` _strike_command() |
 |  | no player %s in the game | `main.gd` _strike_command() |
 |  | strike: no monster in %s is called %s; none struck | `main.gd` _strike_command() |
 |  | strike: %s struck %s, %d hp left | `main.gd` _strike_command() |
+|  | root <player> <monster> <seconds>: that monster held on its cell (test-only) | `main.gd` _root_command() |
+|  | no player %s in the game | `main.gd` _root_command() |
+|  | root: no monster in %s is called %s; none held | `main.gd` _root_command() |
+|  | root: %s held at %s for %s s | `main.gd` _root_command() |
 |  | no production here (the server keeps it) | `main.gd` _makers_command() |
 |  | %s at %s | `main.gd` _makers_command() |
 |  | %s (a companion) at %s | `main.gd` _makers_command() |
