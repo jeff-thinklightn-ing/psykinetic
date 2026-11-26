@@ -825,6 +825,177 @@ func _sections(bot: Node) -> void:
 var _foe_at := {}  # swing run name: the goblin's cell, for its after's check
 
 
+## The weight's section (451 amended (14), TASK 16 step 2; TOUR_ONLY=sway, remote_shot.sh's --tour-only sway): the
+## carry's three columns side by side, today's rigid carry (Client3D.carry_sway off, the shipped placing), the weight on
+## the shipped placing and the weight on J2 (Client3D.carry_placing "j2", Axe_Carry_J2), SWAY_COLUMNS, for the man's
+## battle axe and the woman's giant axe (SWAY_ROWS). Gait by gait, each column in turn: the walk, the jog and the sprint
+## from RUN_FROM west to RUN_TO, standing to standing (the start and the stop in each), then a jog with a 90-degree turn
+## (west, then at SWAY_CORNER north or south, whichever way SWAY_LEG cells are walkable). Each run is one clip (each
+## 40 ms, cropped round the runner) from SWING_LEAD s standing before the first click to SWING_TAIL s after the stop (the
+## walk's 8 s between kept out, as _run's), and at the jog and the sprint two stills side on, the first at a footfall's
+## low (the Hips' lowest in a stride, SWAY_STILL_AFTER s after the gait is reached; grabbed the frame after it) and the
+## second at the stride's high after it. <run>_frames.txt logs each frame: the state, the Hips' height (m), the body's
+## yaw (deg), and the sway's give (lean, turn, clavicle in deg, the hand up and ahead in cm, its yaw in deg; "off" when
+## none runs). The column's switches are the client's own statics, set before each run and put back after the section.
+const SWAY_COLUMNS: Array[Array] = [["rigid", false, "shipped"], ["shipped", true, "shipped"], ["j2", true, "j2"]]
+const SWAY_ROWS := {"man": "battle_axe", "woman": "giant_axe"}
+const SWAY_CORNER := Vector2i(200, 211)
+const SWAY_LEG := 5
+const SWAY_STILL_AFTER := 1.0
+func _sway_section(bot: Node) -> void:
+	var was_sway := Client3D.carry_sway
+	var was_placing := Client3D.carry_placing
+	var turn_dir := Vector2i.ZERO
+	for d: Vector2i in [Vector2i(0, -1), Vector2i(0, 1)]:
+		var clear := true
+		for k in range(0, SWAY_LEG + 1):
+			clear = clear and World.is_walkable(SWAY_CORNER + d * k)
+		if clear:
+			turn_dir = d
+			break
+	bot.log_line("%s sway: the turn at %s goes %s" % [TAG, SWAY_CORNER, str(turn_dir) if turn_dir != Vector2i.ZERO else "nowhere (no clear leg north or south)"])
+	for row: Array in ROWS:
+		var weapon: String = SWAY_ROWS.get(row[0], "")
+		if weapon == "" or not await _join(bot, row):
+			continue
+		if not await _hold(bot, weapon):
+			continue
+		await _clear(bot)
+		for gait: String in ["walk", "jog", "sprint", "turn"]:
+			if gait == "turn" and turn_dir == Vector2i.ZERO:
+				continue
+			for col: Array in SWAY_COLUMNS:
+				Client3D.carry_sway = bool(col[1])
+				Client3D.carry_placing = str(col[2])
+				await _sway_run(bot, row, weapon, gait, col, turn_dir)
+	Client3D.carry_sway = was_sway
+	Client3D.carry_placing = was_placing
+
+
+func _sway_run(bot: Node, row: Array, weapon: String, gait: String, col: Array, turn_dir: Vector2i) -> void:
+	await _home(bot, RUN_FROM)
+	var name := "%s_%s_%s_%s" % [row[0], weapon, gait, col[0]]
+	await _speed(bot, name, "jog" if gait == "turn" else gait)
+	_mode(bot, true)
+	_near(bot)
+	var west := Vector2i(signi(RUN_TO.x - RUN_FROM.x), 0)
+	_yaw(bot, _yaw_for(Vector2(-west.y, west.x)))
+	await bot.frames(3)
+	var camera := await _settle(bot, name)
+	var rig := _rig(bot)
+	var pup := _pup(bot, bot.me())
+	var sk := pup.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var hips := sk.find_bone("Hips")
+	var body := pup.get_node("Body") as Node3D
+	var lines: PackedStringArray = []
+	var clip: Array[Image] = []
+	var clip_at: PackedStringArray = []
+	var stills: Array[Array] = []
+	var bases := {}
+	var carries := {}
+	var last_click := -1000
+	var last_grab := -1000
+	var start: Vector2i = bot.cell()
+	var moved := -1.0
+	var stopped := -1.0
+	var gait_at := -1.0
+	var turned := false
+	var yaw0 := INF
+	var yaw_most := 0.0
+	var gave := 0  # frames the sway gave (any part not zero)
+	var h := [INF, INF]  # the Hips' height the two frames before
+	var still_want := "low"
+	var target := RUN_TO
+	var t0 := Time.get_ticks_msec() + int(SWING_LEAD * 1000.0)
+	while Time.get_ticks_msec() - t0 < (16000 if gait == "walk" else 9000):
+		var s := (Time.get_ticks_msec() - t0) / 1000.0
+		if stopped >= 0.0 and s > stopped + SWING_TAIL:
+			break
+		if s >= 0.0 and stopped < 0.0 and (Time.get_ticks_msec() - t0) - last_click >= 300:
+			last_click = Time.get_ticks_msec() - t0
+			if gait == "turn" and not turned and bot.cell().x <= SWAY_CORNER.x:
+				turned = true
+				target = SWAY_CORNER + turn_dir * SWAY_LEG
+				bot.log_line("%s %s: at %s, clicked on toward %s, %.2f s" % [TAG, name, bot.cell(), target, s])
+			if gait == "turn" and not turned:
+				await bot.click(SWAY_CORNER + west * 3)
+			elif gait == "turn":
+				for k in range(SWAY_LEG, 1, -1):
+					var to: Vector2i = SWAY_CORNER + turn_dir * k
+					if not is_nan((bot.screen_point(to) as Vector2).x):
+						await bot.click(to)
+						break
+			else:
+				await _click_on(bot, west)
+		var in_clip := gait != "walk" or s < WALK_CLIP_START or absi(bot.cell().x - RUN_TO.x) <= 1 or stopped >= 0.0
+		var grabbed := false
+		var y := (sk.global_transform * sk.get_bone_global_pose(hips).origin).y
+		var fast := rig.base_clip() in ["Jog_Short", "Sprint_Short"]
+		if fast and gait_at < 0.0:
+			gait_at = s
+		if gait != "walk" and gait != "turn" and fast and gait_at >= 0.0 and s >= gait_at + SWAY_STILL_AFTER and still_want != "":
+			var at_low: bool = still_want == "low" and h[0] < h[1] and h[0] <= y
+			var at_high: bool = still_want == "high" and h[0] > h[1] and h[0] >= y
+			if at_low or at_high:
+				var img := await _grab(bot)
+				grabbed = true
+				stills.append(["%s_%s" % [name, still_want], img, _crop_of(bot, img), "%.2f s, the Hips %.3f m (the %s %.3f the frame before), %s" % [s, y, still_want, h[0], _state(bot)]])
+				still_want = "high" if still_want == "low" else ""
+		if not grabbed and in_clip and (Time.get_ticks_msec() - t0) - last_grab >= 40:
+			last_grab = Time.get_ticks_msec() - t0
+			clip_at.append("%03d %.3f" % [clip.size(), last_grab / 1000.0])
+			clip.append(await _clip_frame(bot))
+		elif not grabbed:
+			await bot.get_tree().process_frame
+		h = [y, h[0]]
+		var now := (Time.get_ticks_msec() - t0) / 1000.0
+		if moved < 0.0 and bot.cell() != start:
+			moved = now
+		if moved >= 0.0 and stopped < 0.0 and rig.base_clip() == Client3D.CLIP_IDLE:
+			stopped = now
+		var yaw := rad_to_deg(body.rotation.y)
+		if moved >= 0.0 and yaw0 == INF:
+			yaw0 = yaw
+		if yaw0 != INF:
+			yaw_most = maxf(yaw_most, absf(wrapf(yaw - yaw0, -180.0, 180.0)))
+		bases[rig.base_clip()] = true
+		if rig.carry_clip() != "":
+			carries[rig.carry_clip()] = true
+		var sway: Node = pup.get_meta("sway") if pup.has_meta("sway") else null
+		var give := "off"
+		if sway != null and sway.get("active"):
+			var off: Vector3 = sway.get("hand_off")
+			give = "lean %+.2f turn %+.2f clav %.2f hand up %+.2f ahead %+.2f yaw %+.2f" % [sway.get("lean"), sway.get("turn"), sway.get("clav"), off.y * 100.0, off.z * 100.0, sway.get("yaw")]
+			if absf(float(sway.get("lean"))) + absf(float(sway.get("turn"))) + off.length() > 0.0001:
+				gave += 1
+		lines.append("%.3f %s hips %.3f yaw %.1f %s" % [now, _state(bot), y, yaw, give])
+	var file := FileAccess.open((bot.own_dir() as String).path_join(name + "_frames.txt"), FileAccess.WRITE)
+	if file != null:
+		file.store_line("# %s: %s; worn: %s; the column %s (carry_sway %s, placing %s); camera %.2f m; first step %.2f s, the stop %.2f s, the gait reached %.2f s; the body's yaw turned %.1f deg at most; seconds after the first click (negative: standing before it), state, the Hips' height, the body's yaw, the sway's give" % [
+			name, _hands(bot), _worn(bot), col[0], col[1], col[2], camera, moved, stopped, gait_at, yaw_most])
+		file.store_string("\n".join(lines) + "\n")
+		file.close()
+	for still: Array in stills:
+		var ok: bool = _save(bot, still[1], still[0]) and _save_crop(bot, still[2], still[0])
+		bot.log_line("%s still %s %s (and %s_crop, 3x): %s" % [TAG, still[0], "saved" if ok else "FAILED", still[0], still[3]])
+		await bot.frames(1)
+	for i in clip.size():
+		_save(bot, clip[i], "clip_%s/%03d" % [name, i])
+		if i % 4 == 3:
+			await bot.frames(1)
+	_times(bot, name, clip_at, "first step %.2f s, the stop %.2f s; the column %s" % [moved, stopped, col[0]])
+	bot.log_line("%s run %s: the stop at %.2f s at %s; clips %s; carry %s; the sway gave on %d frames; yaw turned %.1f deg; %d stills, %d clip frames; camera %.2f m" % [
+		TAG, name, stopped, bot.cell(), ",".join(bases.keys()), ",".join(carries.keys()), gave, yaw_most, stills.size(), clip.size(), camera])
+	var placed := str(Client3D.CARRY_PLACINGS[col[2]])
+	bot.expect(carries.has(placed) and carries.size() == 1, "%s: carried as %s" % [name, placed], ",".join(carries.keys()))
+	bot.expect((gave > 0) == bool(col[1]), "%s: the sway %s" % [name, "gave" if col[1] else "off (the rigid carry)"], "%d frames gave" % gave)
+	bot.expect(stopped >= 0.0, "%s: stood at the run's end" % name, "at %s" % bot.cell())
+	if gait == "turn":
+		bot.expect(turned and yaw_most >= 80.0, "%s: turned about 90 degrees" % name, "%.1f deg" % yaw_most)
+	elif gait != "walk":
+		bot.expect(stills.size() == 2, "%s: the footfall's low and the stride's high stills" % name, "%d" % stills.size())
+
+
 ## The speed for [param gait], set after the run's move: the console's quick (test-only) at Main.QUICK_LEAST for the walk,
 ## QUICK_SHARE for the sprint (a stamina potion's +0.25 stays under the man's sprint change), none for the jog; logged
 ## with the buffs the client then shows. At 969f33fa7 it was set before the runs and never reached one: the console's
@@ -876,8 +1047,11 @@ func run(bot: Node) -> void:
 	_only = OS.get_environment("TOUR_ONLY")
 	if _only != "":
 		bot.log_line("%s section %s" % [TAG, _only])
-		if bot.expect(_only.contains("wrists") or _only.contains("pace"), "a section this tour has (wrists, pace)", _only):
-			await _sections(bot)
+		if bot.expect(_only.contains("wrists") or _only.contains("pace") or _only.contains("sway"), "a section this tour has (wrists, pace, sway)", _only):
+			if _only.contains("wrists") or _only.contains("pace"):
+				await _sections(bot)
+			if _only.contains("sway"):
+				await _sway_section(bot)
 		bot.log_line("%s done: server script errors %d" % [TAG, bot.server_lines("SCRIPT ERROR").size()])
 		return
 	var joined := ""

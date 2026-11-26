@@ -21140,6 +21140,10 @@ func _test_carry_run() -> void:
 		return
 	var vary_was := AnimRig.vary_on
 	AnimRig.vary_on = false
+	# The placing's own steps, its bounds read without the weight (451 amended (14)'s sway: its steps are
+	# carry_sway_test's no-kick rows).
+	var sway_was := Client3D.carry_sway
+	Client3D.carry_sway = false
 	var processing := _rig.is_processing()
 	var slots := player.slots
 	while slots.size() < Items.CARRIED:
@@ -21203,6 +21207,7 @@ func _test_carry_run() -> void:
 	_check(main_stop > float(CARRY_RUN_STEPS["jog>stop"][0]),
 			"main's stop (no carry) steps past the stop's bound at the left hand: %.3f against %.2f" % [main_stop, CARRY_RUN_STEPS["jog>stop"][0]])
 	AnimRig.vary_on = vary_was
+	Client3D.carry_sway = sway_was
 	player.body = was_body
 	player.slots = was_slots
 	player.raised = was_raised

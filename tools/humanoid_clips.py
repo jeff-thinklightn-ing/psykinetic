@@ -761,13 +761,29 @@ CLIPS["Axe_Ready_Loop"] = {"loop": True, "keys": [
 CARRY_HAFT = (0.58, -0.77, 0.06)
 CARRY_RIGHT = (0.33, 0.06, -0.28)
 CARRY_EDGE_LEFT = 1.5
-_carry_length = Vector((-CARRY_HAFT[1], -CARRY_HAFT[0], CARRY_HAFT[2])).normalized()
-AXE_CARRY = chop(CARRY_RIGHT, CARRY_HAFT,
-	tuple((_carry_length.cross(Vector((0.0, -1.0, 0.0))).normalized() + Vector((CARRY_EDGE_LEFT, 0.0, 0.0))).normalized()),
-	((-0.6, 0.6, -0.5), (1.0, -0.3, -0.6)), grip=GREAT_GRIP)[len(SQUARED):]
+
+
+def _carry_pose(right, haft, edge_left, poles):
+	length = Vector((-haft[1], -haft[0], haft[2])).normalized()
+	edge = tuple((length.cross(Vector((0.0, -1.0, 0.0))).normalized() + Vector((edge_left, 0.0, 0.0))).normalized())
+	return chop(right, haft, edge, poles, grip=GREAT_GRIP)[len(SQUARED):]
+
+
+AXE_CARRY = _carry_pose(CARRY_RIGHT, CARRY_HAFT, CARRY_EDGE_LEFT, ((-0.6, 0.6, -0.5), (1.0, -0.3, -0.6)))
 CLIPS["Axe_Carry_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_CARRY)),
 	(1.0, P("Idle_Loop", 0.0, AXE_CARRY)),
+]}
+# The closer carry, J2 (TASK 16 step 2, 451 amended (14); built for the strip, not shipped): the haft nearer the
+# body's line (0.97 of it to the left), the right hand a little lower and in, the left hand's pole out ahead, so
+# the left palm closes on the haft (shipped: 3.0 cm short of grip_2 on the man, J2 0) and the weight's give has room
+# down, forward and turned right (C:/dev/review/animation/axe_run/sway/envelope.txt). Client3D.CARRY_PLACINGS.
+CARRY_J2_HAFT = (0.26, -0.97, 0.01)
+CARRY_J2_RIGHT = (0.3, 0.04, -0.26)
+AXE_CARRY_J2 = _carry_pose(CARRY_J2_RIGHT, CARRY_J2_HAFT, CARRY_EDGE_LEFT, ((-1.0, 0.3, -0.5), (0.6, -1.0, 0.0)))
+CLIPS["Axe_Carry_J2_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, AXE_CARRY_J2)),
+	(1.0, P("Idle_Loop", 0.0, AXE_CARRY_J2)),
 ]}
 # The war hammer's blow, one-handed (the coordinator, on 451 amended (2)'s cut: Axe_Overhead put
 # the left hand up beside a one-handed haft, holding nothing): the right arm alone raises it over
