@@ -26841,13 +26841,21 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 ## hands giving to it inside the placing's room, its share the carry layer's own) while [member carry_sway] is on; off
 ## outside the carry (the ready, a rest, a blow, a draw, a one-hander, every other body and every other puppet: no
 ## part of it is made or runs). [member carry_placing] names the carry's placing (CARRY_PLACINGS: the shipped carry,
-## or J2, the closer one built for the strip), so one build shoots both; the tour sets both.
+## or J2, the closer one built for the strip), and [member carry_sway_strength] its strength (CarrySway.STRENGTHS:
+## "light" as first shot, "heavy"), so one build shoots each; the tour sets them.
 const CARRY_PLACINGS := {"shipped": "Axe_Carry", "j2": "Axe_Carry_J2"}
 const CARRY_SWAY_BODIES := ["human_m", "human_f"]
 const CarrySway := preload("res://client3d/carry_sway.gd")
 static var carry_placing := "shipped"
 static var carry_sway := true
+static var carry_sway_strength := "light"
 const CARRY_SWAY_STRIKE_FADE := 0.1
+
+
+## The blow's ease of the sway off and back (s): CARRY_SWAY_STRIKE_FADE times the strength's fade.
+static func carry_sway_fade() -> float:
+	return CARRY_SWAY_STRIKE_FADE * float((CarrySway.STRENGTHS.get(carry_sway_strength, CarrySway.STRENGTHS["light"]) as Dictionary)["fade"])
+
 const CARRY_TWO_FADE := 0.3
 const READY_IN_FADE := 0.3
 func _carry_two(entity: GridEntity, puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String, ids: Array) -> void:
@@ -26888,7 +26896,7 @@ func _carry_sway(entity: GridEntity, puppet: Node3D, rig: AnimRig, clip: String,
 	var now := AnimRig.now_msec()
 	var dt := clampf((now - int(puppet.get_meta("sway_ms", now))) / 1000.0, 0.0, CarrySway.RESET_DT)
 	puppet.set_meta("sway_ms", now)
-	var struck := move_toward(float(puppet.get_meta("sway_struck", 0.0)), 1.0 if rig.striking() else 0.0, dt / CARRY_SWAY_STRIKE_FADE)
+	var struck := move_toward(float(puppet.get_meta("sway_struck", 0.0)), 1.0 if rig.striking() else 0.0, dt / carry_sway_fade())
 	puppet.set_meta("sway_struck", struck)
 	share *= 1.0 - struck
 	sway.set_on(share)
@@ -26898,6 +26906,7 @@ func _carry_sway(entity: GridEntity, puppet: Node3D, rig: AnimRig, clip: String,
 	for i in mini(3, gaits.size()):
 		if rig.base_clip() == str(gaits[i][0]):
 			gait = i
+	sway.set("strength", carry_sway_strength)
 	sway.set("weight", Items.weight_of(str(ids[0])) if ids.size() > 0 and Items.weight_of(str(ids[0])) > 0.0 else CarrySway.WEIGHT)
 	# The pace's gait: past the midpoint of two gaits' speeds (a start into the sprint still on the jog's clip).
 	var speed := float(puppet.get_meta("speed", 0.0))
@@ -26905,7 +26914,7 @@ func _carry_sway(entity: GridEntity, puppet: Node3D, rig: AnimRig, clip: String,
 	for i in range(1, mini(3, gaits.size())):
 		if speed >= (float(gaits[i - 1][1]) + float(gaits[i][1])) * 0.5:
 			by_pace = i
-	sway.set_room(CarrySway.room_of(clip, rig.kind, gait, by_pace))
+	sway.set_room(CarrySway.room_of(clip, rig.kind, gait, by_pace, carry_sway_strength))
 
 
 ## The bow aimed at the sky for a lob (677, pc-character's side): drawn or

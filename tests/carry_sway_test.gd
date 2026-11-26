@@ -25,6 +25,11 @@ const SHORT := [["stand", 0.0, 0.4], ["walk", 1.0, 1.0], ["jog", 4.0, 2.0], ["st
 const TURN_AT := 1.3
 const TURN_TIME := 0.2
 const DT := 0.02
+## A long frame (s): a zone's load, a hitch on any player's machine; the tour's frames showed one of 0.49 s at a stop.
+const LONG_FRAME := 0.5
+## The pose's catch-up after it (frames): the clock and the body move the whole long frame at once, the pose its own
+## frame only, the rest over the next LONG_CATCH frames (the tour's stop: the hips 9 cm in 0.07 s after the hole).
+const LONG_CATCH := 3
 const LOWER := ["Hips", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "LeftToes", "RightUpperLeg", "RightLowerLeg", "RightFoot", "RightToes"]
 ## The off run against itself (m): the drive repeats.
 const REPEAT := 0.0001
@@ -54,6 +59,11 @@ const WRIST_TWIST := 45.0
 const HEAD_CLEAR := 0.30
 const HEAD_UP := 0.09
 const LAMP := 0.15
+## The left hand's gap to its place on the haft may widen this much (m) over the rigid carry's on a leg.
+const LGAP_SLACK := 0.002
+## The light strength on the shipped placing as first shot (1f3a5b92a): its hand's give widens the left hand's gap
+## 0.4 to 0.7 cm (TASK 16's reshoot); printed, not failed, till the coordinator rules on it.
+const LGAP_AS_SHOT := ["man battle_axe shipped light", "woman giant_axe shipped light"]
 const GRIP := 0.01
 const HASH := 0.25
 const BOUND_EVERY := 3
@@ -92,19 +102,23 @@ func _ready() -> void:
 	print("carry_sway_test: %.3f px a cm at the low camera's zoom 1.0 (%.0f m, fov %.0f, 1080 rows)" % [_px_per_cm, dist, Client3D.LOW_FOV])
 	var placing_was := Client3D.carry_placing
 	var sway_was := Client3D.carry_sway
-	var steps := {}
+	var strength_was := Client3D.carry_sway_strength
 	for r: Array in RUNS:
 		for placing: String in ["shipped", "j2"]:
 			Client3D.carry_placing = placing
+			Client3D.carry_sway_strength = "light"
 			var off: Array = await _drive(str(r[0]), str(r[1]), false, LEGS, DT, {}, true)
-			var on: Array = await _drive(str(r[0]), str(r[1]), true, LEGS, DT, {}, true)
 			var again: Array = await _drive(str(r[0]), str(r[1]), false, LEGS, DT, {}, false)
-			var name := "%s %s %s" % [r[0], r[1], placing]
-			_check_runs(name, placing, off, on, again)
-			if r[0] == "man" and placing == "shipped":
-				steps = _steps(on)
-				await _test_events(on, steps)
-				await _test_steady(on)
+			for strength: String in ["light", "heavy"]:
+				Client3D.carry_sway_strength = strength
+				var on: Array = await _drive(str(r[0]), str(r[1]), true, LEGS, DT, {}, true)
+				var name := "%s %s %s %s" % [r[0], r[1], placing, strength]
+				_check_runs(name, placing, off, on, again)
+				if r[0] == "man" and placing == "shipped":
+					print("  -- %s: events and frame rates" % strength)
+					await _test_events(on, _steps(on))
+					await _test_steady(on)
+	Client3D.carry_sway_strength = strength_was
 	Client3D.carry_placing = "shipped"
 	await _test_off_means_off()
 	Client3D.carry_placing = placing_was
@@ -221,6 +235,8 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 	rig._rng = seeded
 	var frames := []
 	var t := 0.0
+	var owed := 0.0
+	var catch := 0
 	for leg: Array in legs:
 		player.step_pace = float(leg[1]) * pace
 		var t0 := t
@@ -230,7 +246,13 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 				yaw = PI / 2.0 * clampf((lt + dt - TURN_AT) / TURN_TIME, 0.0, 1.0)
 				bodyn.rotation.y = yaw
 			var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
-			puppet.position += ahead * float(leg[1]) * pace * dt
+			var fdt := dt
+			var pose_dt := dt
+			if owed > 0.0:
+				pose_dt += owed / LONG_CATCH
+				catch -= 1
+				if catch <= 0:
+					owed = 0.0
 			var event := ""
 			if not ev.is_empty() and str(ev["leg"]) == str(leg[0]) and lt >= float(ev["at"]) and lt < float(ev["at"]) + dt * 0.5:
 				event = str(ev["do"])
@@ -243,11 +265,16 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 						AnimRig._clock_msec += 300
 					"unseen":
 						rig.every = Client3D.POSE_UNSEEN_EVERY
+					"long":
+						fdt = LONG_FRAME
+						owed = LONG_FRAME - dt
+						catch = LONG_CATCH
+			puppet.position += ahead * float(leg[1]) * pace * fdt
 			if not ev.is_empty() and str(ev["do"]) == "unseen" and str(ev["leg"]) == str(leg[0]) and lt >= float(ev["at"]) + 0.3 and rig.every != 1:
 				rig.every = 1
 				event = "seen"
-			await _step(puppet, player, rig, dt)
-			t += dt
+			await _step(puppet, player, rig, fdt, pose_dt)
+			t += fdt
 			var w := held.global_transform * top if held != null else Vector3.ZERO
 			var mb := model.global_basis.orthonormalized()
 			var hb := (mb.inverse() * (drawn["Head"] as Node3D).global_basis).orthonormalized()
@@ -287,13 +314,14 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 	return frames
 
 
-func _step(puppet: Node3D, player: Player, rig: AnimRig, dt: float) -> void:
+## [param pose_dt]: the rig's own advance when it is not the clock's (a long frame's pose caught up after it).
+func _step(puppet: Node3D, player: Player, rig: AnimRig, dt: float, pose_dt := -1.0) -> void:
 	AnimRig._clock_frame = Engine.get_process_frames()
 	AnimRig._clock_msec += int(roundf(dt * 1000.0))
 	puppet.remove_meta("stood_at")  # No rest: its REST_STAND_SECONDS run on the wall clock, at the machine's pace.
 	_rig3d._animate(puppet)
 	_rig3d._sync_bow(player, puppet)
-	rig._process(dt)
+	rig._process(dt if pose_dt < 0.0 else pose_dt)
 	await get_tree().process_frame
 	# The rigs' clock held through the frame the readings are taken in: a read in a new frame (rig.striking()) adds
 	# the wall's frame time to it otherwise (AnimRig.now_msec).
@@ -355,6 +383,17 @@ func _check_runs(name: String, placing: String, off: Array, on: Array, again: Ar
 	for k: String in b_on["breaks"]:
 		if not (b_off["breaks"] as Dictionary).has(k):
 			extra.append("%s x%d" % [k, b_on["breaks"][k]])
+	# The left hand's gap to its place on the haft, leg by leg, no wider than the rigid carry's (LGAP_SLACK over).
+	var wider: Array[String] = []
+	for leg: String in b_on["lgap"]:
+		var was := float((b_off["lgap"] as Dictionary).get(leg, 0.0))
+		if float(b_on["lgap"][leg]) > was + LGAP_SLACK:
+			wider.append("L gap (%s) %.4f m, rigid %.4f" % [leg, b_on["lgap"][leg], was])
+	if name in LGAP_AS_SHOT:
+		if not wider.is_empty():
+			print("  NOTE  %s: the left hand's gap wider than the rigid carry's, as shot (%s)" % [name, ", ".join(wider)])
+	else:
+		extra.append_array(wider)
 	print("    bounds off: %s" % b_off["line"])
 	print("    bounds on:  %s" % b_on["line"])
 	_check(extra.is_empty(), "%s: sway on breaks no bound the rigid carry keeps on that leg (%s)" % [name, ", ".join(extra) if not extra.is_empty() else "none"])
@@ -586,10 +625,11 @@ func _steps(fr: Array) -> Dictionary:
 ## No kick: a jump of 6 m in a frame, a 300 ms gap, a return from posing one frame in eight, each in the jog; and a
 ## blow from a run (0.72 s into the jog) takes the sway off, eased, and keeps it off while it strikes.
 func _test_events(plain: Array, steps: Dictionary) -> void:
-	for ev: Dictionary in [{"leg": "jog", "at": 0.72, "do": "jump"}, {"leg": "jog", "at": 0.72, "do": "gap"},
+	for ev: Dictionary in [{"leg": "jog", "at": 0.72, "do": "long"}, {"leg": "stop", "at": 0.0, "do": "long"},
+			{"leg": "jog", "at": 0.72, "do": "jump"}, {"leg": "jog", "at": 0.72, "do": "gap"},
 			{"leg": "jog", "at": 0.6, "do": "unseen"}, {"leg": "jog", "at": 0.72, "do": "blow"}]:
 		var fr: Array = await _drive("man", "battle_axe", true, SHORT, DT, ev, false)
-		var near := _steps(fr.filter(func(f: Dictionary) -> bool: return str(f["leg"]) == "jog"))
+		var near := _steps(fr.filter(func(f: Dictionary) -> bool: return str(f["leg"]) == str(ev["leg"])))
 		var worst := ""
 		for k: String in near:
 			if float(near[k]) > float(steps[k]) * KICK + KICK_LEAST:
@@ -600,14 +640,68 @@ func _test_events(plain: Array, steps: Dictionary) -> void:
 				resets = maxi(resets, int(f["sway"]["resets"]))
 		if str(ev["do"]) == "blow":
 			var struck := fr.filter(func(f: Dictionary) -> bool: return bool(f["striking"]))
-			var late := struck.slice(int(ceilf((Client3D.CARRY_SWAY_STRIKE_FADE + DT) / DT)))
+			var late := struck.slice(int(ceilf((Client3D.carry_sway_fade() + DT) / DT)))
 			var on_late := late.filter(func(f: Dictionary) -> bool: return not (f["sway"] as Dictionary).is_empty() and bool(f["sway"]["active"]))
 			_check(not struck.is_empty() and on_late.is_empty() and worst == "",
 				"a blow from a run: the sway eased off over %.1f s and off while it strikes (%d frames striking, %d with the sway on after the ease; steps%s)" % [
-				Client3D.CARRY_SWAY_STRIKE_FADE, struck.size(), on_late.size(), worst if worst != "" else " within the run's"])
+				Client3D.carry_sway_fade(), struck.size(), on_late.size(), worst if worst != "" else " within the run's"])
 		else:
-			_check(worst == "" and (resets >= 1 or str(ev["do"]) == "unseen"), "no kick at a %s in the jog (%d reset%s; steps%s)" % [
-				ev["do"], resets, "" if resets == 1 else "s", worst if worst != "" else " within the run's"])
+			if str(ev["do"]) == "long":
+				_print_long(fr)
+			if worst != "":
+				_print_worst(fr, str(ev["leg"]))
+			_check(worst == "" and (resets >= 1 or str(ev["do"]) == "unseen"), "no kick at a %s in the %s (%d reset%s; steps%s)" % [
+				ev["do"], ev["leg"], resets, "" if resets == 1 else "s", worst if worst != "" else " within the run's"])
+
+
+## The frames about a long frame: each output as drawn and as the give (the output over the carry's share), so a step
+## shows whether it is the give's or the share's.
+func _print_long(fr: Array) -> void:
+	var at := -1
+	for i in fr.size():
+		if str(fr[i]["event"]) == "long":
+			at = i
+	if at < 0:
+		return
+	var worst := {"lean": 0.0, "turn": 0.0, "clav": 0.0, "hand": 0.0}
+	for i in range(maxi(at - 2, 1), mini(at + 12, fr.size())):
+		var s: Dictionary = fr[i]["sway"]
+		var q: Dictionary = fr[i - 1]["sway"]
+		if s.is_empty() or q.is_empty():
+			continue
+		var a := maxf(float(s["amount"]), 0.001)
+		var qa := maxf(float(q["amount"]), 0.001)
+		if i > at:
+			for k: String in ["lean", "turn", "clav"]:
+				worst[k] = maxf(worst[k], absf(float(s[k]) / a - float(q[k]) / qa))
+			worst["hand"] = maxf(worst["hand"], ((s["hand"] as Vector3) / a).distance_to((q["hand"] as Vector3) / qa))
+		if i <= at + 6:
+			print("      %+.2f s %s share %.2f lean %+.2f turn %+.2f clav %.2f hand %+.2f %+.2f cm; give lean %+.2f turn %+.2f%s" % [
+				float(fr[i]["lt"]), fr[i]["leg"], a, s["lean"], s["turn"], s["clav"], (s["hand"] as Vector3).y, (s["hand"] as Vector3).z,
+				float(s["lean"]) / a, float(s["turn"]) / a, "  <- the long frame" if i == at else ""])
+	print("    after the long frame, the give's largest one-frame step: lean %.2f, turn %.2f, clav %.2f deg, hand %.2f cm" % [
+		worst["lean"], worst["turn"], worst["clav"], worst["hand"]])
+
+
+## The frames about the leg's largest one-frame step of the turn's or the hand yaw's output, each with its event and reset count.
+func _print_worst(fr: Array, leg: String) -> void:
+	var at := -1
+	var most := -1.0
+	for i in range(1, fr.size()):
+		var s: Dictionary = fr[i]["sway"]
+		var q: Dictionary = fr[i - 1]["sway"]
+		if str(fr[i]["leg"]) != leg or s.is_empty() or q.is_empty():
+			continue
+		var d := maxf(absf(float(s["turn"]) - float(q["turn"])), absf(float(s["yaw"]) - float(q["yaw"])))
+		if d > most:
+			most = d
+			at = i
+	for i in range(maxi(at - 6, 0), mini(at + 4, fr.size())):
+		var s: Dictionary = fr[i]["sway"]
+		if s.is_empty():
+			continue
+		print("      %+.2f s %s %s share %.2f turn %+.2f yaw %+.2f lean %+.2f resets %d%s" % [float(fr[i]["lt"]), fr[i]["leg"], str(fr[i]["event"]),
+			float(s["amount"]), s["turn"], s["yaw"], s["lean"], int(s["resets"]), "  <- the largest step" if i == at else ""])
 
 
 ## Steady at 30 fps and at 100 ms frames: the outputs finite, their extremes near the 50 fps run's, the rows' (a) range too.
@@ -749,8 +843,9 @@ func _bounds(ctx: Dictionary, sway: Node) -> Dictionary:
 
 ## The run's most against each bound, and its breaks: {"breaks": {"<bound> (<leg>)": frames}, "line"}.
 func _breaks(fr: Array) -> Dictionary:
-	var m := {"chin": -INF, "shoulder": -INF, "Lb": 0.0, "Lt": 0.0, "Rb": 0.0, "Rt": 0.0, "clear": INF, "lamp": INF, "thigh": INF, "rgrip": 0.0, "overlap": 0.0}
+	var m := {"chin": -INF, "shoulder": -INF, "Lb": 0.0, "Lt": 0.0, "Rb": 0.0, "Rt": 0.0, "clear": INF, "lamp": INF, "thigh": INF, "rgrip": 0.0, "lgrip": 0.0, "overlap": 0.0}
 	var breaks := {}
+	var lgap := {}
 	var n := 0
 	for f: Dictionary in fr:
 		var r: Dictionary = f["bounds"]
@@ -766,6 +861,8 @@ func _breaks(fr: Array) -> Dictionary:
 		m["lamp"] = minf(m["lamp"], r["lamp"])
 		m["thigh"] = minf(m["thigh"], r["thigh"])
 		m["rgrip"] = maxf(m["rgrip"], r["rgrip"])
+		m["lgrip"] = maxf(m["lgrip"], r["lgrip"])
+		lgap[f["leg"]] = maxf(float(lgap.get(f["leg"], 0.0)), r["lgrip"])
 		var why: Array[String] = []
 		if float(r["overlap"]) > 0.0:
 			why.append("overlap")
@@ -791,8 +888,8 @@ func _breaks(fr: Array) -> Dictionary:
 	var parts: Array[String] = []
 	for k: String in breaks:
 		parts.append("%s x%d" % [k, breaks[k]])
-	return {"breaks": breaks, "line": "%d frames: overlap %.0f, chin %.3f, shoulder %.3f, wrists L %.0f/%.0f R %.0f/%.0f, arm off head %.3f, lamp %.3f, thigh %.3f, R target %.4f; breaks %s" % [
-		n, m["overlap"], m["chin"], m["shoulder"], m["Lb"], m["Lt"], m["Rb"], m["Rt"], m["clear"], m["lamp"], m["thigh"], m["rgrip"],
+	return {"breaks": breaks, "lgap": lgap, "line": "%d frames: overlap %.0f, chin %.3f, shoulder %.3f, wrists L %.0f/%.0f R %.0f/%.0f, arm off head %.3f, lamp %.3f, thigh %.3f, R target %.4f, L gap %.4f; breaks %s" % [
+		n, m["overlap"], m["chin"], m["shoulder"], m["Lb"], m["Lt"], m["Rb"], m["Rt"], m["clear"], m["lamp"], m["thigh"], m["rgrip"], m["lgrip"],
 		", ".join(parts) if not parts.is_empty() else "none"]}
 
 
