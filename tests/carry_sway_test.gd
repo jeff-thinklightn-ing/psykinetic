@@ -9,7 +9,7 @@ extends Node
 ## HEAD_PITCH_ALLOW; every bound the carry keeps (the chin, the shoulders, the wrists, the left arm off the head, the
 ## lantern, the thighs, the grips) read every BOUND_EVERY'th carried frame, and the sway on breaks none the rigid
 ## carry does not break on the same leg; the four rows, failing on the rigid carry and passing on the sway: (a) at the
-## jog, the weapon's head moving A_RANGE or more in the upper chest's frame, its low A_LAG or more after the hips'
+## jog, the weapon's head moving A_RANGE or more in the rigid carry's upper chest's frame, its low A_LAG or more after the hips'
 ## low; (b) at the start, behind the rigid carry's place B_BEHIND or more for B_TIME; (c) at the stop, ahead of it
 ## during the hold (J2's room only; the shipped carry has none ahead there, printed); (d) at the turn, its bearing
 ## D_LAG behind the rigid carry's. Off means off: a one-hander, a blow from a run, every frame the carry is out (the
@@ -32,10 +32,11 @@ const REPEAT := 0.0001
 ## (Client3D's roused look, twice a second), 0.52 at the stop on the man's j2 run.
 const HEAD_REPEAT := 1.0
 ## With the sway on: the lower body against the rigid run's (m), and the head's yaw and pitch (deg; the neck keeps
-## its pose as the spine leans, so the head turns little: measured 0.3 and 4.5 on the probe, tune17).
+## its global pose as the spine leans, so the drawn head does not turn: 0.00 and 0.00 on every frame, each run's settle
+## from the stand's first frame).
 const LOWER_SAME := 0.001
 const HEAD_YAW_ALLOW := 0.5
-const HEAD_PITCH_ALLOW := 5.0
+const HEAD_PITCH_ALLOW := 0.5
 ## The rows (d8's step-2 call): (a) range (m) and lag (s); (b) behind (m) for (s); (c) ahead (m); (d) lag (deg).
 const A_RANGE := 0.02
 const A_LAG := 0.05
@@ -171,6 +172,16 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 	rig._settle = 0.0
 	rig._settle_rising = false
 	rig._settle_stood = 0.0
+	# The stop's settle blends the trunk to the stand clip where that clip stands; its place carries from the run before
+	# (no seek: it advances only while settling), so each run's stop met the stand at another moment (0.02 s against
+	# 0.62, the head 4.5 degrees apart with every sway output 0). Every run's settle starts the stand at its first frame.
+	# (Its place is a read-only parameter: the node is made again, so the tree starts it at 0.)
+	var root := rig._root as AnimationNodeBlendTree
+	var fresh := AnimationNodeAnimation.new()
+	fresh.animation = (root.get_node("settle_clip") as AnimationNodeAnimation).animation
+	root.remove_node("settle_clip")
+	root.add_node("settle_clip", fresh)
+	root.connect_node("settle", 1, "settle_clip")
 	rig.every = 1
 	AnimRig._clock_movie = 1
 	AnimRig._clock_frame = Engine.get_process_frames()
@@ -187,9 +198,18 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 	var bctx := _bounds_context(puppet, model, sk, held) if bounds and held != null else {}
 	if not bctx.is_empty():
 		await _frames(2)
-	var head := sk.find_bone("Head")
-	var uc := sk.find_bone("UpperChest")
-	var hips := sk.find_bone("Hips")
+	# The pose as drawn, the modifiers in (the sway's, the reach's): read at BoneAttachment3Ds, which follow the
+	# skeleton once its modifiers have run. Skeleton3D.get_bone_global_pose is the animation's pose, the modifiers'
+	# work given back after the draw (it read the body's head 0.00 cm ahead under a 5 degree lean).
+	var drawn := {}
+	for b: String in LOWER + ["Neck", "Head", "UpperChest"]:
+		if bctx.is_empty():
+			var att := BoneAttachment3D.new()
+			att.bone_name = b
+			sk.add_child(att)
+			drawn[b] = att
+		else:
+			drawn[b] = bctx["at"][sk.find_bone(b)]
 	player.step_pace = 0.0
 	for i in int(roundf(1.0 / dt)):
 		await _step(puppet, player, rig, dt)
@@ -230,24 +250,33 @@ func _drive(body: String, weapon: String, on: bool, legs: Array, dt: float, ev: 
 			t += dt
 			var w := held.global_transform * top if held != null else Vector3.ZERO
 			var mb := model.global_basis.orthonormalized()
-			var hb := (mb.inverse() * (sk.global_basis * sk.get_bone_global_pose(head).basis)).orthonormalized()
+			var hb := (mb.inverse() * (drawn["Head"] as Node3D).global_basis).orthonormalized()
 			var fwd := hb * Vector3(0, 0, 1)
 			var lower := []
 			for b: String in LOWER:
 				var k := sk.find_bone(b)
-				lower.append((sk.global_transform * sk.get_bone_global_pose(k).origin) if k >= 0 else Vector3.ZERO)
-			var hips_w := sk.global_transform * sk.get_bone_global_pose(hips).origin
-			var ug := sk.global_transform * sk.get_bone_global_pose(uc)
+				lower.append((drawn[b] as Node3D).global_position if k >= 0 else Vector3.ZERO)
+			var hips_w: Vector3 = (drawn["Hips"] as Node3D).global_position
+			# The rigid carry's upper chest: the animation's pose, which the sway never writes (its spine's lean is a
+			# modifier's), so the weapon's head read in it is its give against the rigid carry, the trunk's and the
+			# hands' together; in the drawn upper chest ("ucd") the hands' share alone.
+			var ug := sk.global_transform * sk.get_bone_global_pose(sk.find_bone("UpperChest"))
+			var ugd: Transform3D = (drawn["UpperChest"] as Node3D).global_transform
 			var sway: Node = puppet.get_meta("sway") if puppet.has_meta("sway") else null
 			frames.append({"leg": leg[0], "lt": lt + dt, "amount": rig.carry_amount(), "hips": hips_w.y,
-				"uc": ug.basis.orthonormalized().inverse() * (w - ug.origin), "rel": mb.inverse() * (w - hips_w),
+				"uc": ug.basis.orthonormalized().inverse() * (w - ug.origin),
+				"ucd": ugd.basis.orthonormalized().inverse() * (w - ugd.origin), "rel": mb.inverse() * (w - hips_w),
 				"yaw": rad_to_deg(atan2(fwd.x, fwd.z)), "pitch": rad_to_deg(asin(clampf(fwd.y, -1.0, 1.0))), "lower": lower,
 				"event": event, "striking": rig.striking(),
+				"headp": mb.inverse() * ((drawn["Head"] as Node3D).global_position - model.global_position),
 				"bounds": _bounds(bctx, sway) if not bctx.is_empty() and rig.carry_amount() > 0.01 and frames.size() % BOUND_EVERY == 0 else {},
 				"sway": {} if sway == null else {"active": sway.active, "amount": sway.amount, "lean": sway.lean, "turn": sway.turn,
 					"clav": sway.clav, "hand": (sway.hand_off as Vector3) * 100.0, "yaw": sway.yaw, "resets": sway.resets}})
 	if not bctx.is_empty():
 		for on_bone: Node in (bctx["at"] as Dictionary).values():
+			on_bone.queue_free()
+	else:
+		for on_bone: Node in drawn.values():
 			on_bone.queue_free()
 	AnimRig._clock_movie = -1
 	AnimRig._clock_frame = -1
@@ -300,6 +329,7 @@ func _check_runs(name: String, placing: String, off: Array, on: Array, again: Ar
 		"%s: the rigid run repeats (lower body %.5f m at %s, head yaw %.2f, pitch %.2f deg at %s; first over %.4f m: %s)" % [
 		name, rep[0], rep[1], rep[2], rep[3], rep[4], REPEAT, _first_over(off, again)])
 	var same := _against(off, on)
+	_steady(name, off, on)
 	_check(same[0] <= LOWER_SAME, "%s: sway on, the hips, legs and feet within %.3f m of the rigid run's every frame (most %.5f m, %s)" % [
 		name, LOWER_SAME, same[0], same[1]])
 	_check(same[2] <= HEAD_YAW_ALLOW and same[3] <= HEAD_PITCH_ALLOW, "%s: sway on, the head's facing within %.1f deg yaw, %.1f pitch of the rigid run's (%.2f, %.2f at %s)" % [
@@ -332,9 +362,10 @@ func _check_runs(name: String, placing: String, off: Array, on: Array, again: Ar
 	# The rows.
 	var a_off := _row_a(off)
 	var a_on := _row_a(on)
+	var a_hands := _row_a(on, "ucd")
 	_check(a_off[0] < A_RANGE and a_on[0] >= A_RANGE and a_on[1] >= A_LAG,
-		"%s: (a) jog: the head's range in the upper chest's frame %.1f cm rigid, %.1f cm (%.1f px) on; its height follows the hips' %.2f s behind (best correlation; each step's low after the hips' %s s, mean %.2f)" % [
-		name, a_off[0] * 100, a_on[0] * 100, a_on[0] * 100 * _px_per_cm, a_on[1], a_on[2], a_on[3]])
+		"%s: (a) jog: the head's range in the rigid carry's upper chest's frame %.1f cm rigid, %.1f cm (%.1f px) on (the hands' share, in the drawn chest's, %.1f cm); its height follows the hips' %.2f s behind (best correlation; each step's low after the hips' %s s, mean %.2f)" % [
+		name, a_off[0] * 100, a_on[0] * 100, a_on[0] * 100 * _px_per_cm, a_hands[0] * 100, a_on[1], a_on[2], a_on[3]])
 	var b_rig := _row_b(off, again)
 	var b := _row_b(on, off)
 	_check(b_rig[0] < B_TIME and b[0] >= B_TIME, "%s: (b) start: behind the rigid carry's place by %.1f cm or more till %.2f s from the first step (rigid %.2f s); most %.1f cm (%.1f px)" % [
@@ -375,6 +406,29 @@ func _against(a: Array, b: Array) -> Array:
 	return [low, where, hy, hp, hwhere]
 
 
+## The steady give at each gait (the leg's second half, the sway on against the rigid run): the spine's lean (deg), how
+## far it carries the body's head ahead (its Head bone, in the body's frame) and the weapon's head (cm). Printed, no check.
+func _steady(name: String, off: Array, on: Array) -> void:
+	for leg: String in ["walk", "jog", "sprint"]:
+		var n := 0
+		var lean := 0.0
+		var hz := 0.0
+		var wz := 0.0
+		var t_end := 0.0
+		for f: Dictionary in on:
+			if str(f["leg"]) == leg:
+				t_end = maxf(t_end, float(f["lt"]))
+		for i in mini(off.size(), on.size()):
+			if str(on[i]["leg"]) != leg or float(on[i]["lt"]) < t_end * 0.5 or (on[i]["sway"] as Dictionary).is_empty():
+				continue
+			n += 1
+			lean += float(on[i]["sway"]["lean"])
+			hz += (on[i]["headp"] as Vector3).z - (off[i]["headp"] as Vector3).z
+			wz += (on[i]["rel"] as Vector3).z - (off[i]["rel"] as Vector3).z
+		print("  steady %s %s: lean %.2f deg, the body's head ahead %.2f cm, the weapon's head ahead %.2f cm (%d frames, the leg's second half)" % [
+			name, leg, lean / maxf(n, 1), hz / maxf(n, 1) * 100.0, wz / maxf(n, 1) * 100.0, n])
+
+
 func _first_over(a: Array, b: Array) -> String:
 	for i in mini(a.size(), b.size()):
 		for k in (a[i]["lower"] as Array).size():
@@ -384,18 +438,19 @@ func _first_over(a: Array, b: Array) -> String:
 	return "none"
 
 
-## (a) the jog before the turn: the head's range in the upper chest's frame, and each hips' low to the head's next
+## (a) the jog before the turn: the head's range in the upper chest's frame ([param key]: "uc" the rigid carry's, "ucd"
+## the drawn), and each hips' low to the head's next
 ## low there (within a step: the load answers the step's dip, so a low before the hips' is the last step's): [range,
 ## mean lag, the lags].
-func _row_a(fr: Array) -> Array:
+func _row_a(fr: Array, key := "uc") -> Array:
 	var seg := fr.filter(func(f: Dictionary) -> bool: return str(f["leg"]) == "jog" and float(f["lt"]) > 0.4 and float(f["lt"]) <= TURN_AT)
 	if seg.size() < 10:
 		return [0.0, 0.0, "", 0.0]
 	var lo := INF
 	var hi := -INF
 	for f: Dictionary in seg:
-		lo = minf(lo, (f["uc"] as Vector3).y)
-		hi = maxf(hi, (f["uc"] as Vector3).y)
+		lo = minf(lo, (f[key] as Vector3).y)
+		hi = maxf(hi, (f[key] as Vector3).y)
 	var lows: Array[int] = []
 	for i in range(1, seg.size() - 1):
 		if float(seg[i]["hips"]) < float(seg[i - 1]["hips"]) and float(seg[i]["hips"]) <= float(seg[i + 1]["hips"]):
@@ -409,7 +464,7 @@ func _row_a(fr: Array) -> Array:
 	for i: int in lows:
 		var best := -1
 		for j in range(i, mini(i + int(ceilf(step)), seg.size() - 1)):
-			if j > 0 and float(seg[j]["uc"].y) <= float(seg[j - 1]["uc"].y) and float(seg[j]["uc"].y) <= float(seg[j + 1]["uc"].y):
+			if j > 0 and float(seg[j][key].y) <= float(seg[j - 1][key].y) and float(seg[j][key].y) <= float(seg[j + 1][key].y):
 				best = j
 				break
 		if best >= 0:
@@ -427,12 +482,12 @@ func _row_a(fr: Array) -> Array:
 		var mu := 0.0
 		for i in range(0, seg.size() - lag):
 			mh += float(seg[i]["hips"])
-			mu += float(seg[i + lag]["uc"].y)
+			mu += float(seg[i + lag][key].y)
 			m += 1
 		mh /= m
 		mu /= m
 		for i in range(0, seg.size() - lag):
-			c += (float(seg[i]["hips"]) - mh) * (float(seg[i + lag]["uc"].y) - mu)
+			c += (float(seg[i]["hips"]) - mh) * (float(seg[i + lag][key].y) - mu)
 		c /= m
 		if c > best:
 			best = c
